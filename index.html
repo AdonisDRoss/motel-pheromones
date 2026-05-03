@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v0.8</title>
+<title>Motel Pheromones v0.9</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
@@ -28,7 +28,6 @@ canvas {
 <body>
 <script>
 
-// ================= TITLE =================
 class TitleScene extends Phaser.Scene {
   constructor(){ super("TitleScene"); }
 
@@ -100,14 +99,11 @@ class TitleScene extends Phaser.Scene {
   }
 }
 
-// ================= CHARACTER SELECT =================
 class CharacterSelectScene extends Phaser.Scene {
   constructor(){ super("CharacterSelectScene"); }
 
   create(){
     this.add.image(480,270,"characterSelect").setDisplaySize(960,540);
-
-    this.characters=["DONNY","JT","HEW"];
 
     const spots=[
       {x:300,y:270,w:210,h:340,name:"DONNY"},
@@ -143,14 +139,19 @@ class CharacterSelectScene extends Phaser.Scene {
   }
 }
 
-// ================= LEVEL SELECT =================
 class LevelSelectScene extends Phaser.Scene {
   constructor(){ super("LevelSelectScene"); }
 
   create(data){
-    this.selectedCharacter=data.character;
+    this.selectedCharacter=data.character || "JT";
 
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+
+    this.confirmText=this.add.text(480,500,"TAP A LEVEL",{
+      fontFamily:"monospace",
+      fontSize:"22px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5);
 
     this.levels=[
       {x:180,y:270,w:160,h:300,name:"HOUSE PARTY"},
@@ -161,37 +162,40 @@ class LevelSelectScene extends Phaser.Scene {
     ];
 
     this.outline=this.add.rectangle(180,270,160,300,0xff4fc3,0)
-      .setStrokeStyle(4,0xff4fc3);
+      .setStrokeStyle(5,0xff4fc3);
 
     this.levels.forEach((l)=>{
       this.add.rectangle(l.x,l.y,l.w,l.h,0xff0000,0)
         .setInteractive()
-        .on("pointerdown",()=>{
-          this.outline.setPosition(l.x,l.y);
-          this.outline.setSize(l.w,l.h);
+        .on("pointerdown",()=>this.confirmLevel(l));
+    });
+  }
 
-          let glow=this.add.rectangle(l.x,l.y,l.w+20,l.h+20,0xff4fc3,0.25);
-          this.tweens.add({
-            targets:glow,
-            alpha:0,
-            scaleX:1.1,
-            scaleY:1.1,
-            duration:180,
-            onComplete:()=>glow.destroy()
-          });
+  confirmLevel(level){
+    this.outline.setPosition(level.x,level.y);
+    this.outline.setSize(level.w,level.h);
 
-          this.time.delayedCall(180,()=>{
-            this.scene.start("GameScene",{
-              character:this.selectedCharacter,
-              level:l.name
-            });
-          });
-        });
+    this.confirmText.setText("SELECTED: " + level.name);
+
+    let glow=this.add.rectangle(level.x,level.y,level.w+24,level.h+24,0xff4fc3,0.25);
+    this.tweens.add({
+      targets:glow,
+      alpha:0,
+      scaleX:1.08,
+      scaleY:1.08,
+      duration:250,
+      onComplete:()=>glow.destroy()
+    });
+
+    this.time.delayedCall(650,()=>{
+      this.scene.start("GameScene",{
+        character:this.selectedCharacter,
+        level:level.name
+      });
     });
   }
 }
 
-// ================= GAME =================
 class GameScene extends Phaser.Scene {
   constructor(){ super("GameScene"); }
 
@@ -201,6 +205,9 @@ class GameScene extends Phaser.Scene {
     this.add.text(20,20,"CHAR: "+data.character,{color:"#fff"});
     this.add.text(20,50,"LEVEL: "+data.level,{color:"#ff4fc3"});
 
+    this.depthMin=210;
+    this.depthMax=430;
+
     this.facing=1;
     this.isAttacking=false;
     this.moveX=0;
@@ -208,7 +215,9 @@ class GameScene extends Phaser.Scene {
 
     this.createJTAnimations();
 
-    this.player=this.physics.add.sprite(200,300,"jt");
+    this.shadow=this.add.ellipse(200,330,52,14,0x000000,0.35);
+
+    this.player=this.physics.add.sprite(200,320,"jt");
     this.player.setScale(1.4);
     this.player.setCollideWorldBounds(true);
     this.player.play("jt_idle");
@@ -217,11 +226,12 @@ class GameScene extends Phaser.Scene {
 
     for(let i=0;i<5;i++){
       let e=this.physics.add.rectangle(
-        500+i*70,
-        300+Phaser.Math.Between(-40,40),
+        520+i*70,
+        320+Phaser.Math.Between(-40,40),
         40,60,0xff3355
       );
       e.hp=30;
+      e.speed=70;
       this.enemies.add(e);
     }
 
@@ -233,6 +243,8 @@ class GameScene extends Phaser.Scene {
 
     if(!this.isAttacking){
       this.player.body.setVelocity(this.moveX*speed,this.moveY*speed);
+
+      this.player.y=Phaser.Math.Clamp(this.player.y,this.depthMin,this.depthMax);
 
       if(this.moveX!==0 || this.moveY!==0){
         this.player.play("jt_walk",true);
@@ -251,7 +263,36 @@ class GameScene extends Phaser.Scene {
       }
     }
 
+    this.shadow.x=this.player.x;
+    this.shadow.y=this.player.y+42;
+    this.shadow.depth=this.player.y-1;
     this.player.depth=this.player.y;
+
+    this.updateEnemies();
+  }
+
+  updateEnemies(){
+    this.enemies.children.iterate(e=>{
+      if(!e || e.hp<=0) return;
+
+      e.y=Phaser.Math.Clamp(e.y,this.depthMin,this.depthMax);
+      e.depth=e.y;
+
+      let dx=this.player.x-e.x;
+      let dy=this.player.y-e.y;
+
+      if(Math.abs(dy)>12){
+        e.body.setVelocityY(Math.sign(dy)*e.speed);
+      } else {
+        e.body.setVelocityY(0);
+      }
+
+      if(Math.abs(dx)>55){
+        e.body.setVelocityX(Math.sign(dx)*e.speed);
+      } else {
+        e.body.setVelocityX(0);
+      }
+    });
   }
 
   createJTAnimations(){
@@ -267,16 +308,9 @@ class GameScene extends Phaser.Scene {
 
     makeAnim("jt_idle",0,3,6,-1);
     makeAnim("jt_walk",16,21,10,-1);
-    makeAnim("jt_jump",32,34,8,0);
-    makeAnim("jt_crouch",48,50,6,0);
-    makeAnim("jt_dash",64,67,12,0);
-    makeAnim("jt_climb",80,83,8,0);
     makeAnim("jt_light",96,99,14,0);
     makeAnim("jt_heavy",112,116,10,0);
     makeAnim("jt_kick",128,131,10,0);
-    makeAnim("jt_hurt",144,146,8,0);
-    makeAnim("jt_ko",160,163,6,0);
-    makeAnim("jt_spin",176,181,14,0);
     makeAnim("jt_missile",192,194,8,0);
   }
 
@@ -299,19 +333,21 @@ class GameScene extends Phaser.Scene {
 
   attack(range,damage,knockback){
     this.enemies.children.iterate(e=>{
-      if(!e||e.hp<=0)return;
+      if(!e || e.hp<=0) return;
 
-      let dist=Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y);
+      let xDist=Math.abs(this.player.x-e.x);
+      let yDist=Math.abs(this.player.y-e.y);
 
-      if(dist<range){
+      if(xDist<range && yDist<42){
         e.hp-=damage;
-        let dir=e.x>this.player.x?1:-1;
+
+        let dir=e.x>this.player.x ? 1 : -1;
         e.body.setVelocityX(dir*knockback);
 
         e.setFillStyle(0xffff00);
 
         this.time.delayedCall(120,()=>{
-          if(e.hp>0)e.setFillStyle(0xff3355);
+          if(e.hp>0) e.setFillStyle(0xff3355);
         });
 
         if(e.hp<=0){
@@ -330,15 +366,13 @@ class GameScene extends Phaser.Scene {
 
     this.time.delayedCall(220,()=>{
       let stick=this.physics.add.rectangle(
-        this.player.x + this.facing*55,
-        this.player.y - 10,
+        this.player.x+this.facing*55,
+        this.player.y-10,
         28,8,
         0xffffff
       );
 
       stick.body.setVelocityX(this.facing*420);
-      stick.life=1200;
-
       let glow=this.add.circle(stick.x,stick.y,14,0xffffff,0.35);
 
       let timer=this.time.addEvent({
@@ -346,21 +380,25 @@ class GameScene extends Phaser.Scene {
         repeat:75,
         callback:()=>{
           if(!stick.body) return;
+
           glow.setPosition(stick.x,stick.y);
 
           this.enemies.children.iterate(e=>{
-            if(!e||e.hp<=0||!stick.body)return;
+            if(!e || e.hp<=0 || !stick.body) return;
 
-            let hit=Phaser.Math.Distance.Between(stick.x,stick.y,e.x,e.y);
-            if(hit<45){
+            let xDist=Math.abs(stick.x-e.x);
+            let yDist=Math.abs(stick.y-e.y);
+
+            if(xDist<45 && yDist<45){
               e.hp-=15;
               e.setFillStyle(0xffff00);
               e.body.setVelocityX(this.facing*300);
+
               stick.destroy();
               glow.destroy();
 
               this.time.delayedCall(120,()=>{
-                if(e.hp>0)e.setFillStyle(0xff3355);
+                if(e.hp>0) e.setFillStyle(0xff3355);
               });
 
               if(e.hp<=0){
@@ -388,8 +426,8 @@ class GameScene extends Phaser.Scene {
   makeControls(){
     const baseX=120, baseY=420, r=60;
 
-    const stickBase=this.add.circle(baseX,baseY,r,0xffffff,0.12).setDepth(999);
     const stick=this.add.circle(baseX,baseY,30,0xffffff,0.4).setDepth(1000);
+    this.add.circle(baseX,baseY,r,0xffffff,0.12).setDepth(999);
 
     let dragging=false;
 
@@ -453,7 +491,6 @@ class GameScene extends Phaser.Scene {
   }
 }
 
-// ================= CONFIG =================
 const config={
   type:Phaser.AUTO,
   width:960,
