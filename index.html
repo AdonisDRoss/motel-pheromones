@@ -2,130 +2,111 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v0.6</title>
+<title>Motel Pheromones v0.7</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
 <style>
 html, body {
-  margin: 0;
-  padding: 0;
-  background: #000;
-  width: 100vw;
-  height: 100dvh;
-  overflow: hidden;
-  touch-action: none;
+  margin:0;
+  padding:0;
+  background:#000;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
 }
 
 canvas {
-  display: block;
-  width: 100vw !important;
-  height: 100dvh !important;
-  object-fit: contain;
-  image-rendering: pixelated;
+  width:100vw !important;
+  height:100vh !important;
+  object-fit:contain;
+  image-rendering:pixelated;
 }
 </style>
 </head>
 
 <body>
-
 <script>
 
 // ================= TITLE =================
 class TitleScene extends Phaser.Scene {
-  constructor() { super("TitleScene"); }
+  constructor(){ super("TitleScene"); }
 
-  preload() {
-    this.load.image("title", "assets/title-screen.png");
-    this.load.image("characterSelect", "assets/character-select.png");
-    this.load.image("levelSelect", "assets/level-select.png");
+  preload(){
+    this.load.image("title","assets/title-screen.png");
+    this.load.image("characterSelect","assets/character-select.png");
+    this.load.image("levelSelect","assets/level-select.png");
+
+    // OPTIONAL PLAYER SPRITE
+    this.load.spritesheet("jt","assets/player/jt.png",{
+      frameWidth:128,
+      frameHeight:128
+    });
   }
 
-  create() {
+  create(){
     this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    // Rain
-    this.rain = [];
-    for (let i = 0; i < 120; i++) {
-      let drop = this.add.rectangle(
+    // rain
+    this.rain=[];
+    for(let i=0;i<120;i++){
+      let d=this.add.rectangle(
         Phaser.Math.Between(0,960),
         Phaser.Math.Between(0,540),
-        2,
-        12,
-        0x66ccff,
-        0.5
+        2,12,0x66ccff,0.5
       );
-      drop.speed = Phaser.Math.Between(300,500);
-      this.rain.push(drop);
+      d.speed=Phaser.Math.Between(300,500);
+      this.rain.push(d);
     }
 
-    // Fog
-    this.fogLayers = [];
-    for (let i = 0; i < 3; i++) {
-      let fog = this.add.rectangle(
+    // fog
+    this.fog=[];
+    for(let i=0;i<3;i++){
+      let f=this.add.rectangle(
         480,
         Phaser.Math.Between(200,500),
-        1000,
-        120,
-        0xff0088,
-        0.08
+        1000,120,0xff0088,0.08
       );
-      fog.speed = Phaser.Math.FloatBetween(0.2,0.6);
-      fog.dir = Math.random() > 0.5 ? 1 : -1;
-      this.fogLayers.push(fog);
+      f.speed=Phaser.Math.FloatBetween(0.2,0.6);
+      f.dir=Math.random()>0.5?1:-1;
+      this.fog.push(f);
     }
 
-    // Lightning
-    this.lightningFlash = this.add.rectangle(480,270,960,540,0xffffff,0);
+    // lightning
+    this.flash=this.add.rectangle(480,270,960,540,0xffffff,0);
 
-    const start = this.add.text(480,470,"TAP TO START",{
-      fontFamily:"monospace",
-      fontSize:"28px",
-      color:"#ff4fc3"
-    }).setOrigin(0.5).setInteractive();
+    let start=this.add.text(480,470,"TAP TO START",{fontSize:"28px",color:"#ff4fc3"})
+      .setOrigin(0.5)
+      .setInteractive();
 
-    this.tweens.add({
-      targets:start,
-      alpha:0.2,
-      duration:700,
-      yoyo:true,
-      repeat:-1
-    });
+    this.tweens.add({targets:start,alpha:0.2,duration:700,yoyo:true,repeat:-1});
 
     start.on("pointerdown",()=>this.scene.start("CharacterSelectScene"));
   }
 
-  update() {
-    this.rain.forEach(drop => {
-      drop.y += drop.speed * 0.016;
-      if (drop.y > 540) {
-        drop.y = 0;
-        drop.x = Phaser.Math.Between(0,960);
+  update(){
+    this.rain.forEach(d=>{
+      d.y+=d.speed*0.016;
+      if(d.y>540){
+        d.y=0;
+        d.x=Phaser.Math.Between(0,960);
       }
     });
 
-    this.fogLayers.forEach(fog => {
-      fog.x += fog.speed * fog.dir;
-      if (fog.x > 1100) fog.x = -100;
-      if (fog.x < -100) fog.x = 1100;
+    this.fog.forEach(f=>{
+      f.x+=f.speed*f.dir;
+      if(f.x>1100)f.x=-100;
+      if(f.x<-100)f.x=1100;
     });
 
-    // Lightning random flash
-    if (Phaser.Math.Between(0,1000) > 995) {
-      this.lightningFlash.setAlpha(0.75);
-
-      this.time.delayedCall(60, () => {
-        this.lightningFlash.setAlpha(0);
-      });
-
-      this.time.delayedCall(120, () => {
-        this.lightningFlash.setAlpha(0.45);
-
-        this.time.delayedCall(40, () => {
-          this.lightningFlash.setAlpha(0);
-        });
+    if(Phaser.Math.Between(0,1000)>995){
+      this.flash.setAlpha(0.7);
+      this.time.delayedCall(60,()=>this.flash.setAlpha(0));
+      this.time.delayedCall(120,()=>{
+        this.flash.setAlpha(0.4);
+        this.time.delayedCall(40,()=>this.flash.setAlpha(0));
       });
     }
   }
@@ -141,51 +122,30 @@ class CharacterSelectScene extends Phaser.Scene {
     this.characters=["DONNY","JT","HEW"];
     this.index=1;
 
-    this.charOutline=this.add.rectangle(480,270,240,360,0xff4fc3,0)
+    this.outline=this.add.rectangle(480,270,240,360,0xff4fc3,0)
       .setStrokeStyle(4,0xff4fc3);
 
-    this.updateChar();
-
-    const makeZone=(x,y,w,h,i)=>{
-      this.add.rectangle(x,y,w,h,0xff0000,0)
-        .setInteractive()
-        .on("pointerdown",()=>{
-          this.index=i;
-          this.updateChar();
-
-          let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
-          this.tweens.add({
-            targets:glow,
-            alpha:0,
-            scaleX:1.1,
-            scaleY:1.1,
-            duration:180,
-            onComplete:()=>glow.destroy()
-          });
-
-          this.time.delayedCall(180,()=>{
-            this.scene.start("LevelSelectScene",{
-              character:this.characters[this.index]
-            });
-          });
-        });
-    };
-
-    makeZone(300,270,210,340,0);
-    makeZone(480,270,240,360,1);
-    makeZone(690,270,210,340,2);
-  }
-
-  updateChar(){
     const spots=[
       {x:300,y:270,w:210,h:340},
       {x:480,y:270,w:240,h:360},
       {x:690,y:270,w:210,h:340}
     ];
 
-    let s=spots[this.index];
-    this.charOutline.setPosition(s.x,s.y);
-    this.charOutline.setSize(s.w,s.h);
+    const makeZone=(s,i)=>{
+      this.add.rectangle(s.x,s.y,s.w,s.h,0xff0000,0)
+        .setInteractive()
+        .on("pointerdown",()=>{
+          this.index=i;
+          this.outline.setPosition(s.x,s.y);
+          this.outline.setSize(s.w,s.h);
+
+          this.time.delayedCall(150,()=>{
+            this.scene.start("LevelSelectScene",{character:this.characters[i]});
+          });
+        });
+    };
+
+    spots.forEach((s,i)=>makeZone(s,i));
   }
 }
 
@@ -198,55 +158,31 @@ class LevelSelectScene extends Phaser.Scene {
 
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
-    this.levelSpots=[
+    this.levels=[
       {x:180,y:270,w:160,h:300,name:"HOUSE PARTY"},
-      {x:340,y:270,w:160,h:300,name:"LEFTY'S INDOOR"},
-      {x:500,y:270,w:180,h:320,name:"LEFTY'S OUTDOOR"},
+      {x:340,y:270,w:160,h:300,name:"INDOOR"},
+      {x:500,y:270,w:180,h:320,name:"OUTDOOR"},
       {x:660,y:270,w:160,h:300,name:"LMNOP"},
-      {x:820,y:270,w:160,h:300,name:"CHICKEN COUPE"}
+      {x:820,y:270,w:160,h:300,name:"CHICKEN"}
     ];
 
-    this.levelIndex=0;
-
-    this.levelOutline=this.add.rectangle(180,270,160,300,0xff4fc3,0)
+    this.outline=this.add.rectangle(180,270,160,300,0xff4fc3,0)
       .setStrokeStyle(4,0xff4fc3);
 
-    this.updateOutline();
-
-    this.levelSpots.forEach((s,i)=>{
-      this.add.rectangle(s.x,s.y,s.w,s.h,0xff0000,0)
+    this.levels.forEach((l,i)=>{
+      this.add.rectangle(l.x,l.y,l.w,l.h,0xff0000,0)
         .setInteractive()
         .on("pointerdown",()=>{
-          this.levelIndex=i;
-          this.updateOutline();
+          this.outline.setPosition(l.x,l.y);
+          this.outline.setSize(l.w,l.h);
 
-          let glow=this.add.rectangle(s.x,s.y,s.w+20,s.h+20,0xff4fc3,0.25);
-          this.tweens.add({
-            targets:glow,
-            alpha:0,
-            scaleX:1.1,
-            scaleY:1.1,
-            duration:180,
-            onComplete:()=>glow.destroy()
-          });
-
-          this.time.delayedCall(180,()=>{
-            this.start(s.name);
+          this.time.delayedCall(150,()=>{
+            this.scene.start("GameScene",{
+              character:this.selectedCharacter,
+              level:l.name
+            });
           });
         });
-    });
-  }
-
-  updateOutline(){
-    let s=this.levelSpots[this.levelIndex];
-    this.levelOutline.setPosition(s.x,s.y);
-    this.levelOutline.setSize(s.w,s.h);
-  }
-
-  start(level){
-    this.scene.start("GameScene",{
-      character:this.selectedCharacter,
-      level:level
     });
   }
 }
@@ -258,25 +194,83 @@ class GameScene extends Phaser.Scene {
   create(data){
     this.add.rectangle(480,270,960,540,0x111111);
 
-    this.add.text(30,30,"GAME STARTED",{color:"#fff"});
-    this.add.text(30,70,"CHAR: "+data.character,{color:"#ff4fc3"});
-    this.add.text(30,100,"LEVEL: "+data.level,{color:"#fff"});
+    this.add.text(20,20,"CHAR: "+data.character,{color:"#fff"});
+    this.add.text(20,50,"LEVEL: "+data.level,{color:"#ff4fc3"});
 
-    this.player=this.physics.add.rectangle(200,300,50,70,0x00ffcc);
+    // player
+    if(this.textures.exists("jt")){
+      this.player=this.physics.add.sprite(200,300,"jt");
+    } else {
+      this.player=this.physics.add.rectangle(200,300,50,70,0x00ffcc);
+    }
+
+    this.player.body.setCollideWorldBounds(true);
+
+    // enemies
+    this.enemies=this.physics.add.group();
+
+    for(let i=0;i<5;i++){
+      let e=this.physics.add.rectangle(
+        500+i*70,
+        300+Phaser.Math.Between(-40,40),
+        40,60,0xff3355
+      );
+      e.hp=30;
+      this.enemies.add(e);
+    }
+
     this.makeControls();
   }
 
-  makeControls(){
-    const baseX=120, baseY=420, radius=60;
+  // ===== ATTACK SYSTEM =====
+  attack(range,damage,knock){
+    this.enemies.children.iterate(e=>{
+      if(!e||e.hp<=0)return;
 
-    const stickBase=this.add.circle(baseX,baseY,radius,0xffffff,0.1);
+      let dist=Phaser.Math.Distance.Between(
+        this.player.x,this.player.y,e.x,e.y
+      );
+
+      if(dist<range){
+        e.hp-=damage;
+
+        let dir=e.x>this.player.x?1:-1;
+        e.body.setVelocityX(dir*knock);
+
+        e.setFillStyle(0xffff00);
+
+        this.time.delayedCall(120,()=>{
+          if(e.hp>0)e.setFillStyle(0xff3355);
+        });
+
+        if(e.hp<=0){
+          e.setFillStyle(0x555555);
+          e.body.enable=false;
+        }
+      }
+    });
+  }
+
+  // ===== CONTROLS =====
+  makeControls(){
+    const baseX=120, baseY=420, r=60;
+
+    const stickBase=this.add.circle(baseX,baseY,r,0xffffff,0.1);
     const stick=this.add.circle(baseX,baseY,30,0xffffff,0.4);
 
     let dragging=false;
 
     this.input.on("pointerdown",p=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<radius+20){
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<r+20){
         dragging=true;
+      }
+
+      if(p.x>700){
+        this.attack(80,10,200);
+      }
+
+      if(p.x>850){
+        this.attack(120,20,400);
       }
     });
 
@@ -287,13 +281,14 @@ class GameScene extends Phaser.Scene {
       let dy=p.y-baseY;
       let dist=Math.sqrt(dx*dx+dy*dy);
 
-      if(dist>radius){
-        dx=dx/dist*radius;
-        dy=dy/dist*radius;
+      if(dist>r){
+        dx=dx/dist*r;
+        dy=dy/dist*r;
       }
 
       stick.x=baseX+dx;
       stick.y=baseY+dy;
+
       this.player.body.setVelocity(dx*3,dy*3);
     });
 
@@ -303,20 +298,6 @@ class GameScene extends Phaser.Scene {
       stick.y=baseY;
       this.player.body.setVelocity(0,0);
     });
-
-    // SNES buttons
-    this.add.circle(860,360,30,0xffffff,0.2);
-    this.add.circle(800,420,30,0xffffff,0.2);
-    this.add.circle(920,420,30,0xffffff,0.2);
-    this.add.circle(860,480,30,0xffffff,0.2);
-
-    this.add.text(850,350,"X",{color:"#fff"});
-    this.add.text(790,410,"Y",{color:"#fff"});
-    this.add.text(910,410,"A",{color:"#fff"});
-    this.add.text(850,470,"B",{color:"#fff"});
-
-    this.add.rectangle(480,500,100,30,0xffffff,0.2);
-    this.add.text(450,490,"START",{color:"#fff"});
   }
 }
 
@@ -325,21 +306,13 @@ const config={
   type:Phaser.AUTO,
   width:960,
   height:540,
-  backgroundColor:"#000",
-  scale:{
-    mode:Phaser.Scale.FIT,
-    autoCenter:Phaser.Scale.CENTER_BOTH
-  },
-  physics:{
-    default:"arcade",
-    arcade:{gravity:{y:0}}
-  },
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+  physics:{default:"arcade"},
   scene:[TitleScene,CharacterSelectScene,LevelSelectScene,GameScene]
 };
 
 new Phaser.Game(config);
 
 </script>
-
 </body>
 </html>
