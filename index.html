@@ -3,26 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <title>Motel Pheromones</title>
-
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-
   <style>
     body { margin: 0; background: #000; overflow: hidden; }
     canvas { display: block; margin: 0 auto; image-rendering: pixelated; }
   </style>
 </head>
-
 <body>
 
 <script>
-
-// =========================
-// TITLE SCENE
-// =========================
 class TitleScene extends Phaser.Scene {
-  constructor() {
-    super("TitleScene");
-  }
+  constructor() { super("TitleScene"); }
 
   preload() {
     this.load.image("title", "assets/title-screen.png");
@@ -33,45 +24,24 @@ class TitleScene extends Phaser.Scene {
     this.add.image(480, 270, "title").setDisplaySize(960, 540);
 
     this.glow = this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.06);
+    this.tweens.add({ targets: this.glow, alpha: 0.12, duration: 1200, yoyo: true, repeat: -1 });
 
-    this.tweens.add({
-      targets: this.glow,
-      alpha: 0.12,
-      duration: 1200,
-      yoyo: true,
-      repeat: -1
-    });
-
-    // RAIN
     this.rain = [];
     for (let i = 0; i < 120; i++) {
       let drop = this.add.rectangle(
         Phaser.Math.Between(0, 960),
         Phaser.Math.Between(0, 540),
-        2,
-        12,
-        0x66ccff,
-        0.5
+        2, 12, 0x66ccff, 0.5
       );
       drop.speed = Phaser.Math.Between(300, 500);
       this.rain.push(drop);
     }
 
-    // FOG
     this.fogLayers = [];
     for (let i = 0; i < 3; i++) {
-      let fog = this.add.rectangle(
-        480,
-        Phaser.Math.Between(200, 500),
-        1000,
-        120,
-        0xff0088,
-        0.08
-      );
-
+      let fog = this.add.rectangle(480, Phaser.Math.Between(200, 500), 1000, 120, 0xff0088, 0.08);
       fog.speed = Phaser.Math.FloatBetween(0.2, 0.6);
       fog.direction = Math.random() > 0.5 ? 1 : -1;
-
       this.fogLayers.push(fog);
     }
 
@@ -79,76 +49,19 @@ class TitleScene extends Phaser.Scene {
       fontFamily: "monospace",
       fontSize: "28px",
       color: "#ff4fc3"
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setInteractive();
 
-    this.tweens.add({
-      targets: pressStart,
-      alpha: 0.2,
-      duration: 700,
-      yoyo: true,
-      repeat: -1
-    });
-
-    const menuItems = ["START GAME", "OPTIONS", "CREDITS"];
-    let selected = 0;
-    let menuTexts = [];
-    let selector;
-
-    const drawMenu = () => {
-      menuTexts.forEach(t => t.destroy());
-      if (selector) selector.destroy();
-      menuTexts = [];
-
-      for (let i = 0; i < menuItems.length; i++) {
-        let color = i === selected ? "#ffffff" : "#888888";
-
-        let text = this.add.text(120, 300 + i * 40, menuItems[i], {
-          fontFamily: "monospace",
-          fontSize: "24px",
-          color: color
-        }).setInteractive();
-
-        text.on("pointerdown", () => {
-          selected = i;
-          drawMenu();
-
-          if (selected === 0) startGame.call(this);
-        });
-
-        menuTexts.push(text);
-      }
-
-      selector = this.add.text(90, 300 + selected * 40, "▶", {
-        fontSize: "24px",
-        color: "#ff4fc3"
-      });
-    };
-
-    drawMenu();
-
-    this.input.keyboard.on("keydown-UP", () => {
-      selected = (selected - 1 + menuItems.length) % menuItems.length;
-      drawMenu();
-    });
-
-    this.input.keyboard.on("keydown-DOWN", () => {
-      selected = (selected + 1) % menuItems.length;
-      drawMenu();
-    });
-
-    this.input.keyboard.on("keydown-ENTER", () => {
-      if (selected === 0) startGame.call(this);
-    });
-
-    pressStart.setInteractive();
-    pressStart.on("pointerdown", () => startGame.call(this));
+    this.tweens.add({ targets: pressStart, alpha: 0.2, duration: 700, yoyo: true, repeat: -1 });
 
     const startGame = () => {
       this.cameras.main.fadeOut(300);
-      this.time.delayedCall(300, () => {
-        this.scene.start("CharacterSelectScene");
-      });
+      this.time.delayedCall(300, () => this.scene.start("CharacterSelectScene"));
     };
+
+    pressStart.on("pointerdown", startGame);
+
+    this.input.keyboard.on("keydown-ENTER", startGame);
+    this.input.keyboard.on("keydown-SPACE", startGame);
   }
 
   update() {
@@ -168,42 +81,77 @@ class TitleScene extends Phaser.Scene {
   }
 }
 
-// =========================
-// CHARACTER SELECT
-// =========================
 class CharacterSelectScene extends Phaser.Scene {
-  constructor() {
-    super("CharacterSelectScene");
-  }
+  constructor() { super("CharacterSelectScene"); }
 
   create() {
     this.add.image(480, 270, "characterSelect").setDisplaySize(960, 540);
 
-    this.add.text(480, 500, "TAP TO SELECT", {
+    this.characters = ["DONNY", "JT", "HEW"];
+    this.selectedIndex = 1;
+
+    this.charText = this.add.text(480, 420, "", {
+      fontFamily: "monospace",
+      fontSize: "36px",
+      color: "#ffffff"
+    }).setOrigin(0.5);
+
+    this.updateSelection();
+
+    const left = this.add.text(90, 270, "◀", {
+      fontFamily: "monospace",
+      fontSize: "72px",
+      color: "#ff4fc3"
+    }).setOrigin(0.5).setInteractive();
+
+    const right = this.add.text(870, 270, "▶", {
+      fontFamily: "monospace",
+      fontSize: "72px",
+      color: "#ff4fc3"
+    }).setOrigin(0.5).setInteractive();
+
+    const select = this.add.text(480, 485, "TAP SELECT / PRESS ENTER", {
       fontFamily: "monospace",
       fontSize: "24px",
       color: "#ff4fc3"
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setInteractive();
 
-    this.input.on("pointerdown", () => {
-      this.scene.start("GameScene");
-    });
+    left.on("pointerdown", () => this.move(-1));
+    right.on("pointerdown", () => this.move(1));
+    select.on("pointerdown", () => this.selectCharacter());
 
-    this.input.keyboard.on("keydown-ENTER", () => {
-      this.scene.start("GameScene");
+    this.input.keyboard.on("keydown-LEFT", () => this.move(-1));
+    this.input.keyboard.on("keydown-RIGHT", () => this.move(1));
+    this.input.keyboard.on("keydown-ENTER", () => this.selectCharacter());
+  }
+
+  move(dir) {
+    this.selectedIndex = (this.selectedIndex + dir + this.characters.length) % this.characters.length;
+    this.updateSelection();
+  }
+
+  updateSelection() {
+    const name = this.characters[this.selectedIndex];
+    this.charText.setText(name);
+
+    this.tweens.add({
+      targets: this.charText,
+      scale: 1.2,
+      duration: 100,
+      yoyo: true
     });
+  }
+
+  selectCharacter() {
+    const chosen = this.characters[this.selectedIndex];
+    this.scene.start("GameScene", { character: chosen });
   }
 }
 
-// =========================
-// GAME SCENE
-// =========================
 class GameScene extends Phaser.Scene {
-  constructor() {
-    super("GameScene");
-  }
+  constructor() { super("GameScene"); }
 
-  create() {
+  create(data) {
     this.add.rectangle(480, 270, 960, 540, 0x151515);
 
     this.add.text(30, 30, "GAME STARTED", {
@@ -211,36 +159,32 @@ class GameScene extends Phaser.Scene {
       fontSize: "22px",
       color: "#ffffff"
     });
+
+    this.add.text(30, 70, "CHARACTER: " + (data.character || "DONNY"), {
+      fontFamily: "monospace",
+      fontSize: "22px",
+      color: "#ff4fc3"
+    });
   }
 }
 
-// =========================
-// CONFIG (LAST)
-// =========================
 const config = {
   type: Phaser.AUTO,
   width: 960,
   height: 540,
   backgroundColor: "#000",
-
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-
   physics: {
     default: "arcade",
-    arcade: {
-      gravity: { y: 0 },
-      debug: false
-    }
+    arcade: { gravity: { y: 0 }, debug: false }
   },
-
   scene: [TitleScene, CharacterSelectScene, GameScene]
 };
 
 new Phaser.Game(config);
-
 </script>
 
 </body>
