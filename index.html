@@ -4,14 +4,20 @@
   <meta charset="UTF-8" />
   <title>Motel Pheromones</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+
   <style>
     body { margin: 0; background: #000; overflow: hidden; }
     canvas { display: block; margin: 0 auto; image-rendering: pixelated; }
   </style>
 </head>
+
 <body>
 
 <script>
+
+// =========================
+// TITLE SCENE
+// =========================
 class TitleScene extends Phaser.Scene {
   constructor() { super("TitleScene"); }
 
@@ -26,6 +32,7 @@ class TitleScene extends Phaser.Scene {
     this.glow = this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.06);
     this.tweens.add({ targets: this.glow, alpha: 0.12, duration: 1200, yoyo: true, repeat: -1 });
 
+    // Rain
     this.rain = [];
     for (let i = 0; i < 120; i++) {
       let drop = this.add.rectangle(
@@ -37,9 +44,18 @@ class TitleScene extends Phaser.Scene {
       this.rain.push(drop);
     }
 
+    // Fog
     this.fogLayers = [];
     for (let i = 0; i < 3; i++) {
-      let fog = this.add.rectangle(480, Phaser.Math.Between(200, 500), 1000, 120, 0xff0088, 0.08);
+      let fog = this.add.rectangle(
+        480,
+        Phaser.Math.Between(200, 500),
+        1000,
+        120,
+        0xff0088,
+        0.08
+      );
+
       fog.speed = Phaser.Math.FloatBetween(0.2, 0.6);
       fog.direction = Math.random() > 0.5 ? 1 : -1;
       this.fogLayers.push(fog);
@@ -51,7 +67,13 @@ class TitleScene extends Phaser.Scene {
       color: "#ff4fc3"
     }).setOrigin(0.5).setInteractive();
 
-    this.tweens.add({ targets: pressStart, alpha: 0.2, duration: 700, yoyo: true, repeat: -1 });
+    this.tweens.add({
+      targets: pressStart,
+      alpha: 0.2,
+      duration: 700,
+      yoyo: true,
+      repeat: -1
+    });
 
     const startGame = () => {
       this.cameras.main.fadeOut(300);
@@ -59,9 +81,7 @@ class TitleScene extends Phaser.Scene {
     };
 
     pressStart.on("pointerdown", startGame);
-
     this.input.keyboard.on("keydown-ENTER", startGame);
-    this.input.keyboard.on("keydown-SPACE", startGame);
   }
 
   update() {
@@ -81,6 +101,9 @@ class TitleScene extends Phaser.Scene {
   }
 }
 
+// =========================
+// CHARACTER SELECT
+// =========================
 class CharacterSelectScene extends Phaser.Scene {
   constructor() { super("CharacterSelectScene"); }
 
@@ -98,27 +121,17 @@ class CharacterSelectScene extends Phaser.Scene {
 
     this.updateSelection();
 
-    const left = this.add.text(90, 270, "◀", {
-      fontFamily: "monospace",
-      fontSize: "72px",
-      color: "#ff4fc3"
-    }).setOrigin(0.5).setInteractive();
+    this.add.text(90, 270, "◀", { fontSize: "72px", color: "#ff4fc3" })
+      .setOrigin(0.5).setInteractive().on("pointerdown", () => this.move(-1));
 
-    const right = this.add.text(870, 270, "▶", {
-      fontFamily: "monospace",
-      fontSize: "72px",
-      color: "#ff4fc3"
-    }).setOrigin(0.5).setInteractive();
+    this.add.text(870, 270, "▶", { fontSize: "72px", color: "#ff4fc3" })
+      .setOrigin(0.5).setInteractive().on("pointerdown", () => this.move(1));
 
-    const select = this.add.text(480, 485, "TAP SELECT / PRESS ENTER", {
-      fontFamily: "monospace",
+    this.add.text(480, 485, "TAP SELECT", {
       fontSize: "24px",
       color: "#ff4fc3"
-    }).setOrigin(0.5).setInteractive();
-
-    left.on("pointerdown", () => this.move(-1));
-    right.on("pointerdown", () => this.move(1));
-    select.on("pointerdown", () => this.selectCharacter());
+    }).setOrigin(0.5).setInteractive()
+      .on("pointerdown", () => this.selectCharacter());
 
     this.input.keyboard.on("keydown-LEFT", () => this.move(-1));
     this.input.keyboard.on("keydown-RIGHT", () => this.move(1));
@@ -131,7 +144,7 @@ class CharacterSelectScene extends Phaser.Scene {
   }
 
   updateSelection() {
-    const name = this.characters[this.selectedIndex];
+    let name = this.characters[this.selectedIndex];
     this.charText.setText(name);
 
     this.tweens.add({
@@ -143,48 +156,96 @@ class CharacterSelectScene extends Phaser.Scene {
   }
 
   selectCharacter() {
-    const chosen = this.characters[this.selectedIndex];
-    this.scene.start("GameScene", { character: chosen });
+    let chosen = this.characters[this.selectedIndex];
+    this.scene.start("LevelSelectScene", { character: chosen });
   }
 }
 
+// =========================
+// LEVEL SELECT
+// =========================
+class LevelSelectScene extends Phaser.Scene {
+  constructor() { super("LevelSelectScene"); }
+
+  preload() {
+    this.load.image("house", "assets/house-party.png");
+    this.load.image("indoor", "assets/leftys-indoor.png");
+    this.load.image("outdoor", "assets/leftys-outdoor.png");
+    this.load.image("lmnop", "assets/lmnop.png");
+    this.load.image("chicken", "assets/chicken-coupe.png");
+  }
+
+  create(data) {
+    this.selectedCharacter = data.character;
+
+    this.levels = [
+      { name: "HOUSE PARTY", key: "house" },
+      { name: "LEFTY'S INDOOR", key: "indoor" },
+      { name: "LEFTY'S OUTDOOR", key: "outdoor" },
+      { name: "LMNOP", key: "lmnop" },
+      { name: "CHICKEN COUPE", key: "chicken" }
+    ];
+
+    this.index = 0;
+
+    this.bg = this.add.image(480, 270, this.levels[0].key).setDisplaySize(960, 540);
+    this.levelName = this.add.text(480, 430, "", {
+      fontSize: "32px",
+      color: "#fff"
+    }).setOrigin(0.5);
+
+    this.updateLevel();
+
+    this.input.on("pointerdown", () => this.startLevel());
+  }
+
+  updateLevel() {
+    let level = this.levels[this.index];
+    this.bg.setTexture(level.key);
+    this.levelName.setText(level.name);
+  }
+
+  startLevel() {
+    let level = this.levels[this.index];
+
+    this.scene.start("GameScene", {
+      character: this.selectedCharacter,
+      level: level.name
+    });
+  }
+}
+
+// =========================
+// GAME
+// =========================
 class GameScene extends Phaser.Scene {
   constructor() { super("GameScene"); }
 
   create(data) {
     this.add.rectangle(480, 270, 960, 540, 0x151515);
 
-    this.add.text(30, 30, "GAME STARTED", {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#ffffff"
-    });
+    this.add.text(30, 30, "GAME STARTED", { color: "#fff" });
 
-    this.add.text(30, 70, "CHARACTER: " + (data.character || "DONNY"), {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#ff4fc3"
-    });
+    this.add.text(30, 60, "CHARACTER: " + data.character, { color: "#ff4fc3" });
+    this.add.text(30, 90, "LEVEL: " + data.level, { color: "#fff" });
   }
 }
 
+// =========================
+// CONFIG
+// =========================
 const config = {
   type: Phaser.AUTO,
   width: 960,
   height: 540,
   backgroundColor: "#000",
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-  physics: {
-    default: "arcade",
-    arcade: { gravity: { y: 0 }, debug: false }
-  },
-  scene: [TitleScene, CharacterSelectScene, GameScene]
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  physics: { default: "arcade", arcade: { gravity: { y: 0 } } },
+  scene: [TitleScene, CharacterSelectScene, LevelSelectScene, GameScene]
 };
 
 new Phaser.Game(config);
+
 </script>
 
 </body>
