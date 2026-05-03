@@ -3,76 +3,189 @@
 <head>
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-
 <style>
-body { margin:0; background:black; overflow:hidden; }
-canvas { width:100vw !important; height:100vh !important; image-rendering:pixelated; }
+html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:hidden;touch-action:none;}
+canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
-
 <body>
 <script>
 
-const VERSION = 101;
+const VERSION = 103;
 
-class GameScene extends Phaser.Scene {
-  constructor(){ super("GameScene"); }
+class BootScene extends Phaser.Scene {
+  constructor(){ super("BootScene"); }
 
   preload(){
+    this.load.image("title","assets/title-screen.png?v="+VERSION);
+    this.load.image("fighterSelect","assets/character-select.png?v="+VERSION);
+    this.load.image("levelSelect","assets/level-select.png?v="+VERSION);
+    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
+
     this.load.spritesheet("jt","assets/player/jt/jt-master.png?v="+VERSION,{
       frameWidth:128,
-      frameHeight:128
+      frameHeight:128,
+      margin:0,
+      spacing:0
     });
   }
 
   create(){
+    this.scene.start("TitleScene");
+  }
+}
 
-    // SAFE BACKGROUND (prevents freeze)
-    this.add.rectangle(480,270,960,540,0x222222);
+class TitleScene extends Phaser.Scene {
+  constructor(){ super("TitleScene"); }
 
-    // DEBUG TEXT
-    this.add.text(20,20,"JT TEST BUILD",{font:"16px monospace",fill:"#fff"});
+  create(){
+    this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    this.createSafeAnimations();
+    const start=this.add.text(480,470,"TAP TO START",{
+      fontFamily:"monospace",
+      fontSize:"28px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5).setInteractive();
 
-    this.player = this.physics.add.sprite(200,400,"jt",0);
-    this.player.setOrigin(0.5,1);
-    this.player.setScale(2);
+    start.on("pointerdown",()=>{
+      this.scene.start("FighterSelectScene");
+    });
+  }
+}
 
-    if(this.anims.exists("idle")){
-      this.player.play("idle");
+class FighterSelectScene extends Phaser.Scene {
+  constructor(){ super("FighterSelectScene"); }
+
+  create(){
+    this.add.image(480,270,"fighterSelect").setDisplaySize(960,540);
+
+    this.selectedFighter="JT";
+
+    const fighters=[
+      {name:"DOTTIE",x:260,y:280,w:170,h:300},
+      {name:"GIGI",x:480,y:280,w:170,h:300},
+      {name:"JT",x:700,y:280,w:170,h:300}
+    ];
+
+    this.outline=this.add.rectangle(700,280,170,300,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
+
+    fighters.forEach(f=>{
+      this.add.rectangle(f.x,f.y,f.w,f.h,0xff0000,0.01)
+        .setInteractive()
+        .setDepth(40)
+        .on("pointerdown",()=>{
+          this.selectedFighter=f.name;
+          this.outline.setPosition(f.x,f.y);
+          this.outline.setSize(f.w,f.h);
+
+          this.time.delayedCall(250,()=>{
+            this.scene.start("LevelSelectScene",{fighter:this.selectedFighter});
+          });
+        });
+    });
+  }
+}
+
+class LevelSelectScene extends Phaser.Scene {
+  constructor(){ super("LevelSelectScene"); }
+
+  create(data){
+    this.selectedFighter=data.fighter || "JT";
+
+    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+
+    const levels=[
+      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
+      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
+      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
+      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
+      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
+    ];
+
+    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
+
+    this.status=this.add.text(480,505,"TAP A LEVEL",{
+      fontFamily:"monospace",
+      fontSize:"20px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(60);
+
+    levels.forEach(l=>{
+      this.add.rectangle(l.x,l.y,l.w,l.h,0xff0000,0.01)
+        .setInteractive()
+        .setDepth(40)
+        .on("pointerdown",()=>{
+          this.outline.setPosition(l.x,l.y);
+          this.outline.setSize(l.w,l.h);
+          this.status.setText("LOADING: "+l.name);
+
+          this.time.delayedCall(300,()=>{
+            this.scene.start("GameScene",{
+              fighter:this.selectedFighter,
+              levelName:l.name,
+              levelKey:l.key
+            });
+          });
+        });
+    });
+  }
+}
+
+class GameScene extends Phaser.Scene {
+  constructor(){ super("GameScene"); }
+
+  create(data){
+    this.fighter=data.fighter || "JT";
+    this.levelName=data.levelName || "OUTDOOR";
+    this.levelKey=data.levelKey || "outdoor";
+
+    if(this.levelKey==="outdoor" && this.textures.exists("outdoor")){
+      this.add.image(480,270,"outdoor").setDisplaySize(960,540);
+    } else {
+      this.add.rectangle(480,270,960,540,0x333333);
+      this.add.text(480,270,"LEVEL IMAGE MISSING\nUsing test background",{
+        fontFamily:"monospace",
+        fontSize:"22px",
+        color:"#ff4fc3",
+        align:"center"
+      }).setOrigin(0.5);
     }
 
+    this.add.text(20,20,"CHAR: "+this.fighter,{fontFamily:"monospace",fontSize:"16px",color:"#fff"}).setDepth(1000);
+    this.add.text(20,45,"LEVEL: "+this.levelName,{fontFamily:"monospace",fontSize:"16px",color:"#ff4fc3"}).setDepth(1000);
+
+    this.createJTAnimations();
+
+    this.player=this.physics.add.sprite(200,400,"jt",0);
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(1.5);
     this.player.setCollideWorldBounds(true);
 
-    this.moveX = 0;
-    this.moveY = 0;
+    if(this.anims.exists("idle")) this.player.play("idle");
 
+    this.moveX=0;
+    this.moveY=0;
     this.makeControls();
   }
 
-  createSafeAnimations(){
-    const tex = this.textures.get("jt");
+  createJTAnimations(){
+    if(!this.textures.exists("jt")) return;
+    const tex=this.textures.get("jt");
 
-    if(!tex){
-      console.log("JT texture missing");
-      return;
-    }
-
-    console.log("JT frames:", tex.frameTotal);
-
-    const safe = (key,start,end,rate,repeat=0)=>{
-      if(tex.frameTotal <= end) return;
+    const safe=(key,start,end,rate,repeat=0)=>{
+      if(tex.frameTotal<=end) return;
       if(this.anims.exists(key)) return;
-
       this.anims.create({
-        key:key,
+        key,
         frames:this.anims.generateFrameNumbers("jt",{start,end}),
         frameRate:rate,
-        repeat:repeat
+        repeat
       });
     };
 
@@ -85,90 +198,91 @@ class GameScene extends Phaser.Scene {
   }
 
   update(){
-    const speed = 200;
-
+    const speed=200;
     this.player.setVelocity(this.moveX*speed,this.moveY*speed);
 
-    if(this.moveX !== 0 || this.moveY !== 0){
-      if(this.anims.exists("walk")){
-        this.player.play("walk",true);
-      }
+    if(this.moveX!==0 || this.moveY!==0){
+      if(this.anims.exists("walk")) this.player.play("walk",true);
     } else {
-      if(this.anims.exists("idle")){
-        this.player.play("idle",true);
-      }
+      if(this.anims.exists("idle")) this.player.play("idle",true);
     }
 
-    if(this.moveX < 0) this.player.setFlipX(true);
-    if(this.moveX > 0) this.player.setFlipX(false);
+    if(this.moveX<0)this.player.setFlipX(true);
+    if(this.moveX>0)this.player.setFlipX(false);
   }
 
   makeControls(){
+    const baseX=120, baseY=420, r=60;
+    this.add.circle(baseX,baseY,r,0xffffff,0.15).setDepth(999);
+    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.4).setDepth(1000);
 
-    const baseX = 120;
-    const baseY = 420;
+    let dragging=false;
 
-    this.add.circle(baseX,baseY,60,0xffffff,0.1);
+    const moveStick=(p)=>{
+      let dx=p.x-baseX, dy=p.y-baseY;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d>r){ dx=dx/d*r; dy=dy/d*r; }
+      knob.x=baseX+dx;
+      knob.y=baseY+dy;
+      this.moveX=dx/r;
+      this.moveY=dy/r;
+    };
 
-    let dragging = false;
-
-    this.input.on("pointerdown",(p)=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<80){
-        dragging = true;
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<85){
+        dragging=true;
+        moveStick(p);
       }
     });
 
-    this.input.on("pointermove",(p)=>{
-      if(!dragging) return;
-
-      let dx = p.x - baseX;
-      let dy = p.y - baseY;
-
-      const len = Math.sqrt(dx*dx+dy*dy);
-      if(len>60){
-        dx/=len; dy/=len;
-        dx*=60; dy*=60;
-      }
-
-      this.moveX = dx/60;
-      this.moveY = dy/60;
+    this.input.on("pointermove",p=>{
+      if(dragging) moveStick(p);
     });
 
     this.input.on("pointerup",()=>{
       dragging=false;
+      knob.x=baseX;
+      knob.y=baseY;
       this.moveX=0;
       this.moveY=0;
     });
 
-    // ATTACK BUTTONS
-    this.makeBtn(860,380,"X",()=>this.playAnim("heavy"));
-    this.makeBtn(800,450,"Y",()=>this.playAnim("light"));
-    this.makeBtn(920,450,"A",()=>this.playAnim("kick"));
-    this.makeBtn(860,520,"B",()=>this.playAnim("spin"));
+    this.makeButton(860,360,"X","heavy");
+    this.makeButton(800,430,"Y","light");
+    this.makeButton(920,430,"A","kick");
+    this.makeButton(860,500,"B","spin");
   }
 
-  makeBtn(x,y,label,fn){
-    this.add.circle(x,y,30,0xffffff,0.2)
+  makeButton(x,y,label,anim){
+    this.add.circle(x,y,32,0xffffff,0.22)
       .setInteractive()
-      .on("pointerdown",fn);
+      .setDepth(999)
+      .on("pointerdown",()=>{
+        if(this.anims.exists(anim)) this.player.play(anim,true);
+      });
 
-    this.add.text(x,y,label,{font:"18px monospace",fill:"#fff"})
-      .setOrigin(0.5);
-  }
-
-  playAnim(key){
-    if(this.anims.exists(key)){
-      this.player.play(key,true);
-    }
+    this.add.text(x,y,label,{
+      fontFamily:"monospace",
+      fontSize:"18px",
+      color:"#fff"
+    }).setOrigin(0.5).setDepth(1000);
   }
 }
 
-const config = {
-  type: Phaser.AUTO,
+const config={
+  type:Phaser.AUTO,
   width:960,
   height:540,
-  physics:{ default:"arcade" },
-  scene:[GameScene]
+  backgroundColor:"#000",
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH
+  },
+  physics:{
+    default:"arcade",
+    arcade:{gravity:{y:0},debug:false}
+  },
+  scene:[BootScene,TitleScene,FighterSelectScene,LevelSelectScene,GameScene]
 };
 
 new Phaser.Game(config);
