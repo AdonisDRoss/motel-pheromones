@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
 <style>
@@ -18,7 +16,6 @@ html, body {
   overflow: hidden;
   touch-action: none;
 }
-
 canvas {
   display: block;
   width: 100vw !important;
@@ -26,7 +23,6 @@ canvas {
   object-fit: contain;
   image-rendering: pixelated;
 }
-
 #rotate-warning {
   display: none;
   position: fixed;
@@ -40,7 +36,6 @@ canvas {
   text-align: center;
   z-index: 9999;
 }
-
 @media (orientation: portrait) {
   #rotate-warning { display: flex; }
 }
@@ -48,52 +43,39 @@ canvas {
 </head>
 
 <body>
-
-<div id="rotate-warning">
-TURN PHONE SIDEWAYS<br>
-LANDSCAPE REQUIRED
-</div>
+<div id="rotate-warning">TURN PHONE SIDEWAYS<br>LANDSCAPE REQUIRED</div>
 
 <script>
-
-// ================= TITLE =================
 class TitleScene extends Phaser.Scene {
-  constructor() { super("TitleScene"); }
+  constructor(){ super("TitleScene"); }
 
-  preload() {
+  preload(){
     this.load.image("title", "assets/title-screen.png");
     this.load.image("characterSelect", "assets/character-select.png");
     this.load.image("levelSelect", "assets/level-select.png");
   }
 
-  create() {
-    this.add.image(480, 270, "title").setDisplaySize(960, 540);
+  create(){
+    this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    const start = this.add.text(480, 470, "PRESS START", {
-      fontFamily: "monospace",
-      fontSize: "28px",
-      color: "#ff4fc3"
+    const start = this.add.text(480,470,"PRESS START",{
+      fontFamily:"monospace",
+      fontSize:"28px",
+      color:"#ff4fc3"
     }).setOrigin(0.5).setInteractive();
 
-    this.tweens.add({
-      targets: start,
-      alpha: 0.2,
-      duration: 700,
-      yoyo: true,
-      repeat: -1
-    });
+    this.tweens.add({ targets:start, alpha:0.2, duration:700, yoyo:true, repeat:-1 });
 
-    start.on("pointerdown", () => this.scene.start("CharacterSelectScene"));
-    this.input.keyboard.on("keydown-ENTER", () => this.scene.start("CharacterSelectScene"));
+    start.on("pointerdown",()=>this.scene.start("CharacterSelectScene"));
+    this.input.keyboard.on("keydown-ENTER",()=>this.scene.start("CharacterSelectScene"));
   }
 }
 
-// ================= CHARACTER SELECT =================
 class CharacterSelectScene extends Phaser.Scene {
-  constructor() { super("CharacterSelectScene"); }
+  constructor(){ super("CharacterSelectScene"); }
 
-  create() {
-    this.add.image(480, 270, "characterSelect").setDisplaySize(960, 540);
+  create(){
+    this.add.image(480,270,"characterSelect").setDisplaySize(960,540);
 
     this.characters = ["DONNY","JT","HEW"];
     this.index = 1;
@@ -106,14 +88,12 @@ class CharacterSelectScene extends Phaser.Scene {
 
     this.updateChar();
 
-    // arrows
     this.add.text(100,270,"◀",{fontSize:"70px",color:"#ff4fc3"})
       .setInteractive().on("pointerdown",()=>this.move(-1));
 
     this.add.text(860,270,"▶",{fontSize:"70px",color:"#ff4fc3"})
       .setInteractive().on("pointerdown",()=>this.move(1));
 
-    // 🔥 CHARACTER TOUCH ZONES + GLOW
     const makeCharZone = (x,y,w,h,i)=>{
       this.add.rectangle(x,y,w,h,0xff00aa,0)
         .setInteractive()
@@ -122,9 +102,8 @@ class CharacterSelectScene extends Phaser.Scene {
           this.updateChar();
 
           let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
-
           this.tweens.add({
-            targets: glow,
+            targets:glow,
             alpha:0,
             scaleX:1.08,
             scaleY:1.08,
@@ -138,10 +117,8 @@ class CharacterSelectScene extends Phaser.Scene {
     makeCharZone(480,270,240,360,1);
     makeCharZone(690,270,210,340,2);
 
-    // select
     this.add.text(480,490,"TAP SELECT",{fontSize:"24px",color:"#ff4fc3"})
-      .setOrigin(0.5)
-      .setInteractive()
+      .setOrigin(0.5).setInteractive()
       .on("pointerdown",()=>this.select());
 
     this.input.keyboard.on("keydown-LEFT",()=>this.move(-1));
@@ -163,12 +140,11 @@ class CharacterSelectScene extends Phaser.Scene {
   }
 }
 
-// ================= LEVEL SELECT =================
 class LevelSelectScene extends Phaser.Scene {
   constructor(){ super("LevelSelectScene"); }
 
   create(data){
-    this.selectedCharacter=data.character;
+    this.selectedCharacter = data.character || "DONNY";
 
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
@@ -177,7 +153,6 @@ class LevelSelectScene extends Phaser.Scene {
         .setInteractive()
         .on("pointerdown",()=>{
           let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
-
           this.tweens.add({
             targets:glow,
             alpha:0,
@@ -186,26 +161,25 @@ class LevelSelectScene extends Phaser.Scene {
             duration:200,
             onComplete:()=>glow.destroy()
           });
-
           this.time.delayedCall(150,()=>this.start(name));
         });
     };
 
     makeZone(180,270,160,300,"HOUSE PARTY");
-    makeZone(340,270,160,300,"LEFTY'S INDOOR");
-    makeZone(500,270,180,320,"LEFTY'S OUTDOOR");
+    makeZone(340,270,160,300,"LEFTY'S LIVE INDOOR");
+    makeZone(500,270,180,320,"LEFTY'S LOUD OUTDOOR");
     makeZone(660,270,160,300,"LMNOP");
     makeZone(820,270,160,300,"CHICKEN COUPE");
-
-    this.add.text(480,500,"TAP LEVEL",{fontSize:"22px",color:"#ff4fc3"}).setOrigin(0.5);
   }
 
   start(level){
-    this.scene.start("GameScene",{character:this.selectedCharacter,level:level});
+    this.scene.start("GameScene",{
+      character:this.selectedCharacter,
+      level:level
+    });
   }
 }
 
-// ================= GAME =================
 class GameScene extends Phaser.Scene {
   constructor(){ super("GameScene"); }
 
@@ -217,15 +191,14 @@ class GameScene extends Phaser.Scene {
     this.add.text(30,100,"LEVEL: "+data.level,{color:"#fff"});
 
     this.player=this.physics.add.rectangle(200,300,50,70,0x00ffcc);
-
     this.makeControls();
   }
 
   makeControls(){
     const baseX=120, baseY=420, radius=60;
 
-    let stick=this.add.circle(baseX,baseY,30,0xffffff,0.4);
-    this.add.circle(baseX,baseY,radius,0xffffff,0.1);
+    const stickBase = this.add.circle(baseX,baseY,radius,0xffffff,0.1);
+    const stick = this.add.circle(baseX,baseY,30,0xffffff,0.4);
 
     let dragging=false;
 
@@ -238,7 +211,8 @@ class GameScene extends Phaser.Scene {
     this.input.on("pointermove",p=>{
       if(!dragging)return;
 
-      let dx=p.x-baseX, dy=p.y-baseY;
+      let dx=p.x-baseX;
+      let dy=p.y-baseY;
       let dist=Math.sqrt(dx*dx+dy*dy);
 
       if(dist>radius){
@@ -248,7 +222,6 @@ class GameScene extends Phaser.Scene {
 
       stick.x=baseX+dx;
       stick.y=baseY+dy;
-
       this.player.body.setVelocity(dx*3,dy*3);
     });
 
@@ -259,23 +232,21 @@ class GameScene extends Phaser.Scene {
       this.player.body.setVelocity(0,0);
     });
 
-    // buttons
     this.add.circle(860,360,30,0xffffff,0.2);
     this.add.circle(800,420,30,0xffffff,0.2);
     this.add.circle(920,420,30,0xffffff,0.2);
     this.add.circle(860,480,30,0xffffff,0.2);
 
-    this.add.text(850,350,"X");
-    this.add.text(790,410,"Y");
-    this.add.text(910,410,"A");
-    this.add.text(850,470,"B");
+    this.add.text(850,350,"X",{color:"#fff"});
+    this.add.text(790,410,"Y",{color:"#fff"});
+    this.add.text(910,410,"A",{color:"#fff"});
+    this.add.text(850,470,"B",{color:"#fff"});
 
     this.add.rectangle(480,500,100,30,0xffffff,0.2);
-    this.add.text(450,490,"START");
+    this.add.text(450,490,"START",{color:"#fff"});
   }
 }
 
-// ================= CONFIG =================
 const config={
   type:Phaser.AUTO,
   width:960,
@@ -295,8 +266,6 @@ const config={
 };
 
 new Phaser.Game(config);
-
 </script>
-
 </body>
 </html>
