@@ -24,32 +24,6 @@
 <body>
 
 <script>
-// =========================
-// GAME CONFIG
-// =========================
-const config = {
-  type: Phaser.AUTO,
-  width: 960,
-  height: 540,
-  backgroundColor: "#000",
-
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-
-  physics: {
-    default: "arcade",
-    arcade: {
-      gravity: { y: 0 },
-      debug: false
-    }
-  },
-
-  scene: [TitleScene, GameScene]
-};
-
-new Phaser.Game(config);
 
 // =========================
 // TITLE SCENE
@@ -60,25 +34,20 @@ class TitleScene extends Phaser.Scene {
   }
 
   preload() {
-    // MAKE SURE THIS MATCHES YOUR FILE EXACTLY
     this.load.image("title", "assets/title-screen.png");
   }
 
   create() {
-    // Background image
     this.add.image(480, 270, "title").setDisplaySize(960, 540);
 
-    // Glow overlay
     this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.06);
 
-    // PRESS START TEXT
     const pressStart = this.add.text(480, 470, "PRESS START", {
       fontFamily: "monospace",
       fontSize: "28px",
       color: "#ff4fc3"
     }).setOrigin(0.5);
 
-    // Blinking animation
     this.tweens.add({
       targets: pressStart,
       alpha: 0.2,
@@ -87,7 +56,6 @@ class TitleScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // MENU
     const menuItems = ["START GAME", "OPTIONS", "CREDITS"];
     let selected = 0;
     let menuTexts = [];
@@ -118,7 +86,6 @@ class TitleScene extends Phaser.Scene {
 
     drawMenu();
 
-    // INPUT
     this.input.keyboard.on("keydown-UP", () => {
       selected = (selected - 1 + menuItems.length) % menuItems.length;
       drawMenu();
@@ -148,7 +115,7 @@ class TitleScene extends Phaser.Scene {
 }
 
 // =========================
-// GAME SCENE (TEST BUILD)
+// GAME SCENE
 // =========================
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -164,11 +131,9 @@ class GameScene extends Phaser.Scene {
       color: "#ffffff"
     });
 
-    // Player
     this.player = this.physics.add.rectangle(200, 300, 50, 70, 0x00ffcc);
     this.player.body.setCollideWorldBounds(true);
 
-    // Enemies
     this.enemies = this.physics.add.group();
 
     for (let i = 0; i < 5; i++) {
@@ -185,7 +150,6 @@ class GameScene extends Phaser.Scene {
       this.enemies.add(enemy);
     }
 
-    // Controls
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K");
 
@@ -261,6 +225,34 @@ class GameScene extends Phaser.Scene {
     });
   }
 }
+
+// =========================
+// CONFIG (MOVED TO BOTTOM)
+// =========================
+const config = {
+  type: Phaser.AUTO,
+  width: 960,
+  height: 540,
+  backgroundColor: "#000",
+
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
+
+  physics: {
+    default: "arcade",
+    arcade: {
+      gravity: { y: 0 },
+      debug: false
+    }
+  },
+
+  scene: [TitleScene, GameScene]
+};
+
+new Phaser.Game(config);
+
 </script>
 
 </body>
