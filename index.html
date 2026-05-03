@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v1.0</title>
+<title>Motel Pheromones v1.1</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
@@ -85,7 +85,7 @@ class CharacterSelectScene extends Phaser.Scene {
   }
 }
 
-// ================= LEVEL SELECT =================
+// ================= LEVEL SELECT (FIXED) =================
 class LevelSelectScene extends Phaser.Scene {
   constructor(){ super("LevelSelectScene"); }
 
@@ -94,23 +94,29 @@ class LevelSelectScene extends Phaser.Scene {
 
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
-    this.confirmText=this.add.text(480,500,"TAP A LEVEL",{fontSize:"22px",color:"#ff4fc3"}).setOrigin(0.5);
+    this.confirmText=this.add.text(480,500,"TAP A LEVEL",{
+      fontFamily:"monospace",
+      fontSize:"22px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(100);
 
     this.levels=[
-      {x:180,y:270,w:160,h:300,name:"HOUSE PARTY"},
-      {x:340,y:270,w:160,h:300,name:"INDOOR"},
-      {x:500,y:270,w:180,h:320,name:"OUTDOOR"},
-      {x:660,y:270,w:160,h:300,name:"LMNOP"},
-      {x:820,y:270,w:160,h:300,name:"CHICKEN"}
+      {x:190,y:305,w:165,h:300,name:"HOUSE PARTY"},
+      {x:355,y:305,w:165,h:300,name:"LEFTY'S INDOOR"},
+      {x:520,y:305,w:190,h:330,name:"LEFTY'S OUTDOOR"},
+      {x:690,y:305,w:165,h:300,name:"LMNOP"},
+      {x:845,y:305,w:165,h:300,name:"CHICKEN COUPE"}
     ];
 
-    this.outline=this.add.rectangle(180,270,160,300,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3);
+    this.outline=this.add.rectangle(520,305,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(90);
 
-    this.levels.forEach((l)=>{
-      this.add.rectangle(l.x,l.y,l.w,l.h,0xff0000,0)
+    this.levels.forEach(level=>{
+      this.add.rectangle(level.x,level.y,level.w,level.h,0xff0000,0)
         .setInteractive()
-        .on("pointerdown",()=>this.confirmLevel(l));
+        .setDepth(99)
+        .on("pointerdown",()=>this.confirmLevel(level));
     });
   }
 
@@ -118,9 +124,11 @@ class LevelSelectScene extends Phaser.Scene {
     this.outline.setPosition(level.x,level.y);
     this.outline.setSize(level.w,level.h);
 
-    this.confirmText.setText("SELECTED: " + level.name);
+    this.confirmText.setText("LOADING: " + level.name);
 
-    this.time.delayedCall(600,()=>{
+    this.cameras.main.flash(120,255,0,150);
+
+    this.time.delayedCall(300,()=>{
       this.scene.start("GameScene",{
         character:this.selectedCharacter,
         level:level.name
@@ -135,6 +143,9 @@ class GameScene extends Phaser.Scene {
 
   create(data){
     this.add.rectangle(480,270,960,540,0x111111);
+
+    this.add.text(20,20,"CHAR: "+data.character,{color:"#fff"});
+    this.add.text(20,50,"LEVEL: "+data.level,{color:"#ff4fc3"});
 
     this.depthMin=210;
     this.depthMax=430;
@@ -241,7 +252,6 @@ class GameScene extends Phaser.Scene {
   }
 
   comboAttack(){
-
     if(this.isAttacking) return;
 
     this.comboStep++;
@@ -255,8 +265,6 @@ class GameScene extends Phaser.Scene {
       dmg=20;
     }
 
-    this.snapToEnemy();
-
     this.playAttack(anim,90,dmg,250);
 
     if(this.comboTimer) this.comboTimer.remove();
@@ -264,25 +272,6 @@ class GameScene extends Phaser.Scene {
     this.comboTimer=this.time.delayedCall(500,()=>{
       this.comboStep=0;
     });
-  }
-
-  snapToEnemy(){
-    let closest=null;
-    let dist=9999;
-
-    this.enemies.children.iterate(e=>{
-      if(!e||e.hp<=0)return;
-
-      let d=Math.abs(this.player.x-e.x);
-      if(d<dist){
-        dist=d;
-        closest=e;
-      }
-    });
-
-    if(closest && Math.abs(this.player.y-closest.y)<80){
-      this.player.y=Phaser.Math.Linear(this.player.y,closest.y,0.4);
-    }
   }
 
   playAttack(anim,range,damage,knock){
@@ -373,7 +362,6 @@ class GameScene extends Phaser.Scene {
   }
 }
 
-// ================= CONFIG =================
 const config={
   type:Phaser.AUTO,
   width:960,
