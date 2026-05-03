@@ -1,49 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motel Pheromones</title>
-</head>
-<body style="background:black; color:white; text-align:center;">
-  <h1>🎮 Motel Pheromones</h1>
-  <p>If you see this, GitHub Pages works.</p>
-</body>
-</html>
-<!DOCTYPE html>
-<html>
-<head>
   <meta charset="UTF-8" />
-  <title>Motel Pheromones Brawler</title>
+  <title>Motel Pheromones</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
   <style>
     body { margin:0; background:#000; overflow:hidden; }
     canvas { display:block; margin:0 auto; image-rendering: pixelated; }
-    #rotate {
-      display:none;
-      position:fixed;
-      inset:0;
-      background:#000;
-      color:white;
-      z-index:99;
-      font-family:monospace;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      padding:20px;
-    }
-    @media (orientation: portrait) {
-      #rotate { display:flex; }
-    }
   </style>
 </head>
 <body>
-<div id="rotate">Turn phone sideways for landscape mode</div>
 
 <script>
 const config = {
   type: Phaser.AUTO,
   width: 960,
   height: 540,
-  backgroundColor: "#111",
+  backgroundColor: "#000",
   physics: {
     default: "arcade",
     arcade: { gravity: { y: 0 }, debug: false }
@@ -52,142 +25,157 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: { preload, create, update }
+  scene: [TitleScene, GameScene]
 };
 
 let game = new Phaser.Game(config);
-let player, enemies, cursors, keys;
-let playerHP = 100;
-let touch = { left:false, right:false, up:false, down:false };
 
-function preload(){}
-
-function create() {
-  // Street background
-  this.add.rectangle(480, 270, 960, 540, 0x1a1a1a);
-  this.add.rectangle(480, 360, 960, 180, 0x333333);
-  this.add.rectangle(480, 255, 960, 15, 0x555555);
-  this.add.text(30, 30, "MOTEL PHEROMONES - TEST BUILD", {
-    fontFamily:"monospace", fontSize:"22px", color:"#ffffff"
-  });
-
-  // Player placeholder
-  player = this.physics.add.rectangle(180, 330, 42, 70, 0x00ffcc);
-  player.body.setCollideWorldBounds(true);
-  player.hp = 100;
-
-  enemies = this.physics.add.group();
-
-  for (let i = 0; i < 5; i++) {
-    let e = this.physics.add.rectangle(540 + i * 70, 330 + Phaser.Math.Between(-45,45), 42, 66, 0xff3355);
-    e.hp = 30;
-    e.speed = 55;
-    e.body.setCollideWorldBounds(true);
-    enemies.add(e);
+class TitleScene extends Phaser.Scene {
+  constructor() {
+    super("TitleScene");
   }
 
-  cursors = this.input.keyboard.createCursorKeys();
-  keys = this.input.keyboard.addKeys({
-    W:"W", A:"A", S:"S", D:"D",
-    J:"J", K:"K"
-  });
+  preload() {
+    this.load.image("title", "assets/title-screen.png");
+  }
 
-  this.input.keyboard.on("keydown-J", () => attack(this, 70, 10, 250));
-  this.input.keyboard.on("keydown-K", () => attack(this, 105, 20, 400));
+  create() {
+    this.add.image(480, 270, "title").setDisplaySize(960, 540);
 
-  makeMobileControls(this);
+    this.add.text(480, 485, "PRESS ANY BUTTON TO START", {
+      fontFamily: "monospace",
+      fontSize: "26px",
+      color: "#ff4fc3"
+    }).setOrigin(0.5);
+
+    this.input.keyboard.on("keydown", () => {
+      this.scene.start("GameScene");
+    });
+
+    this.input.on("pointerdown", () => {
+      this.scene.start("GameScene");
+    });
+  }
 }
 
-function update() {
-  let speed = 180;
-  player.body.setVelocity(0);
+class GameScene extends Phaser.Scene {
+  constructor() {
+    super("GameScene");
+  }
 
-  if (cursors.left.isDown || keys.A.isDown || touch.left) player.body.setVelocityX(-speed);
-  if (cursors.right.isDown || keys.D.isDown || touch.right) player.body.setVelocityX(speed);
-  if (cursors.up.isDown || keys.W.isDown || touch.up) player.body.setVelocityY(-speed);
-  if (cursors.down.isDown || keys.S.isDown || touch.down) player.body.setVelocityY(speed);
+  create() {
+    this.add.rectangle(480, 270, 960, 540, 0x151515);
+    this.add.rectangle(480, 360, 960, 180, 0x333333);
 
-  player.depth = player.y;
+    this.add.text(30, 25, "MOTEL PHEROMONES - GAME STARTED", {
+      fontFamily: "monospace",
+      fontSize: "22px",
+      color: "#ffffff"
+    });
 
-  enemies.children.iterate(e => {
-    if (!e || e.hp <= 0) return;
+    this.player = this.physics.add.rectangle(180, 330, 42, 70, 0x00ffcc);
+    this.player.body.setCollideWorldBounds(true);
 
-    e.depth = e.y;
-    moveEnemyTowardPlayer(e);
+    this.enemies = this.physics.add.group();
 
-    if (Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < 45) {
-      playerHP -= 0.08;
+    for (let i = 0; i < 5; i++) {
+      let enemy = this.physics.add.rectangle(
+        540 + i * 70,
+        330 + Phaser.Math.Between(-45, 45),
+        42,
+        66,
+        0xff3355
+      );
+      enemy.hp = 30;
+      enemy.speed = 55;
+      this.enemies.add(enemy);
     }
-  });
-}
 
-function moveEnemyTowardPlayer(e) {
-  let dx = player.x - e.x;
-  let dy = player.y - e.y;
-  let dist = Math.sqrt(dx*dx + dy*dy);
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys({
+      W: "W",
+      A: "A",
+      S: "S",
+      D: "D",
+      J: "J",
+      K: "K"
+    });
 
-  if (dist > 45) {
-    e.body.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
-  } else {
-    e.body.setVelocity(0);
+    this.input.keyboard.on("keydown-J", () => this.attack(70, 10, 250));
+    this.input.keyboard.on("keydown-K", () => this.attack(105, 20, 400));
   }
-}
 
-function attack(scene, range, damage, knockback) {
-  let hitbox = scene.add.rectangle(player.x + 45, player.y, range, 50, 0xffff00, 0.25);
-  scene.time.delayedCall(90, () => hitbox.destroy());
+  update() {
+    let speed = 200;
+    this.player.body.setVelocity(0);
 
-  enemies.children.iterate(e => {
-    if (!e || e.hp <= 0) return;
+    if (this.cursors.left.isDown || this.keys.A.isDown) this.player.body.setVelocityX(-speed);
+    if (this.cursors.right.isDown || this.keys.D.isDown) this.player.body.setVelocityX(speed);
+    if (this.cursors.up.isDown || this.keys.W.isDown) this.player.body.setVelocityY(-speed);
+    if (this.cursors.down.isDown || this.keys.S.isDown) this.player.body.setVelocityY(speed);
 
-    let dist = Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y);
+    this.player.depth = this.player.y;
 
-    if (dist < range) {
-      e.hp -= damage;
-      e.setFillStyle(0xffff00);
+    this.enemies.children.iterate(enemy => {
+      if (!enemy || enemy.hp <= 0) return;
 
-      let dir = e.x > player.x ? 1 : -1;
-      e.body.setVelocityX(dir * knockback);
+      enemy.depth = enemy.y;
 
-      scene.time.delayedCall(120, () => {
-        if (e.hp > 0) e.setFillStyle(0xff3355);
-      });
+      let dx = this.player.x - enemy.x;
+      let dy = this.player.y - enemy.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (e.hp <= 0) {
-        e.setFillStyle(0x555555);
-        e.body.setVelocity(0);
-        e.body.enable = false;
+      if (dist > 45) {
+        enemy.body.setVelocity((dx / dist) * enemy.speed, (dy / dist) * enemy.speed);
+      } else {
+        enemy.body.setVelocity(0);
       }
-    }
-  });
-}
+    });
+  }
 
-function makeMobileControls(scene) {
-  const makeButton = (x,y,label,callback) => {
-    let b = scene.add.circle(x,y,34,0xffffff,0.18).setInteractive().setDepth(999);
-    let t = scene.add.text(x-10,y-12,label,{fontSize:"22px",color:"#fff"}).setDepth(1000);
-    b.on("pointerdown", callback);
-    return b;
-  };
+  attack(range, damage, knockback) {
+    let hitbox = this.add.rectangle(
+      this.player.x + 45,
+      this.player.y,
+      range,
+      50,
+      0xffff00,
+      0.25
+    );
 
-  makeButton(805, 410, "J", () => attack(scene, 70, 10, 250));
-  makeButton(875, 360, "K", () => attack(scene, 105, 20, 400));
+    this.time.delayedCall(90, () => hitbox.destroy());
 
-  const dpad = [
-    [80,410,"←","left"],
-    [150,410,"→","right"],
-    [115,360,"↑","up"],
-    [115,465,"↓","down"]
-  ];
+    this.enemies.children.iterate(enemy => {
+      if (!enemy || enemy.hp <= 0) return;
 
-  dpad.forEach(([x,y,label,dir]) => {
-    let b = scene.add.circle(x,y,32,0xffffff,0.15).setInteractive().setDepth(999);
-    scene.add.text(x-10,y-12,label,{fontSize:"22px",color:"#fff"}).setDepth(1000);
-    b.on("pointerdown", () => touch[dir] = true);
-    b.on("pointerup", () => touch[dir] = false);
-    b.on("pointerout", () => touch[dir] = false);
-  });
+      let distance = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (distance < range) {
+        enemy.hp -= damage;
+        enemy.setFillStyle(0xffff00);
+
+        let dir = enemy.x > this.player.x ? 1 : -1;
+        enemy.body.setVelocityX(dir * knockback);
+
+        this.time.delayedCall(120, () => {
+          if (enemy.hp > 0) enemy.setFillStyle(0xff3355);
+        });
+
+        if (enemy.hp <= 0) {
+          enemy.setFillStyle(0x555555);
+          enemy.body.setVelocity(0);
+          enemy.body.enable = false;
+        }
+      }
+    });
+  }
 }
 </script>
+
 </body>
 </html>
