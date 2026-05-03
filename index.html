@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v0.5</title>
+<title>Motel Pheromones v0.6</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
@@ -46,7 +46,42 @@ class TitleScene extends Phaser.Scene {
   create() {
     this.add.image(480,270,"title").setDisplaySize(960,540);
 
+    // Rain
+    this.rain = [];
+    for (let i = 0; i < 120; i++) {
+      let drop = this.add.rectangle(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(0,540),
+        2,
+        12,
+        0x66ccff,
+        0.5
+      );
+      drop.speed = Phaser.Math.Between(300,500);
+      this.rain.push(drop);
+    }
+
+    // Fog
+    this.fogLayers = [];
+    for (let i = 0; i < 3; i++) {
+      let fog = this.add.rectangle(
+        480,
+        Phaser.Math.Between(200,500),
+        1000,
+        120,
+        0xff0088,
+        0.08
+      );
+      fog.speed = Phaser.Math.FloatBetween(0.2,0.6);
+      fog.dir = Math.random() > 0.5 ? 1 : -1;
+      this.fogLayers.push(fog);
+    }
+
+    // Lightning
+    this.lightningFlash = this.add.rectangle(480,270,960,540,0xffffff,0);
+
     const start = this.add.text(480,470,"TAP TO START",{
+      fontFamily:"monospace",
       fontSize:"28px",
       color:"#ff4fc3"
     }).setOrigin(0.5).setInteractive();
@@ -60,6 +95,39 @@ class TitleScene extends Phaser.Scene {
     });
 
     start.on("pointerdown",()=>this.scene.start("CharacterSelectScene"));
+  }
+
+  update() {
+    this.rain.forEach(drop => {
+      drop.y += drop.speed * 0.016;
+      if (drop.y > 540) {
+        drop.y = 0;
+        drop.x = Phaser.Math.Between(0,960);
+      }
+    });
+
+    this.fogLayers.forEach(fog => {
+      fog.x += fog.speed * fog.dir;
+      if (fog.x > 1100) fog.x = -100;
+      if (fog.x < -100) fog.x = 1100;
+    });
+
+    // Lightning random flash
+    if (Phaser.Math.Between(0,1000) > 995) {
+      this.lightningFlash.setAlpha(0.75);
+
+      this.time.delayedCall(60, () => {
+        this.lightningFlash.setAlpha(0);
+      });
+
+      this.time.delayedCall(120, () => {
+        this.lightningFlash.setAlpha(0.45);
+
+        this.time.delayedCall(40, () => {
+          this.lightningFlash.setAlpha(0);
+        });
+      });
+    }
   }
 }
 
@@ -82,11 +150,9 @@ class CharacterSelectScene extends Phaser.Scene {
       this.add.rectangle(x,y,w,h,0xff0000,0)
         .setInteractive()
         .on("pointerdown",()=>{
-
           this.index=i;
           this.updateChar();
 
-          // glow feedback
           let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
           this.tweens.add({
             targets:glow,
@@ -102,7 +168,6 @@ class CharacterSelectScene extends Phaser.Scene {
               character:this.characters[this.index]
             });
           });
-
         });
     };
 
@@ -152,11 +217,9 @@ class LevelSelectScene extends Phaser.Scene {
       this.add.rectangle(s.x,s.y,s.w,s.h,0xff0000,0)
         .setInteractive()
         .on("pointerdown",()=>{
-
           this.levelIndex=i;
           this.updateOutline();
 
-          // glow
           let glow=this.add.rectangle(s.x,s.y,s.w+20,s.h+20,0xff4fc3,0.25);
           this.tweens.add({
             targets:glow,
@@ -170,7 +233,6 @@ class LevelSelectScene extends Phaser.Scene {
           this.time.delayedCall(180,()=>{
             this.start(s.name);
           });
-
         });
     });
   }
@@ -199,6 +261,62 @@ class GameScene extends Phaser.Scene {
     this.add.text(30,30,"GAME STARTED",{color:"#fff"});
     this.add.text(30,70,"CHAR: "+data.character,{color:"#ff4fc3"});
     this.add.text(30,100,"LEVEL: "+data.level,{color:"#fff"});
+
+    this.player=this.physics.add.rectangle(200,300,50,70,0x00ffcc);
+    this.makeControls();
+  }
+
+  makeControls(){
+    const baseX=120, baseY=420, radius=60;
+
+    const stickBase=this.add.circle(baseX,baseY,radius,0xffffff,0.1);
+    const stick=this.add.circle(baseX,baseY,30,0xffffff,0.4);
+
+    let dragging=false;
+
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<radius+20){
+        dragging=true;
+      }
+    });
+
+    this.input.on("pointermove",p=>{
+      if(!dragging)return;
+
+      let dx=p.x-baseX;
+      let dy=p.y-baseY;
+      let dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(dist>radius){
+        dx=dx/dist*radius;
+        dy=dy/dist*radius;
+      }
+
+      stick.x=baseX+dx;
+      stick.y=baseY+dy;
+      this.player.body.setVelocity(dx*3,dy*3);
+    });
+
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      stick.x=baseX;
+      stick.y=baseY;
+      this.player.body.setVelocity(0,0);
+    });
+
+    // SNES buttons
+    this.add.circle(860,360,30,0xffffff,0.2);
+    this.add.circle(800,420,30,0xffffff,0.2);
+    this.add.circle(920,420,30,0xffffff,0.2);
+    this.add.circle(860,480,30,0xffffff,0.2);
+
+    this.add.text(850,350,"X",{color:"#fff"});
+    this.add.text(790,410,"Y",{color:"#fff"});
+    this.add.text(910,410,"A",{color:"#fff"});
+    this.add.text(850,470,"B",{color:"#fff"});
+
+    this.add.rectangle(480,500,100,30,0xffffff,0.2);
+    this.add.text(450,490,"START",{color:"#fff"});
   }
 }
 
@@ -213,7 +331,8 @@ const config={
     autoCenter:Phaser.Scale.CENTER_BOTH
   },
   physics:{
-    default:"arcade"
+    default:"arcade",
+    arcade:{gravity:{y:0}}
   },
   scene:[TitleScene,CharacterSelectScene,LevelSelectScene,GameScene]
 };
