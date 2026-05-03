@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v0.4</title>
+<title>Motel Pheromones v0.5</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
@@ -46,12 +46,18 @@ class TitleScene extends Phaser.Scene {
   create() {
     this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    const start = this.add.text(480,470,"PRESS START",{
+    const start = this.add.text(480,470,"TAP TO START",{
       fontSize:"28px",
       color:"#ff4fc3"
     }).setOrigin(0.5).setInteractive();
 
-    this.tweens.add({targets:start,alpha:0.2,duration:700,yoyo:true,repeat:-1});
+    this.tweens.add({
+      targets:start,
+      alpha:0.2,
+      duration:700,
+      yoyo:true,
+      repeat:-1
+    });
 
     start.on("pointerdown",()=>this.scene.start("CharacterSelectScene"));
   }
@@ -67,9 +73,6 @@ class CharacterSelectScene extends Phaser.Scene {
     this.characters=["DONNY","JT","HEW"];
     this.index=1;
 
-    this.text=this.add.text(480,420,"",{fontSize:"36px",color:"#fff"}).setOrigin(0.5);
-
-    // OUTLINE
     this.charOutline=this.add.rectangle(480,270,240,360,0xff4fc3,0)
       .setStrokeStyle(4,0xff4fc3);
 
@@ -79,24 +82,36 @@ class CharacterSelectScene extends Phaser.Scene {
       this.add.rectangle(x,y,w,h,0xff0000,0)
         .setInteractive()
         .on("pointerdown",()=>{
+
           this.index=i;
           this.updateChar();
+
+          // glow feedback
+          let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
+          this.tweens.add({
+            targets:glow,
+            alpha:0,
+            scaleX:1.1,
+            scaleY:1.1,
+            duration:180,
+            onComplete:()=>glow.destroy()
+          });
+
+          this.time.delayedCall(180,()=>{
+            this.scene.start("LevelSelectScene",{
+              character:this.characters[this.index]
+            });
+          });
+
         });
     };
 
     makeZone(300,270,210,340,0);
     makeZone(480,270,240,360,1);
     makeZone(690,270,210,340,2);
-
-    this.add.text(480,500,"SELECT",{color:"#ff4fc3"})
-      .setOrigin(0.5)
-      .setInteractive()
-      .on("pointerdown",()=>this.select());
   }
 
   updateChar(){
-    this.text.setText(this.characters[this.index]);
-
     const spots=[
       {x:300,y:270,w:210,h:340},
       {x:480,y:270,w:240,h:360},
@@ -106,10 +121,6 @@ class CharacterSelectScene extends Phaser.Scene {
     let s=spots[this.index];
     this.charOutline.setPosition(s.x,s.y);
     this.charOutline.setSize(s.w,s.h);
-  }
-
-  select(){
-    this.scene.start("LevelSelectScene",{character:this.characters[this.index]});
   }
 }
 
@@ -124,10 +135,10 @@ class LevelSelectScene extends Phaser.Scene {
 
     this.levelSpots=[
       {x:180,y:270,w:160,h:300,name:"HOUSE PARTY"},
-      {x:340,y:270,w:160,h:300,name:"INDOOR"},
-      {x:500,y:270,w:180,h:320,name:"OUTDOOR"},
+      {x:340,y:270,w:160,h:300,name:"LEFTY'S INDOOR"},
+      {x:500,y:270,w:180,h:320,name:"LEFTY'S OUTDOOR"},
       {x:660,y:270,w:160,h:300,name:"LMNOP"},
-      {x:820,y:270,w:160,h:300,name:"CHICKEN"}
+      {x:820,y:270,w:160,h:300,name:"CHICKEN COUPE"}
     ];
 
     this.levelIndex=0;
@@ -135,20 +146,36 @@ class LevelSelectScene extends Phaser.Scene {
     this.levelOutline=this.add.rectangle(180,270,160,300,0xff4fc3,0)
       .setStrokeStyle(4,0xff4fc3);
 
-    this.updateLevelOutline();
+    this.updateOutline();
 
     this.levelSpots.forEach((s,i)=>{
       this.add.rectangle(s.x,s.y,s.w,s.h,0xff0000,0)
         .setInteractive()
         .on("pointerdown",()=>{
+
           this.levelIndex=i;
-          this.updateLevelOutline();
-          this.start(s.name);
+          this.updateOutline();
+
+          // glow
+          let glow=this.add.rectangle(s.x,s.y,s.w+20,s.h+20,0xff4fc3,0.25);
+          this.tweens.add({
+            targets:glow,
+            alpha:0,
+            scaleX:1.1,
+            scaleY:1.1,
+            duration:180,
+            onComplete:()=>glow.destroy()
+          });
+
+          this.time.delayedCall(180,()=>{
+            this.start(s.name);
+          });
+
         });
     });
   }
 
-  updateLevelOutline(){
+  updateOutline(){
     let s=this.levelSpots[this.levelIndex];
     this.levelOutline.setPosition(s.x,s.y);
     this.levelOutline.setSize(s.w,s.h);
@@ -180,6 +207,7 @@ const config={
   type:Phaser.AUTO,
   width:960,
   height:540,
+  backgroundColor:"#000",
   scale:{
     mode:Phaser.Scale.FIT,
     autoCenter:Phaser.Scale.CENTER_BOTH
