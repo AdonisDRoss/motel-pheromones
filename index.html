@@ -4,59 +4,59 @@
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: #000;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
-    touch-action: none;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+}
 
-  canvas {
-    display: block;
-    margin: 0 auto;
-    image-rendering: pixelated;
-  }
+canvas {
+  display: block;
+  width: 100vw !important;
+  height: 100dvh !important;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
 
-  #rotate-warning {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: #000;
-    color: #ff4fc3;
-    font-family: monospace;
-    font-size: 24px;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    z-index: 9999;
-  }
+#rotate-warning {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  color: #ff4fc3;
+  font-family: monospace;
+  font-size: 24px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 9999;
+}
 
-  @media (orientation: portrait) {
-    #rotate-warning {
-      display: flex;
-    }
-  }
+@media (orientation: portrait) {
+  #rotate-warning { display: flex; }
+}
 </style>
 </head>
 
 <body>
 
 <div id="rotate-warning">
-  TURN PHONE SIDEWAYS<br>
-  LANDSCAPE REQUIRED
+TURN PHONE SIDEWAYS<br>
+LANDSCAPE REQUIRED
 </div>
 
 <script>
 
-// =========================
-// TITLE
-// =========================
+// ================= TITLE =================
 class TitleScene extends Phaser.Scene {
   constructor() { super("TitleScene"); }
 
@@ -88,165 +88,182 @@ class TitleScene extends Phaser.Scene {
   }
 }
 
-// =========================
-// CHARACTER SELECT
-// =========================
+// ================= CHARACTER SELECT =================
 class CharacterSelectScene extends Phaser.Scene {
   constructor() { super("CharacterSelectScene"); }
 
   create() {
     this.add.image(480, 270, "characterSelect").setDisplaySize(960, 540);
 
-    this.characters = ["DONNY", "JT", "HEW"];
+    this.characters = ["DONNY","JT","HEW"];
     this.index = 1;
 
-    this.text = this.add.text(480, 420, "", {
-      fontFamily: "monospace",
-      fontSize: "36px",
-      color: "#fff"
+    this.text = this.add.text(480,420,"",{
+      fontFamily:"monospace",
+      fontSize:"36px",
+      color:"#fff"
     }).setOrigin(0.5);
 
     this.updateChar();
 
-    this.add.text(100, 270, "◀", { fontSize: "70px", color: "#ff4fc3" })
-      .setInteractive().on("pointerdown", () => this.move(-1));
+    // arrows
+    this.add.text(100,270,"◀",{fontSize:"70px",color:"#ff4fc3"})
+      .setInteractive().on("pointerdown",()=>this.move(-1));
 
-    this.add.text(860, 270, "▶", { fontSize: "70px", color: "#ff4fc3" })
-      .setInteractive().on("pointerdown", () => this.move(1));
+    this.add.text(860,270,"▶",{fontSize:"70px",color:"#ff4fc3"})
+      .setInteractive().on("pointerdown",()=>this.move(1));
 
-    this.add.text(480, 485, "TAP SELECT", {
-      fontSize: "24px",
-      color: "#ff4fc3"
-    }).setOrigin(0.5).setInteractive()
-      .on("pointerdown", () => this.select());
+    // 🔥 CHARACTER TOUCH ZONES + GLOW
+    const makeCharZone = (x,y,w,h,i)=>{
+      this.add.rectangle(x,y,w,h,0xff00aa,0)
+        .setInteractive()
+        .on("pointerdown",()=>{
+          this.index=i;
+          this.updateChar();
 
-    this.input.keyboard.on("keydown-LEFT", () => this.move(-1));
-    this.input.keyboard.on("keydown-RIGHT", () => this.move(1));
-    this.input.keyboard.on("keydown-ENTER", () => this.select());
+          let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
+
+          this.tweens.add({
+            targets: glow,
+            alpha:0,
+            scaleX:1.08,
+            scaleY:1.08,
+            duration:220,
+            onComplete:()=>glow.destroy()
+          });
+        });
+    };
+
+    makeCharZone(300,270,210,340,0);
+    makeCharZone(480,270,240,360,1);
+    makeCharZone(690,270,210,340,2);
+
+    // select
+    this.add.text(480,490,"TAP SELECT",{fontSize:"24px",color:"#ff4fc3"})
+      .setOrigin(0.5)
+      .setInteractive()
+      .on("pointerdown",()=>this.select());
+
+    this.input.keyboard.on("keydown-LEFT",()=>this.move(-1));
+    this.input.keyboard.on("keydown-RIGHT",()=>this.move(1));
+    this.input.keyboard.on("keydown-ENTER",()=>this.select());
   }
 
-  move(dir) {
-    this.index = (this.index + dir + this.characters.length) % this.characters.length;
+  move(dir){
+    this.index=(this.index+dir+this.characters.length)%this.characters.length;
     this.updateChar();
   }
 
-  updateChar() {
+  updateChar(){
     this.text.setText(this.characters[this.index]);
   }
 
-  select() {
-    this.scene.start("LevelSelectScene", {
-      character: this.characters[this.index]
-    });
+  select(){
+    this.scene.start("LevelSelectScene",{character:this.characters[this.index]});
   }
 }
 
-// =========================
-// LEVEL SELECT (GRAPHIC)
-// =========================
+// ================= LEVEL SELECT =================
 class LevelSelectScene extends Phaser.Scene {
-  constructor() { super("LevelSelectScene"); }
+  constructor(){ super("LevelSelectScene"); }
 
-  create(data) {
-    this.selectedCharacter = data.character;
+  create(data){
+    this.selectedCharacter=data.character;
 
-    this.add.image(480, 270, "levelSelect").setDisplaySize(960, 540);
+    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
-    this.add.text(480, 490, "TAP TO START / PRESS ENTER", {
-      fontFamily: "monospace",
-      fontSize: "24px",
-      color: "#ff4fc3"
-    }).setOrigin(0.5).setInteractive()
-      .on("pointerdown", () => this.start());
+    const makeZone=(x,y,w,h,name)=>{
+      this.add.rectangle(x,y,w,h,0xff0000,0)
+        .setInteractive()
+        .on("pointerdown",()=>{
+          let glow=this.add.rectangle(x,y,w+20,h+20,0xff4fc3,0.25);
 
-    this.input.keyboard.on("keydown-ENTER", () => this.start());
+          this.tweens.add({
+            targets:glow,
+            alpha:0,
+            scaleX:1.1,
+            scaleY:1.1,
+            duration:200,
+            onComplete:()=>glow.destroy()
+          });
+
+          this.time.delayedCall(150,()=>this.start(name));
+        });
+    };
+
+    makeZone(180,270,160,300,"HOUSE PARTY");
+    makeZone(340,270,160,300,"LEFTY'S INDOOR");
+    makeZone(500,270,180,320,"LEFTY'S OUTDOOR");
+    makeZone(660,270,160,300,"LMNOP");
+    makeZone(820,270,160,300,"CHICKEN COUPE");
+
+    this.add.text(480,500,"TAP LEVEL",{fontSize:"22px",color:"#ff4fc3"}).setOrigin(0.5);
   }
 
-  start() {
-    this.scene.start("GameScene", {
-      character: this.selectedCharacter,
-      level: "SELECTED LEVEL"
-    });
+  start(level){
+    this.scene.start("GameScene",{character:this.selectedCharacter,level:level});
   }
 }
 
-// =========================
-// GAME
-// =========================
+// ================= GAME =================
 class GameScene extends Phaser.Scene {
-  constructor() { super("GameScene"); }
+  constructor(){ super("GameScene"); }
 
-  create(data) {
-    this.add.rectangle(480, 270, 960, 540, 0x111111);
+  create(data){
+    this.add.rectangle(480,270,960,540,0x111111);
 
-    this.add.text(30, 30, "GAME STARTED", {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#fff"
-    });
+    this.add.text(30,30,"GAME STARTED",{color:"#fff"});
+    this.add.text(30,70,"CHAR: "+data.character,{color:"#ff4fc3"});
+    this.add.text(30,100,"LEVEL: "+data.level,{color:"#fff"});
 
-    this.add.text(30, 70, "CHAR: " + data.character, {
-      fontSize: "20px",
-      color: "#ff4fc3"
-    });
-
-    this.add.text(30, 100, "LEVEL: " + data.level, {
-      fontSize: "20px",
-      color: "#fff"
-    });
-
-    // Player placeholder
-    this.player = this.physics.add.rectangle(200, 300, 50, 70, 0x00ffcc);
+    this.player=this.physics.add.rectangle(200,300,50,70,0x00ffcc);
 
     this.makeControls();
   }
 
-  makeControls() {
-    const baseX = 120;
-    const baseY = 420;
-    const radius = 60;
+  makeControls(){
+    const baseX=120, baseY=420, radius=60;
 
-    let stick = this.add.circle(baseX, baseY, 30, 0xffffff, 0.4);
-    this.add.circle(baseX, baseY, radius, 0xffffff, 0.1);
+    let stick=this.add.circle(baseX,baseY,30,0xffffff,0.4);
+    this.add.circle(baseX,baseY,radius,0xffffff,0.1);
 
-    let dragging = false;
+    let dragging=false;
 
-    this.input.on("pointerdown", p => {
-      if (Phaser.Math.Distance.Between(p.x, p.y, baseX, baseY) < radius + 20) {
-        dragging = true;
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<radius+20){
+        dragging=true;
       }
     });
 
-    this.input.on("pointermove", p => {
-      if (!dragging) return;
+    this.input.on("pointermove",p=>{
+      if(!dragging)return;
 
-      let dx = p.x - baseX;
-      let dy = p.y - baseY;
-      let dist = Math.sqrt(dx*dx + dy*dy);
+      let dx=p.x-baseX, dy=p.y-baseY;
+      let dist=Math.sqrt(dx*dx+dy*dy);
 
-      if (dist > radius) {
-        dx = dx/dist * radius;
-        dy = dy/dist * radius;
+      if(dist>radius){
+        dx=dx/dist*radius;
+        dy=dy/dist*radius;
       }
 
-      stick.x = baseX + dx;
-      stick.y = baseY + dy;
+      stick.x=baseX+dx;
+      stick.y=baseY+dy;
 
-      this.player.body.setVelocity(dx*3, dy*3);
+      this.player.body.setVelocity(dx*3,dy*3);
     });
 
-    this.input.on("pointerup", () => {
-      dragging = false;
-      stick.x = baseX;
-      stick.y = baseY;
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      stick.x=baseX;
+      stick.y=baseY;
       this.player.body.setVelocity(0,0);
     });
 
-    // SNES buttons
-    this.add.circle(860, 360, 30, 0xffffff, 0.2);
-    this.add.circle(800, 420, 30, 0xffffff, 0.2);
-    this.add.circle(920, 420, 30, 0xffffff, 0.2);
-    this.add.circle(860, 480, 30, 0xffffff, 0.2);
+    // buttons
+    this.add.circle(860,360,30,0xffffff,0.2);
+    this.add.circle(800,420,30,0xffffff,0.2);
+    this.add.circle(920,420,30,0xffffff,0.2);
+    this.add.circle(860,480,30,0xffffff,0.2);
 
     this.add.text(850,350,"X");
     this.add.text(790,410,"Y");
@@ -258,23 +275,23 @@ class GameScene extends Phaser.Scene {
   }
 }
 
-// =========================
-// CONFIG
-// =========================
-const config = {
-  type: Phaser.AUTO,
-  width: 960,
-  height: 540,
-  backgroundColor: "#000",
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+// ================= CONFIG =================
+const config={
+  type:Phaser.AUTO,
+  width:960,
+  height:540,
+  backgroundColor:"#000",
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH,
+    width:960,
+    height:540
   },
-  physics: {
-    default: "arcade",
-    arcade: { gravity: { y: 0 }, debug: false }
+  physics:{
+    default:"arcade",
+    arcade:{gravity:{y:0}}
   },
-  scene: [TitleScene, CharacterSelectScene, LevelSelectScene, GameScene]
+  scene:[TitleScene,CharacterSelectScene,LevelSelectScene,GameScene]
 };
 
 new Phaser.Game(config);
