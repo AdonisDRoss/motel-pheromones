@@ -3,123 +3,153 @@
 <head>
   <meta charset="UTF-8" />
   <title>Motel Pheromones</title>
+
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
   <style>
-    body { margin:0; background:#000; overflow:hidden; }
-    canvas { display:block; margin:0 auto; image-rendering: pixelated; }
+    body {
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
   </style>
 </head>
 
 <body>
 
 <script>
+// =========================
+// GAME CONFIG
+// =========================
 const config = {
   type: Phaser.AUTO,
   width: 960,
   height: 540,
   backgroundColor: "#000",
+
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
+
+  physics: {
+    default: "arcade",
+    arcade: {
+      gravity: { y: 0 },
+      debug: false
+    }
+  },
+
   scene: [TitleScene, GameScene]
 };
 
 new Phaser.Game(config);
 
-// =====================
+// =========================
 // TITLE SCENE
-// =====================
+// =========================
 class TitleScene extends Phaser.Scene {
   constructor() {
     super("TitleScene");
   }
 
   preload() {
+    // MAKE SURE THIS MATCHES YOUR FILE EXACTLY
     this.load.image("title", "assets/title-screen.png");
   }
 
   create() {
     // Background image
-    this.bg = this.add.image(480, 270, "title").setDisplaySize(960, 540);
+    this.add.image(480, 270, "title").setDisplaySize(960, 540);
 
     // Glow overlay
-    this.glow = this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.08);
+    this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.06);
 
-    // PRESS START (animated)
-    this.pressStart = this.add.text(480, 470, "PRESS START", {
+    // PRESS START TEXT
+    const pressStart = this.add.text(480, 470, "PRESS START", {
       fontFamily: "monospace",
       fontSize: "28px",
       color: "#ff4fc3"
     }).setOrigin(0.5);
 
+    // Blinking animation
     this.tweens.add({
-      targets: this.pressStart,
+      targets: pressStart,
       alpha: 0.2,
-      duration: 800,
+      duration: 700,
       yoyo: true,
       repeat: -1
     });
 
-    // Menu
-    this.menuItems = ["START GAME", "OPTIONS", "CREDITS"];
-    this.menuText = [];
-    this.selected = 0;
+    // MENU
+    const menuItems = ["START GAME", "OPTIONS", "CREDITS"];
+    let selected = 0;
+    let menuTexts = [];
 
-    this.createMenu();
+    const drawMenu = () => {
+      menuTexts.forEach(t => t.destroy());
+      menuTexts = [];
 
-    // Input
-    this.input.keyboard.on("keydown-UP", () => this.move(-1));
-    this.input.keyboard.on("keydown-DOWN", () => this.move(1));
-    this.input.keyboard.on("keydown-ENTER", () => this.select());
+      for (let i = 0; i < menuItems.length; i++) {
+        let color = i === selected ? "#ffffff" : "#888888";
 
-    this.input.on("pointerdown", () => this.select());
-  }
-
-  createMenu() {
-    this.menuText.forEach(t => t.destroy());
-    this.menuText = [];
-
-    for (let i = 0; i < this.menuItems.length; i++) {
-      let color = i === this.selected ? "#ffffff" : "#888888";
-
-      let text = this.add.text(80, 300 + i * 40, this.menuItems[i], {
-        fontFamily: "monospace",
-        fontSize: "22px",
-        color: color
-      });
-
-      if (i === this.selected) {
-        this.add.text(60, 300 + i * 40, ">", {
+        let text = this.add.text(100, 300 + i * 40, menuItems[i], {
+          fontFamily: "monospace",
           fontSize: "22px",
-          color: "#ff4fc3"
+          color: color
         });
+
+        if (i === selected) {
+          this.add.text(80, 300 + i * 40, ">", {
+            fontSize: "22px",
+            color: "#ff4fc3"
+          });
+        }
+
+        menuTexts.push(text);
       }
+    };
 
-      this.menuText.push(text);
-    }
-  }
+    drawMenu();
 
-  move(dir) {
-    this.selected = (this.selected + dir + this.menuItems.length) % this.menuItems.length;
-    this.createMenu();
-  }
+    // INPUT
+    this.input.keyboard.on("keydown-UP", () => {
+      selected = (selected - 1 + menuItems.length) % menuItems.length;
+      drawMenu();
+    });
 
-  select() {
-    if (this.selected === 0) {
+    this.input.keyboard.on("keydown-DOWN", () => {
+      selected = (selected + 1) % menuItems.length;
+      drawMenu();
+    });
+
+    this.input.keyboard.on("keydown-ENTER", () => {
+      if (selected === 0) startGame.call(this);
+    });
+
+    this.input.on("pointerdown", () => {
+      startGame.call(this);
+    });
+
+    const startGame = () => {
       this.cameras.main.fadeOut(300);
 
       this.time.delayedCall(300, () => {
         this.scene.start("GameScene");
       });
-    }
+    };
   }
 }
 
-// =====================
-// GAME SCENE
-// =====================
+// =========================
+// GAME SCENE (TEST BUILD)
+// =========================
 class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene");
@@ -134,7 +164,101 @@ class GameScene extends Phaser.Scene {
       color: "#ffffff"
     });
 
-    this.player = this.add.rectangle(200, 300, 50, 70, 0x00ffcc);
+    // Player
+    this.player = this.physics.add.rectangle(200, 300, 50, 70, 0x00ffcc);
+    this.player.body.setCollideWorldBounds(true);
+
+    // Enemies
+    this.enemies = this.physics.add.group();
+
+    for (let i = 0; i < 5; i++) {
+      let enemy = this.physics.add.rectangle(
+        500 + i * 70,
+        300 + Phaser.Math.Between(-40, 40),
+        40,
+        60,
+        0xff3355
+      );
+
+      enemy.hp = 30;
+      enemy.speed = 60;
+      this.enemies.add(enemy);
+    }
+
+    // Controls
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K");
+
+    this.input.keyboard.on("keydown-J", () => this.attack(70, 10, 250));
+    this.input.keyboard.on("keydown-K", () => this.attack(100, 20, 400));
+  }
+
+  update() {
+    const speed = 200;
+    this.player.body.setVelocity(0);
+
+    if (this.cursors.left.isDown || this.keys.A.isDown) {
+      this.player.body.setVelocityX(-speed);
+    }
+    if (this.cursors.right.isDown || this.keys.D.isDown) {
+      this.player.body.setVelocityX(speed);
+    }
+    if (this.cursors.up.isDown || this.keys.W.isDown) {
+      this.player.body.setVelocityY(-speed);
+    }
+    if (this.cursors.down.isDown || this.keys.S.isDown) {
+      this.player.body.setVelocityY(speed);
+    }
+
+    this.player.depth = this.player.y;
+
+    this.enemies.children.iterate(enemy => {
+      if (!enemy || enemy.hp <= 0) return;
+
+      let dx = this.player.x - enemy.x;
+      let dy = this.player.y - enemy.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 40) {
+        enemy.body.setVelocity(
+          (dx / dist) * enemy.speed,
+          (dy / dist) * enemy.speed
+        );
+      } else {
+        enemy.body.setVelocity(0);
+      }
+    });
+  }
+
+  attack(range, damage, knockback) {
+    this.enemies.children.iterate(enemy => {
+      if (!enemy || enemy.hp <= 0) return;
+
+      let dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (dist < range) {
+        enemy.hp -= damage;
+
+        let dir = enemy.x > this.player.x ? 1 : -1;
+        enemy.body.setVelocityX(dir * knockback);
+
+        enemy.setFillStyle(0xffff00);
+
+        this.time.delayedCall(120, () => {
+          if (enemy.hp > 0) enemy.setFillStyle(0xff3355);
+        });
+
+        if (enemy.hp <= 0) {
+          enemy.setFillStyle(0x555555);
+          enemy.body.enable = false;
+        }
+      }
+    });
   }
 }
 </script>
