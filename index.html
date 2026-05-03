@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones v1.5</title>
+<title>Motel Pheromones v1.6</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
@@ -29,7 +29,7 @@ canvas {
 <body>
 <script>
 
-const GAME_VERSION = 51;
+const GAME_VERSION = 100;
 
 const JT_ANIMS = {
   idle:{start:0,end:3,rate:6,repeat:-1},
@@ -49,11 +49,501 @@ const JT_ANIMS = {
   doubleJump:{start:224,end:227,rate:10,repeat:0}
 };
 
-// ================= TITLE =================
 class TitleScene extends Phaser.Scene {
   constructor(){ super("TitleScene"); }
 
   preload(){
-    this.load.image("title","assets/title-screen.png?v=" + GAME_VERSION);
-    this.load.image("characterSelect","assets/character-select.png?v=" + GAME_VERSION);
-    this.load.image("levelSelect
+    this.load.image("title","assets/title-screen.png?v="+GAME_VERSION);
+    this.load.image("characterSelect","assets/character-select.png?v="+GAME_VERSION);
+    this.load.image("levelSelect","assets/level-select.png?v="+GAME_VERSION);
+
+    this.load.image("outdoorLevel","assets/levels/outdoor.png?v="+GAME_VERSION);
+    this.load.image("indoorLevel","assets/levels/indoor.png?v="+GAME_VERSION);
+
+    this.load.spritesheet("jt","assets/player/jt/jt-master.png?v="+GAME_VERSION,{
+      frameWidth:128,
+      frameHeight:128,
+      margin:0,
+      spacing:0
+    });
+  }
+
+  create(){
+    this.add.image(480,270,"title").setDisplaySize(960,540);
+
+    const start=this.add.text(480,470,"TAP TO START",{
+      fontFamily:"monospace",
+      fontSize:"28px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5).setInteractive();
+
+    this.tweens.add({
+      targets:start,
+      alpha:0.25,
+      duration:700,
+      yoyo:true,
+      repeat:-1
+    });
+
+    start.on("pointerdown",()=>this.scene.start("CharacterSelectScene"));
+  }
+}
+
+class CharacterSelectScene extends Phaser.Scene {
+  constructor(){ super("CharacterSelectScene"); }
+
+  create(){
+    this.add.image(480,270,"characterSelect").setDisplaySize(960,540);
+
+    const spots=[
+      {x:300,y:280,w:210,h:340,name:"DONNY"},
+      {x:480,y:280,w:240,h:360,name:"JT"},
+      {x:690,y:280,w:210,h:340,name:"HEW"}
+    ];
+
+    this.outline=this.add.rectangle(480,280,240,360,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(20);
+
+    spots.forEach(s=>{
+      this.add.rectangle(s.x,s.y,s.w,s.h,0xff0000,0)
+        .setInteractive()
+        .on("pointerdown",()=>{
+          this.outline.setPosition(s.x,s.y);
+          this.outline.setSize(s.w,s.h);
+
+          this.time.delayedCall(200,()=>{
+            this.scene.start("LevelSelectScene",{character:s.name});
+          });
+        });
+    });
+  }
+}
+
+class LevelSelectScene extends Phaser.Scene {
+  constructor(){ super("LevelSelectScene"); }
+
+  create(data){
+    this.selectedCharacter=data.character || "JT";
+
+    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+
+    const levels=[
+      {x:190,y:300,w:165,h:300,name:"HOUSE PARTY",key:"house"},
+      {x:355,y:300,w:165,h:300,name:"LEFTY'S INDOOR",key:"indoor"},
+      {x:520,y:300,w:190,h:330,name:"OUTDOOR",key:"outdoor"},
+      {x:690,y:300,w:165,h:300,name:"LMNOP",key:"lmnop"},
+      {x:845,y:300,w:165,h:300,name:"CHICKEN COUPE",key:"chicken"}
+    ];
+
+    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(90);
+
+    this.confirmText=this.add.text(480,505,"TAP A LEVEL",{
+      fontFamily:"monospace",
+      fontSize:"20px",
+      color:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(100);
+
+    levels.forEach(level=>{
+      this.add.rectangle(level.x,level.y,level.w,level.h,0xff0000,0)
+        .setInteractive()
+        .setDepth(99)
+        .on("pointerdown",()=>{
+          this.outline.setPosition(level.x,level.y);
+          this.outline.setSize(level.w,level.h);
+          this.confirmText.setText("LOADING: "+level.name);
+
+          this.time.delayedCall(250,()=>{
+            this.scene.start("GameScene",{
+              character:this.selectedCharacter,
+              levelName:level.name,
+              levelKey:level.key
+            });
+          });
+        });
+    });
+  }
+}
+
+class GameScene extends Phaser.Scene {
+  constructor(){ super("GameScene"); }
+
+  create(data){
+    this.levelKey=data.levelKey || "outdoor";
+    this.levelName=data.levelName || "OUTDOOR";
+    this.character=data.character || "JT";
+
+    if(this.levelKey==="outdoor" && this.textures.exists("outdoorLevel")){
+      this.add.image(480,270,"outdoorLevel").setDisplaySize(960,540);
+    } else if(this.levelKey==="indoor" && this.textures.exists("indoorLevel")){
+      this.add.image(480,270,"indoorLevel").setDisplaySize(960,540);
+    } else {
+      this.add.rectangle(480,270,960,540,0x333333);
+      this.add.text(480,270,"LEVEL IMAGE MISSING\nUsing test background",{
+        fontFamily:"monospace",
+        fontSize:"22px",
+        color:"#ff4fc3",
+        align:"center"
+      }).setOrigin(0.5);
+    }
+
+    this.add.text(20,20,"CHAR: "+this.character,{fontFamily:"monospace",fontSize:"16px",color:"#fff"}).setDepth(1000);
+    this.add.text(20,45,"LEVEL: "+this.levelName,{fontFamily:"monospace",fontSize:"16px",color:"#ff4fc3"}).setDepth(1000);
+
+    this.depthMin=250;
+    this.depthMax=440;
+
+    this.moveX=0;
+    this.moveY=0;
+    this.facing=1;
+    this.isAttacking=false;
+    this.comboStep=0;
+    this.comboTimer=null;
+
+    this.createJTAnimations();
+
+    this.shadow=this.add.ellipse(200,410,54,16,0x000000,0.35);
+
+    if(this.textures.exists("jt")){
+      this.player=this.physics.add.sprite(200,400,"jt",0);
+      this.player.setOrigin(0.5,1);
+      this.player.setScale(1.5);
+
+      if(this.anims.exists("idle")){
+        this.player.play("idle");
+      }
+    } else {
+      this.player=this.physics.add.rectangle(200,400,50,80,0x00ffcc);
+    }
+
+    this.player.setCollideWorldBounds(true);
+
+    this.enemies=this.physics.add.group();
+
+    for(let i=0;i<4;i++){
+      const enemy=this.physics.add.rectangle(
+        560+i*70,
+        375+Phaser.Math.Between(-30,30),
+        42,
+        64,
+        0xff3355
+      );
+      enemy.hp=40;
+      enemy.speed=60;
+      enemy.hitstun=0;
+      this.enemies.add(enemy);
+    }
+
+    this.makeTouchControls();
+  }
+
+  createJTAnimations(){
+    if(!this.textures.exists("jt")) return;
+
+    Object.keys(JT_ANIMS).forEach(key=>{
+      if(this.anims.exists(key)) return;
+
+      const a=JT_ANIMS[key];
+
+      this.anims.create({
+        key:key,
+        frames:this.anims.generateFrameNumbers("jt",{start:a.start,end:a.end}),
+        frameRate:a.rate,
+        repeat:a.repeat
+      });
+    });
+  }
+
+  update(){
+    const speed=190;
+
+    if(!this.isAttacking){
+      this.player.body.setVelocity(this.moveX*speed,this.moveY*speed);
+      this.player.y=Phaser.Math.Clamp(this.player.y,this.depthMin,this.depthMax);
+
+      if(this.player.play){
+        if(this.moveX!==0 || this.moveY!==0){
+          this.player.play("walk",true);
+        } else {
+          this.player.play("idle",true);
+        }
+      }
+
+      if(this.moveX<0){
+        this.facing=-1;
+        if(this.player.setFlipX) this.player.setFlipX(true);
+      }
+
+      if(this.moveX>0){
+        this.facing=1;
+        if(this.player.setFlipX) this.player.setFlipX(false);
+      }
+    }
+
+    this.shadow.x=this.player.x;
+    this.shadow.y=this.player.y+4;
+    this.shadow.depth=this.player.y-1;
+    this.player.depth=this.player.y;
+
+    this.updateEnemies();
+  }
+
+  updateEnemies(){
+    this.enemies.children.iterate(enemy=>{
+      if(!enemy || enemy.hp<=0) return;
+
+      enemy.y=Phaser.Math.Clamp(enemy.y,this.depthMin,this.depthMax);
+      enemy.depth=enemy.y;
+
+      if(enemy.hitstun>0){
+        enemy.hitstun--;
+        return;
+      }
+
+      const dx=this.player.x-enemy.x;
+      const dy=this.player.y-enemy.y;
+
+      enemy.body.setVelocityX(Math.abs(dx)>60 ? Math.sign(dx)*enemy.speed : 0);
+      enemy.body.setVelocityY(Math.abs(dy)>14 ? Math.sign(dy)*enemy.speed : 0);
+    });
+  }
+
+  comboAttack(){
+    if(this.isAttacking) return;
+
+    this.comboStep++;
+    if(this.comboStep>3) this.comboStep=1;
+
+    if(this.comboTimer) this.comboTimer.remove();
+
+    if(this.comboStep===1){
+      this.playAttack("light",75,10,180);
+    } else if(this.comboStep===2){
+      this.playAttack("light",85,12,220);
+    } else {
+      this.playAttack("heavy",120,22,380);
+    }
+
+    this.comboTimer=this.time.delayedCall(600,()=>{
+      this.comboStep=0;
+    });
+  }
+
+  playAttack(anim,range,damage,knockback){
+    if(this.isAttacking) return;
+
+    this.isAttacking=true;
+    this.player.body.setVelocity(0,0);
+
+    if(this.player.play && this.anims.exists(anim)){
+      this.player.play(anim,true);
+    }
+
+    this.time.delayedCall(120,()=>{
+      this.attackEnemies(range,damage,knockback);
+    });
+
+    this.time.delayedCall(420,()=>{
+      this.isAttacking=false;
+      if(this.player.play && this.anims.exists("idle")) this.player.play("idle",true);
+    });
+  }
+
+  spinAttack(){
+    if(this.isAttacking) return;
+
+    this.isAttacking=true;
+    this.player.body.setVelocity(0,0);
+
+    if(this.player.play && this.anims.exists("spin")) this.player.play("spin",true);
+
+    this.time.delayedCall(160,()=>{
+      this.enemies.children.iterate(enemy=>{
+        if(!enemy || enemy.hp<=0) return;
+
+        const dist=Phaser.Math.Distance.Between(this.player.x,this.player.y,enemy.x,enemy.y);
+
+        if(dist<125){
+          enemy.hp-=25;
+          enemy.hitstun=18;
+          enemy.setFillStyle(0xffff00);
+
+          const dir=enemy.x>this.player.x ? 1 : -1;
+          enemy.body.setVelocityX(dir*420);
+
+          this.time.delayedCall(120,()=>{
+            if(enemy.hp>0) enemy.setFillStyle(0xff3355);
+          });
+
+          if(enemy.hp<=0){
+            enemy.setFillStyle(0x555555);
+            enemy.body.enable=false;
+          }
+        }
+      });
+    });
+
+    this.time.delayedCall(650,()=>{
+      this.isAttacking=false;
+      if(this.player.play && this.anims.exists("idle")) this.player.play("idle",true);
+    });
+  }
+
+  throwProjectile(){
+    if(this.isAttacking) return;
+
+    this.isAttacking=true;
+    this.player.body.setVelocity(0,0);
+
+    if(this.player.play && this.anims.exists("projectile")) this.player.play("projectile",true);
+
+    this.time.delayedCall(220,()=>{
+      const stick=this.physics.add.rectangle(
+        this.player.x+this.facing*55,
+        this.player.y-40,
+        34,
+        8,
+        0xffffff
+      );
+
+      stick.body.setVelocityX(this.facing*460);
+
+      this.time.delayedCall(1200,()=>{
+        if(stick.body) stick.destroy();
+      });
+    });
+
+    this.time.delayedCall(600,()=>{
+      this.isAttacking=false;
+      if(this.player.play && this.anims.exists("idle")) this.player.play("idle",true);
+    });
+  }
+
+  attackEnemies(range,damage,knockback){
+    this.enemies.children.iterate(enemy=>{
+      if(!enemy || enemy.hp<=0) return;
+
+      const xDist=Math.abs(this.player.x-enemy.x);
+      const yDist=Math.abs(this.player.y-enemy.y);
+
+      if(xDist<range && yDist<45){
+        enemy.hp-=damage;
+        enemy.hitstun=14;
+        enemy.setFillStyle(0xffff00);
+
+        const dir=enemy.x>this.player.x ? 1 : -1;
+        enemy.body.setVelocityX(dir*knockback);
+
+        this.time.delayedCall(120,()=>{
+          if(enemy.hp>0) enemy.setFillStyle(0xff3355);
+        });
+
+        if(enemy.hp<=0){
+          enemy.setFillStyle(0x555555);
+          enemy.body.enable=false;
+        }
+      }
+    });
+  }
+
+  makeTouchControls(){
+    const baseX=120;
+    const baseY=420;
+    const r=62;
+
+    this.add.circle(baseX,baseY,r,0xffffff,0.13).setDepth(999);
+    const stick=this.add.circle(baseX,baseY,30,0xffffff,0.45).setDepth(1000);
+
+    let dragging=false;
+
+    const updateStick=(p)=>{
+      let dx=p.x-baseX;
+      let dy=p.y-baseY;
+      let dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(dist>r){
+        dx=dx/dist*r;
+        dy=dy/dist*r;
+      }
+
+      stick.x=baseX+dx;
+      stick.y=baseY+dy;
+
+      this.moveX=dx/r;
+      this.moveY=dy/r;
+    };
+
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<r+20){
+        dragging=true;
+        updateStick(p);
+      }
+    });
+
+    this.input.on("pointermove",p=>{
+      if(dragging) updateStick(p);
+    });
+
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      stick.x=baseX;
+      stick.y=baseY;
+      this.moveX=0;
+      this.moveY=0;
+      this.player.body.setVelocity(0,0);
+    });
+
+    this.makeButton(860,350,"X",()=>this.playAttack("heavy",120,22,380));
+    this.makeButton(800,420,"Y",()=>this.comboAttack());
+    this.makeButton(920,420,"A",()=>this.throwProjectile());
+    this.makeButton(860,485,"B",()=>this.playAttack("kick",90,14,250));
+    this.makeButton(745,350,"SP",()=>this.spinAttack());
+
+    this.add.rectangle(480,505,100,32,0xffffff,0.18).setDepth(999);
+    this.add.text(480,505,"START",{
+      fontFamily:"monospace",
+      fontSize:"16px",
+      color:"#ffffff"
+    }).setOrigin(0.5).setDepth(1000);
+  }
+
+  makeButton(x,y,label,callback){
+    this.add.circle(x,y,32,0xffffff,0.22)
+      .setInteractive()
+      .setDepth(999)
+      .on("pointerdown",callback);
+
+    this.add.text(x,y,label,{
+      fontFamily:"monospace",
+      fontSize:"18px",
+      color:"#ffffff"
+    }).setOrigin(0.5).setDepth(1000);
+  }
+}
+
+const config={
+  type:Phaser.AUTO,
+  width:960,
+  height:540,
+  backgroundColor:"#000000",
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH
+  },
+  physics:{
+    default:"arcade",
+    arcade:{
+      gravity:{y:0},
+      debug:false
+    }
+  },
+  scene:[TitleScene,CharacterSelectScene,LevelSelectScene,GameScene]
+};
+
+new Phaser.Game(config);
+
+</script>
+</body>
+</html>
