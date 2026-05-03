@@ -7,17 +7,8 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
   <style>
-    body {
-      margin: 0;
-      background: #000;
-      overflow: hidden;
-    }
-
-    canvas {
-      display: block;
-      margin: 0 auto;
-      image-rendering: pixelated;
-    }
+    body { margin: 0; background: #000; overflow: hidden; }
+    canvas { display: block; margin: 0 auto; image-rendering: pixelated; }
   </style>
 </head>
 
@@ -35,16 +26,14 @@ class TitleScene extends Phaser.Scene {
 
   preload() {
     this.load.image("title", "assets/title-screen.png");
+    this.load.image("characterSelect", "assets/character-select.png");
   }
 
   create() {
-    // Background
     this.add.image(480, 270, "title").setDisplaySize(960, 540);
 
-    // Glow
     this.glow = this.add.rectangle(480, 270, 960, 540, 0xff0088, 0.06);
 
-    // Glow animation
     this.tweens.add({
       targets: this.glow,
       alpha: 0.12,
@@ -53,9 +42,7 @@ class TitleScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // =========================
     // RAIN
-    // =========================
     this.rain = [];
     for (let i = 0; i < 120; i++) {
       let drop = this.add.rectangle(
@@ -70,9 +57,7 @@ class TitleScene extends Phaser.Scene {
       this.rain.push(drop);
     }
 
-    // =========================
     // FOG
-    // =========================
     this.fogLayers = [];
     for (let i = 0; i < 3; i++) {
       let fog = this.add.rectangle(
@@ -90,7 +75,6 @@ class TitleScene extends Phaser.Scene {
       this.fogLayers.push(fog);
     }
 
-    // PRESS START
     const pressStart = this.add.text(480, 470, "PRESS START", {
       fontFamily: "monospace",
       fontSize: "28px",
@@ -105,7 +89,6 @@ class TitleScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // MENU
     const menuItems = ["START GAME", "OPTIONS", "CREDITS"];
     let selected = 0;
     let menuTexts = [];
@@ -143,7 +126,6 @@ class TitleScene extends Phaser.Scene {
 
     drawMenu();
 
-    // Keyboard
     this.input.keyboard.on("keydown-UP", () => {
       selected = (selected - 1 + menuItems.length) % menuItems.length;
       drawMenu();
@@ -163,15 +145,13 @@ class TitleScene extends Phaser.Scene {
 
     const startGame = () => {
       this.cameras.main.fadeOut(300);
-
       this.time.delayedCall(300, () => {
-        this.scene.start("GameScene");
+        this.scene.start("CharacterSelectScene");
       });
     };
   }
 
   update() {
-    // Rain movement
     this.rain.forEach(drop => {
       drop.y += drop.speed * 0.016;
       if (drop.y > 540) {
@@ -180,12 +160,37 @@ class TitleScene extends Phaser.Scene {
       }
     });
 
-    // Fog movement
     this.fogLayers.forEach(fog => {
       fog.x += fog.speed * fog.direction;
-
       if (fog.x > 1100) fog.x = -100;
       if (fog.x < -100) fog.x = 1100;
+    });
+  }
+}
+
+// =========================
+// CHARACTER SELECT
+// =========================
+class CharacterSelectScene extends Phaser.Scene {
+  constructor() {
+    super("CharacterSelectScene");
+  }
+
+  create() {
+    this.add.image(480, 270, "characterSelect").setDisplaySize(960, 540);
+
+    this.add.text(480, 500, "TAP TO SELECT", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      color: "#ff4fc3"
+    }).setOrigin(0.5);
+
+    this.input.on("pointerdown", () => {
+      this.scene.start("GameScene");
+    });
+
+    this.input.keyboard.on("keydown-ENTER", () => {
+      this.scene.start("GameScene");
     });
   }
 }
@@ -206,96 +211,11 @@ class GameScene extends Phaser.Scene {
       fontSize: "22px",
       color: "#ffffff"
     });
-
-    this.player = this.physics.add.rectangle(200, 300, 50, 70, 0x00ffcc);
-    this.player.body.setCollideWorldBounds(true);
-
-    this.enemies = this.physics.add.group();
-
-    for (let i = 0; i < 5; i++) {
-      let enemy = this.physics.add.rectangle(
-        500 + i * 70,
-        300 + Phaser.Math.Between(-40, 40),
-        40,
-        60,
-        0xff3355
-      );
-
-      enemy.hp = 30;
-      enemy.speed = 60;
-      this.enemies.add(enemy);
-    }
-
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys("W,A,S,D,J,K");
-
-    this.input.keyboard.on("keydown-J", () => this.attack(70, 10, 250));
-    this.input.keyboard.on("keydown-K", () => this.attack(100, 20, 400));
-  }
-
-  update() {
-    const speed = 200;
-    this.player.body.setVelocity(0);
-
-    if (this.cursors.left.isDown || this.keys.A.isDown) this.player.body.setVelocityX(-speed);
-    if (this.cursors.right.isDown || this.keys.D.isDown) this.player.body.setVelocityX(speed);
-    if (this.cursors.up.isDown || this.keys.W.isDown) this.player.body.setVelocityY(-speed);
-    if (this.cursors.down.isDown || this.keys.S.isDown) this.player.body.setVelocityY(speed);
-
-    this.player.depth = this.player.y;
-
-    this.enemies.children.iterate(enemy => {
-      if (!enemy || enemy.hp <= 0) return;
-
-      let dx = this.player.x - enemy.x;
-      let dy = this.player.y - enemy.y;
-      let dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist > 40) {
-        enemy.body.setVelocity(
-          (dx / dist) * enemy.speed,
-          (dy / dist) * enemy.speed
-        );
-      } else {
-        enemy.body.setVelocity(0);
-      }
-    });
-  }
-
-  attack(range, damage, knockback) {
-    this.enemies.children.iterate(enemy => {
-      if (!enemy || enemy.hp <= 0) return;
-
-      let dist = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        enemy.x,
-        enemy.y
-      );
-
-      if (dist < range) {
-        enemy.hp -= damage;
-
-        let dir = enemy.x > this.player.x ? 1 : -1;
-        enemy.body.setVelocityX(dir * knockback);
-
-        enemy.setFillStyle(0xffff00);
-
-        this.time.delayedCall(120, () => {
-          if (enemy.hp > 0) enemy.setFillStyle(0xff3355);
-        });
-
-        if (enemy.hp <= 0) {
-          enemy.setFillStyle(0x555555);
-          enemy.body.enable = false;
-        }
-      }
-    });
   }
 }
 
 // =========================
-// CONFIG (MUST BE LAST)
+// CONFIG (LAST)
 // =========================
 const config = {
   type: Phaser.AUTO,
@@ -316,7 +236,7 @@ const config = {
     }
   },
 
-  scene: [TitleScene, GameScene]
+  scene: [TitleScene, CharacterSelectScene, GameScene]
 };
 
 new Phaser.Game(config);
