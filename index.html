@@ -3,42 +3,53 @@
 <head>
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 
 <style>
-body { margin:0; background:black; overflow:hidden; }
-canvas { width:100vw !important; height:100vh !important; image-rendering:pixelated; }
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{
+  width:100vw!important;
+  height:100vh!important;
+  object-fit:contain;
+  image-rendering:pixelated;
+}
 </style>
 </head>
 
 <body>
 <script>
 
-const VERSION = 107;
+const VERSION = 108;
 
 class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
 
   preload(){
-
-    // UI
     this.load.image("title","assets/title-screen.png?v="+VERSION);
     this.load.image("fighterSelect","assets/character-select.png?v="+VERSION);
     this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
 
-    // LEVELS
     this.load.image("house","assets/levels/house-party.png?v="+VERSION);
     this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
     this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
-    // PLAYER
     this.load.spritesheet("jt","assets/player/jt/jt-master.png?v="+VERSION,{
       frameWidth:128,
-      frameHeight:128
+      frameHeight:128,
+      margin:0,
+      spacing:0
     });
   }
 
@@ -76,15 +87,20 @@ class FighterSelect extends Phaser.Scene {
       {name:"JT",x:700,y:300}
     ];
 
-    this.outline=this.add.rectangle(700,300,170,260,0xff4fc3,0)
-      .setStrokeStyle(4,0xff4fc3);
+    this.outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
+      .setStrokeStyle(4,0xff4fc3)
+      .setDepth(50);
 
     fighters.forEach(f=>{
       this.add.rectangle(f.x,f.y,170,260,0xffffff,0.01)
         .setInteractive()
+        .setDepth(40)
         .on("pointerdown",()=>{
           this.outline.setPosition(f.x,f.y);
-          this.scene.start("LevelSelect",{fighter:f.name});
+
+          this.time.delayedCall(150,()=>{
+            this.scene.start("LevelSelect",{fighter:f.name});
+          });
         });
     });
   }
@@ -99,26 +115,37 @@ class LevelSelect extends Phaser.Scene {
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
     const levels=[
-      {name:"HOUSE PARTY",key:"house",x:190,y:300},
-      {name:"INDOOR",key:"indoor",x:360,y:300},
-      {name:"OUTDOOR",key:"outdoor",x:520,y:300},
-      {name:"LMNOP",key:"lmnop",x:690,y:300},
-      {name:"CHICKEN",key:"chicken",x:850,y:300}
+      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
+      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
+      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
+      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
+      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
     ];
 
-    this.outline=this.add.rectangle(520,300,180,280,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3);
+    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
+
+    this.status=this.add.text(480,505,"TAP A LEVEL",{
+      font:"20px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(60);
 
     levels.forEach(l=>{
-      this.add.rectangle(l.x,l.y,170,260,0xffffff,0.01)
+      this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
         .setInteractive()
+        .setDepth(40)
         .on("pointerdown",()=>{
           this.outline.setPosition(l.x,l.y);
+          this.outline.setSize(l.w,l.h);
+          this.status.setText("LOADING: "+l.name);
 
-          this.scene.start("Game",{
-            fighter:this.fighter,
-            levelKey:l.key,
-            levelName:l.name
+          this.time.delayedCall(300,()=>{
+            this.scene.start("Game",{
+              fighter:this.fighter,
+              levelKey:l.key,
+              levelName:l.name
+            });
           });
         });
     });
@@ -129,73 +156,263 @@ class Game extends Phaser.Scene {
   constructor(){ super("Game"); }
 
   create(data){
-
+    this.fighter=data.fighter || "JT";
     this.levelKey=data.levelKey || "outdoor";
+    this.levelName=data.levelName || "OUTDOOR";
 
     // BACKGROUND
     if(this.textures.exists(this.levelKey)){
       this.add.image(480,270,this.levelKey).setDisplaySize(960,540);
-    } else {
+    }else{
       this.add.rectangle(480,270,960,540,0x333333);
+      this.add.text(480,270,"LEVEL IMAGE MISSING",{
+        font:"22px monospace",
+        fill:"#ff4fc3"
+      }).setOrigin(0.5);
     }
 
-    // TEXT
-    this.add.text(20,20,"CHAR: "+data.fighter,{font:"16px monospace",fill:"#fff"});
-    this.add.text(20,45,"LEVEL: "+data.levelName,{font:"16px monospace",fill:"#ff4fc3"});
+    // RAIN
+    this.rainDrops=[];
+    for(let i=0;i<120;i++){
+      const drop=this.add.rectangle(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(0,540),
+        2,
+        14,
+        0x77aaff,
+        0.35
+      );
+      drop.speed=Phaser.Math.Between(350,700);
+      drop.setDepth(90);
+      this.rainDrops.push(drop);
+    }
 
-    // PLAYER
-    this.player=this.physics.add.sprite(300,420,"jt",0);
-    this.player.setScale(2);
-
-    // ===== 🌧️ RAIN =====
-    this.rain = this.add.particles(0,0,'jt', {
-      frame: 0,
-      x: {min:0, max:960},
-      y: 0,
-      lifespan: 500,
-      speedY: {min:400,max:700},
-      scale: {start:0.05,end:0.02},
-      quantity: 4,
-      blendMode: 'ADD'
-    });
-
-    // ===== 🌫️ FOG =====
-    this.fog = this.add.rectangle(480,270,960,540,0xaaaaaa,0.08)
-      .setDepth(100);
+    // FOG
+    this.fog=this.add.rectangle(480,270,960,540,0xcccccc,0.07)
+      .setDepth(80);
 
     this.tweens.add({
       targets:this.fog,
-      alpha:{from:0.05,to:0.15},
+      alpha:{from:0.04,to:0.12},
       duration:3000,
       yoyo:true,
       repeat:-1
     });
 
-    // ===== CONTROLS =====
+    // UI TEXT
+    this.add.text(20,20,"CHAR: "+this.fighter,{
+      font:"16px monospace",
+      fill:"#ffffff"
+    }).setDepth(1000);
+
+    this.add.text(20,45,"LEVEL: "+this.levelName,{
+      font:"16px monospace",
+      fill:"#ff4fc3"
+    }).setDepth(1000);
+
+    // ANIMS
+    this.createJTAnimations();
+
+    // PLAYER
+    this.player=this.physics.add.sprite(300,450,"jt",0);
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(1.2);
+    this.player.setCollideWorldBounds(true);
+    this.player.setDepth(50);
+
+    if(this.anims.exists("idle")){
+      this.player.play("idle");
+    }
+
+    // SHADOW
+    this.shadow=this.add.ellipse(300,452,42,12,0x000000,0.35);
+    this.shadow.setDepth(40);
+
     this.moveX=0;
+    this.moveY=0;
+    this.facing=1;
+    this.isAttacking=false;
 
-    this.input.on("pointerdown",(p)=>{
-      if(p.x<300) this.moveX=-1;
-      else this.moveX=1;
-    });
+    this.makeControls();
+  }
 
-    this.input.on("pointerup",()=>{
-      this.moveX=0;
-    });
+  createJTAnimations(){
+    if(!this.textures.exists("jt")) return;
+
+    const tex=this.textures.get("jt");
+
+    const safe=(key,start,end,rate,repeat=0)=>{
+      if(tex.frameTotal<=end) return;
+      if(this.anims.exists(key)) return;
+
+      this.anims.create({
+        key,
+        frames:this.anims.generateFrameNumbers("jt",{start,end}),
+        frameRate:rate,
+        repeat
+      });
+    };
+
+    safe("idle",0,3,6,-1);
+    safe("walk",16,21,10,-1);
+    safe("jump",32,34,8,0);
+    safe("crouch",48,50,6,0);
+    safe("dash",64,67,12,0);
+    safe("climb",80,83,6,0);
+    safe("light",96,99,12,0);
+    safe("heavy",112,116,10,0);
+    safe("kick",128,131,10,0);
+    safe("hurt",144,146,8,0);
+    safe("ko",160,163,6,0);
+    safe("spin",176,181,12,0);
   }
 
   update(){
-    this.player.setVelocityX(this.moveX*200);
+    // rain movement
+    this.rainDrops.forEach(drop=>{
+      drop.y += drop.speed * 0.016;
+      drop.x -= 1.5;
+
+      if(drop.y>560){
+        drop.y=-20;
+        drop.x=Phaser.Math.Between(0,960);
+      }
+    });
+
+    const speed=190;
+
+    if(!this.isAttacking){
+      this.player.setVelocity(this.moveX*speed,this.moveY*speed);
+
+      this.player.y=Phaser.Math.Clamp(this.player.y,330,470);
+
+      if(this.moveX!==0 || this.moveY!==0){
+        if(this.anims.exists("walk")) this.player.play("walk",true);
+      }else{
+        if(this.anims.exists("idle")) this.player.play("idle",true);
+      }
+
+      if(this.moveX<0){
+        this.facing=-1;
+        this.player.setFlipX(true);
+      }
+
+      if(this.moveX>0){
+        this.facing=1;
+        this.player.setFlipX(false);
+      }
+    }
+
+    this.shadow.x=this.player.x;
+    this.shadow.y=this.player.y+2;
+  }
+
+  playAttack(anim){
+    if(this.isAttacking) return;
+
+    this.isAttacking=true;
+    this.player.setVelocity(0,0);
+
+    if(this.anims.exists(anim)){
+      this.player.play(anim,true);
+    }
+
+    this.time.delayedCall(450,()=>{
+      this.isAttacking=false;
+      if(this.anims.exists("idle")){
+        this.player.play("idle",true);
+      }
+    });
+  }
+
+  makeControls(){
+    const baseX=120;
+    const baseY=420;
+    const r=60;
+
+    this.add.circle(baseX,baseY,r,0xffffff,0.15).setDepth(999);
+    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.4).setDepth(1000);
+
+    let dragging=false;
+
+    const moveStick=(p)=>{
+      let dx=p.x-baseX;
+      let dy=p.y-baseY;
+      const d=Math.sqrt(dx*dx+dy*dy);
+
+      if(d>r){
+        dx=dx/d*r;
+        dy=dy/d*r;
+      }
+
+      knob.x=baseX+dx;
+      knob.y=baseY+dy;
+
+      this.moveX=dx/r;
+      this.moveY=dy/r;
+    };
+
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<85){
+        dragging=true;
+        moveStick(p);
+      }
+    });
+
+    this.input.on("pointermove",p=>{
+      if(dragging) moveStick(p);
+    });
+
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      knob.x=baseX;
+      knob.y=baseY;
+      this.moveX=0;
+      this.moveY=0;
+    });
+
+    this.makeButton(860,350,"X","heavy");
+    this.makeButton(800,420,"Y","light");
+    this.makeButton(920,420,"A","kick");
+    this.makeButton(860,490,"B","spin");
+  }
+
+  makeButton(x,y,label,anim){
+    this.add.circle(x,y,32,0xffffff,0.22)
+      .setInteractive()
+      .setDepth(999)
+      .on("pointerdown",()=>{
+        this.playAttack(anim);
+      });
+
+    this.add.text(x,y,label,{
+      font:"18px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(1000);
   }
 }
 
-new Phaser.Game({
+const config={
   type:Phaser.AUTO,
   width:960,
   height:540,
-  physics:{default:"arcade"},
+  backgroundColor:"#000",
+  pixelArt:true,
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH
+  },
+  physics:{
+    default:"arcade",
+    arcade:{
+      gravity:{y:0},
+      debug:false
+    }
+  },
   scene:[Boot,Title,FighterSelect,LevelSelect,Game]
-});
+};
+
+new Phaser.Game(config);
 
 </script>
 </body>
