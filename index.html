@@ -27,7 +27,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 500;
+const VERSION = 501;
 
 let selectedFighter = "GIGI";
 let selectedLevel = "outdoor";
@@ -37,19 +37,16 @@ class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
 
   preload(){
-    // TITLE / UI
     this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
     this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
     this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
 
-    // LEVELS
     this.load.image("house","assets/levels/house-party.png?v="+VERSION);
     this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
     this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
-    // SINGLE CLEAN PLAYER SPRITE
     this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
@@ -154,7 +151,6 @@ class Game extends Phaser.Scene {
   constructor(){ super("Game"); }
 
   create(){
-    // BACKGROUND
     this.bg=this.add.image(480,270,selectedLevel)
       .setDisplaySize(960,540)
       .setDepth(0);
@@ -179,11 +175,9 @@ class Game extends Phaser.Scene {
       fill:"#ffff00"
     }).setOrigin(0.5).setDepth(1000);
 
-    // SHADOW
     this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4)
       .setDepth(199);
 
-    // PLAYER
     this.player=this.physics.add.sprite(470,390,"jtSingle");
     this.player.setOrigin(0.5,1);
     this.player.setDisplaySize(96,144);
@@ -200,38 +194,32 @@ class Game extends Phaser.Scene {
   }
 
   createPlatformZones(){
-    // keep controller how you liked it; zones are semi-visible for testing
-    // change alpha to 0 when finished testing
     const alpha=0.08;
+    const zoneDepth=10;
 
-    // LEFT LADDER: middle -> top
     this.leftLadder=this.add.rectangle(245,345,70,170,0x00ff00,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
-    // RIGHT LADDER: middle -> top
     this.rightLadder=this.add.rectangle(765,345,70,170,0x00ff00,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
-    // STAIRS/DROP: middle -> bottom
     this.downStairs=this.add.rectangle(470,455,260,90,0xff00ff,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
-    // BOTTOM STAIRS: bottom -> middle
     this.upStairs=this.add.rectangle(470,500,300,90,0x00ffff,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
-    // TOP LADDER DOWN
     this.topDownLeft=this.add.rectangle(245,245,80,90,0xffff00,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
     this.topDownRight=this.add.rectangle(765,245,80,90,0xffff00,alpha)
       .setInteractive()
-      .setDepth(300);
+      .setDepth(zoneDepth);
 
     this.leftLadder.on("pointerdown",()=>{
       if(this.platform==="middle"){
@@ -320,7 +308,6 @@ class Game extends Phaser.Scene {
   }
 
   update(){
-    // RAIN
     this.rain.children.iterate(drop=>{
       drop.y += drop.speed;
       drop.x -= 1;
