@@ -10,11 +10,10 @@ html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:h
 canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
-
 <body>
 <script>
 
-const VERSION = 113;
+const VERSION = 117;
 
 class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
@@ -30,7 +29,6 @@ class Boot extends Phaser.Scene {
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
-    // IMPORTANT: single clean sprite only. No jt-master spritesheet.
     this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
@@ -48,8 +46,7 @@ class Title extends Phaser.Scene {
     this.add.text(480,480,"TAP TO START",{
       font:"22px monospace",
       fill:"#ff4fc3"
-    }).setOrigin(0.5)
-      .setInteractive()
+    }).setOrigin(0.5).setInteractive()
       .on("pointerdown",()=>this.scene.start("FighterSelect"));
   }
 }
@@ -76,6 +73,7 @@ class FighterSelect extends Phaser.Scene {
         .setDepth(40)
         .on("pointerdown",()=>{
           this.outline.setPosition(f.x,f.y);
+
           this.time.delayedCall(200,()=>{
             this.scene.start("LevelSelect",{fighter:f.name});
           });
@@ -147,25 +145,19 @@ class Game extends Phaser.Scene {
     this.addRain();
     this.addFog();
 
-    this.add.text(20,20,"CHAR: "+this.fighter,{
-      font:"16px monospace",
-      fill:"#fff"
-    }).setDepth(1000);
-
-    this.add.text(20,45,"LEVEL: "+this.levelName,{
-      font:"16px monospace",
-      fill:"#ff4fc3"
-    }).setDepth(1000);
+    this.add.text(20,20,"CHAR: "+this.fighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
+    this.add.text(20,45,"LEVEL: "+this.levelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
 
     this.shadow=this.add.ellipse(300,452,42,12,0x000000,0.35).setDepth(40);
 
     this.player=this.physics.add.sprite(300,450,"jtSingle");
     this.player.setOrigin(0.5,1);
-    this.player.setDisplaySize(96,96);
+    this.player.setDisplaySize(64,96);
     this.player.setDepth(50);
     this.player.setCollideWorldBounds(true);
-this.player.body.setAllowGravity(false);
-this.player.body.setVelocity(0,0);
+    this.player.body.setAllowGravity(false);
+    this.player.body.setVelocity(0,0);
+
     this.moveX=0;
     this.moveY=0;
 
