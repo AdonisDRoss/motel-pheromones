@@ -3,29 +3,39 @@
 <head>
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+
 <style>
-html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:hidden;touch-action:none;}
-canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
+body { margin:0; background:black; overflow:hidden; }
+canvas {
+  width:100vw !important;
+  height:100vh !important;
+  image-rendering:pixelated;
+}
 </style>
 </head>
+
 <body>
 <script>
 
-const VERSION = 117;
+const VERSION = 200;
+
+let selectedFighter = "gigi";
+let selectedLevel = "outdoor";
 
 class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
 
   preload(){
-    this.load.image("title","assets/title-screen.png?v="+VERSION);
-    this.load.image("fighterSelect","assets/character-select.png?v="+VERSION);
+    this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
+    this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
     this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
 
+    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("house","assets/levels/house-party.png?v="+VERSION);
     this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
-    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
@@ -41,43 +51,32 @@ class Title extends Phaser.Scene {
   constructor(){ super("Title"); }
 
   create(){
-    this.add.image(480,270,"title").setDisplaySize(960,540);
+    this.add.image(480,270,"title");
 
-    this.add.text(480,480,"TAP TO START",{
-      font:"22px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setInteractive()
-      .on("pointerdown",()=>this.scene.start("FighterSelect"));
+    this.add.text(350,450,"TAP TO START",{font:"24px monospace",fill:"#fff"});
+
+    this.input.once("pointerdown",()=>{
+      this.scene.start("CharacterSelect");
+    });
   }
 }
 
-class FighterSelect extends Phaser.Scene {
-  constructor(){ super("FighterSelect"); }
+class CharacterSelect extends Phaser.Scene {
+  constructor(){ super("CharacterSelect"); }
 
   create(){
-    this.add.image(480,270,"fighterSelect").setDisplaySize(960,540);
+    this.add.image(480,270,"charSelect");
 
-    const fighters=[
-      {name:"DOTTIE",x:260,y:300,w:170,h:260},
-      {name:"GIGI",x:480,y:300,w:170,h:260},
-      {name:"JT",x:700,y:300,w:170,h:260}
-    ];
+    this.add.text(20,20,"SELECT FIGHTER",{font:"18px monospace",fill:"#fff"});
 
-    this.outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3)
-      .setDepth(50);
+    this.input.on("pointerdown",(p)=>{
+      if(p.x < 480){
+        selectedFighter = "gigi";
+      } else {
+        selectedFighter = "donny";
+      }
 
-    fighters.forEach(f=>{
-      this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
-        .setInteractive()
-        .setDepth(40)
-        .on("pointerdown",()=>{
-          this.outline.setPosition(f.x,f.y);
-
-          this.time.delayedCall(200,()=>{
-            this.scene.start("LevelSelect",{fighter:f.name});
-          });
-        });
+      this.scene.start("LevelSelect");
     });
   }
 }
@@ -85,45 +84,20 @@ class FighterSelect extends Phaser.Scene {
 class LevelSelect extends Phaser.Scene {
   constructor(){ super("LevelSelect"); }
 
-  create(data){
-    this.fighter=data.fighter || "JT";
+  create(){
+    this.add.image(480,270,"levelSelect");
 
-    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+    this.add.text(20,20,"SELECT LEVEL",{font:"18px monospace",fill:"#fff"});
 
-    const levels=[
-      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
-      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
-      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
-      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
-      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
-    ];
+    this.input.on("pointerdown",(p)=>{
 
-    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3)
-      .setDepth(50);
+      if(p.x < 200) selectedLevel = "house";
+      else if(p.x < 400) selectedLevel = "indoor";
+      else if(p.x < 600) selectedLevel = "outdoor";
+      else if(p.x < 800) selectedLevel = "lmnop";
+      else selectedLevel = "chicken";
 
-    this.status=this.add.text(480,505,"TAP A LEVEL",{
-      font:"20px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(60);
-
-    levels.forEach(l=>{
-      this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
-        .setInteractive()
-        .setDepth(40)
-        .on("pointerdown",()=>{
-          this.outline.setPosition(l.x,l.y);
-          this.outline.setSize(l.w,l.h);
-          this.status.setText("LOADING: "+l.name);
-
-          this.time.delayedCall(300,()=>{
-            this.scene.start("Game",{
-              fighter:this.fighter,
-              levelKey:l.key,
-              levelName:l.name
-            });
-          });
-        });
+      this.scene.start("Game");
     });
   }
 }
@@ -131,165 +105,140 @@ class LevelSelect extends Phaser.Scene {
 class Game extends Phaser.Scene {
   constructor(){ super("Game"); }
 
-  create(data){
-    this.fighter=data.fighter || "JT";
-    this.levelKey=data.levelKey || "outdoor";
-    this.levelName=data.levelName || "OUTDOOR";
+  create(){
 
-    if(this.textures.exists(this.levelKey)){
-      this.add.image(480,270,this.levelKey).setDisplaySize(960,540);
-    } else {
-      this.add.rectangle(480,270,960,540,0x333333);
+    // BACKGROUND
+    this.bg = this.add.image(480,270,selectedLevel).setDepth(0);
+
+    // RAIN
+    this.rain = this.add.group();
+    for(let i=0;i<120;i++){
+      let drop = this.add.rectangle(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(0,540),
+        2,10,0x77aaff,0.4
+      ).setDepth(90);
+      this.rain.add(drop);
     }
 
-    this.addRain();
-    this.addFog();
+    // FOG
+    this.fog = this.add.rectangle(480,500,960,200,0x000000,0.2)
+      .setDepth(95);
 
-    this.add.text(20,20,"CHAR: "+this.fighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
-    this.add.text(20,45,"LEVEL: "+this.levelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
+    // SHADOW
+    this.shadow = this.add.ellipse(300,500,40,12,0x000000,0.4)
+      .setDepth(99);
 
-    this.shadow=this.add.ellipse(300,452,42,12,0x000000,0.35).setDepth(40);
+    // PLAYER (FIXED — NO DUPLICATES)
+    this.player = this.physics.add.sprite(300,450,"jtSingle");
 
-    this.player=this.physics.add.sprite(300,450,"jtSingle");
     this.player.setOrigin(0.5,1);
-    this.player.setDisplaySize(64,96);
-    this.player.setDepth(50);
+    this.player.setDisplaySize(96,144); // GOOD SCALE
+    this.player.setDepth(100);
     this.player.setCollideWorldBounds(true);
     this.player.body.setAllowGravity(false);
     this.player.body.setVelocity(0,0);
 
-    this.moveX=0;
-    this.moveY=0;
+    // FLOAT BOUNCE (GAME FEEL)
+    this.tweens.add({
+      targets: this.player,
+      y: this.player.y - 4,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: "sine.inOut"
+    });
+
+    this.moveX = 0;
+    this.moveY = 0;
 
     this.makeControls();
   }
 
-  addRain(){
-    this.rainDrops=[];
-    for(let i=0;i<120;i++){
-      const drop=this.add.rectangle(
-        Phaser.Math.Between(0,960),
-        Phaser.Math.Between(0,540),
-        2,14,0x77aaff,0.4
-      ).setDepth(90);
-
-      drop.speed=Phaser.Math.Between(350,700);
-      this.rainDrops.push(drop);
-    }
-  }
-
-  addFog(){
-    this.fog=this.add.rectangle(480,270,960,540,0xcccccc,0.06).setDepth(80);
-
-    this.tweens.add({
-      targets:this.fog,
-      alpha:{from:0.04,to:0.11},
-      duration:3000,
-      yoyo:true,
-      repeat:-1
-    });
-  }
-
   update(){
-    this.rainDrops.forEach(drop=>{
-      drop.y += drop.speed * 0.016;
-      drop.x -= 1.5;
 
-      if(drop.y>560){
-        drop.y=-20;
-        drop.x=Phaser.Math.Between(0,960);
+    // RAIN FALL
+    this.rain.children.iterate((drop)=>{
+      drop.y += 8;
+      if(drop.y > 540){
+        drop.y = 0;
+        drop.x = Phaser.Math.Between(0,960);
       }
     });
 
-    const speed=190;
+    // MOVEMENT
+    const speed = 200;
 
     this.player.setVelocity(this.moveX*speed,this.moveY*speed);
-    this.player.y=Phaser.Math.Clamp(this.player.y,330,470);
 
-    if(this.moveX<0)this.player.setFlipX(true);
-    if(this.moveX>0)this.player.setFlipX(false);
+    this.player.y = Phaser.Math.Clamp(this.player.y,360,500);
 
-    this.shadow.x=this.player.x;
-    this.shadow.y=this.player.y+2;
+    this.shadow.x = this.player.x;
+    this.shadow.y = this.player.y + 5;
+
+    if(this.moveX < 0) this.player.setFlipX(true);
+    if(this.moveX > 0) this.player.setFlipX(false);
   }
 
   makeControls(){
-    const baseX=120, baseY=420, r=60;
 
-    this.add.circle(baseX,baseY,r,0xffffff,0.15).setDepth(999);
-    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.4).setDepth(1000);
+    const baseX = 120;
+    const baseY = 420;
 
-    let dragging=false;
+    this.add.circle(baseX,baseY,60,0xffffff,0.1);
 
-    const moveStick=(p)=>{
-      let dx=p.x-baseX;
-      let dy=p.y-baseY;
-      const d=Math.sqrt(dx*dx+dy*dy);
+    let dragging = false;
 
-      if(d>r){
-        dx=dx/d*r;
-        dy=dy/d*r;
-      }
-
-      knob.x=baseX+dx;
-      knob.y=baseY+dy;
-
-      this.moveX=dx/r;
-      this.moveY=dy/r;
-    };
-
-    this.input.on("pointerdown",p=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<85){
-        dragging=true;
-        moveStick(p);
+    this.input.on("pointerdown",(p)=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<80){
+        dragging = true;
       }
     });
 
-    this.input.on("pointermove",p=>{
-      if(dragging) moveStick(p);
+    this.input.on("pointermove",(p)=>{
+      if(!dragging) return;
+
+      let dx = p.x - baseX;
+      let dy = p.y - baseY;
+
+      const len = Math.sqrt(dx*dx+dy*dy);
+      if(len>60){
+        dx/=len; dy/=len;
+        dx*=60; dy*=60;
+      }
+
+      this.moveX = dx/60;
+      this.moveY = dy/60;
     });
 
     this.input.on("pointerup",()=>{
       dragging=false;
-      knob.x=baseX;
-      knob.y=baseY;
       this.moveX=0;
       this.moveY=0;
     });
 
-    this.makeButton(860,350,"X");
-    this.makeButton(800,420,"Y");
-    this.makeButton(920,420,"A");
-    this.makeButton(860,490,"B");
+    this.makeBtn(860,380,"X",()=>{});
+    this.makeBtn(800,450,"Y",()=>{});
+    this.makeBtn(920,450,"A",()=>{});
+    this.makeBtn(860,520,"B",()=>{});
   }
 
-  makeButton(x,y,label){
-    this.add.circle(x,y,32,0xffffff,0.22)
+  makeBtn(x,y,label,fn){
+    this.add.circle(x,y,30,0xffffff,0.2)
       .setInteractive()
-      .setDepth(999);
+      .on("pointerdown",fn);
 
-    this.add.text(x,y,label,{
-      font:"18px monospace",
-      fill:"#fff"
-    }).setOrigin(0.5).setDepth(1000);
+    this.add.text(x,y,label,{font:"18px monospace",fill:"#fff"})
+      .setOrigin(0.5);
   }
 }
 
-const config={
-  type:Phaser.AUTO,
+const config = {
+  type: Phaser.AUTO,
   width:960,
   height:540,
-  backgroundColor:"#000",
-  pixelArt:true,
-  scale:{
-    mode:Phaser.Scale.FIT,
-    autoCenter:Phaser.Scale.CENTER_BOTH
-  },
-  physics:{
-    default:"arcade",
-    arcade:{gravity:{y:0},debug:false}
-  },
-  scene:[Boot,Title,FighterSelect,LevelSelect,Game]
+  physics:{ default:"arcade" },
+  scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
 
 new Phaser.Game(config);
