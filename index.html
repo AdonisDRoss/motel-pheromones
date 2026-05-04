@@ -20,7 +20,7 @@ canvas {
 <body>
 <script>
 
-const VERSION = 200;
+const VERSION = 300;
 
 let selectedFighter = "gigi";
 let selectedLevel = "outdoor";
@@ -29,16 +29,20 @@ class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
 
   preload(){
+
+    // UI
     this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
     this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
     this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
 
+    // LEVELS
     this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("house","assets/levels/house-party.png?v="+VERSION);
     this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
+    // PLAYER
     this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
@@ -52,7 +56,6 @@ class Title extends Phaser.Scene {
 
   create(){
     this.add.image(480,270,"title");
-
     this.add.text(350,450,"TAP TO START",{font:"24px monospace",fill:"#fff"});
 
     this.input.once("pointerdown",()=>{
@@ -70,12 +73,7 @@ class CharacterSelect extends Phaser.Scene {
     this.add.text(20,20,"SELECT FIGHTER",{font:"18px monospace",fill:"#fff"});
 
     this.input.on("pointerdown",(p)=>{
-      if(p.x < 480){
-        selectedFighter = "gigi";
-      } else {
-        selectedFighter = "donny";
-      }
-
+      selectedFighter = (p.x < 480) ? "gigi" : "donny";
       this.scene.start("LevelSelect");
     });
   }
@@ -90,7 +88,6 @@ class LevelSelect extends Phaser.Scene {
     this.add.text(20,20,"SELECT LEVEL",{font:"18px monospace",fill:"#fff"});
 
     this.input.on("pointerdown",(p)=>{
-
       if(p.x < 200) selectedLevel = "house";
       else if(p.x < 400) selectedLevel = "indoor";
       else if(p.x < 600) selectedLevel = "outdoor";
@@ -126,20 +123,20 @@ class Game extends Phaser.Scene {
       .setDepth(95);
 
     // SHADOW
-    this.shadow = this.add.ellipse(300,500,40,12,0x000000,0.4)
+    this.shadow = this.add.ellipse(450,500,50,14,0x000000,0.4)
       .setDepth(99);
 
-    // PLAYER (FIXED — NO DUPLICATES)
-    this.player = this.physics.add.sprite(300,450,"jtSingle");
+    // PLAYER (FIXED)
+    this.player = this.physics.add.sprite(450,460,"jtSingle");
 
     this.player.setOrigin(0.5,1);
-    this.player.setDisplaySize(96,144); // GOOD SCALE
-    this.player.setDepth(100);
+    this.player.setDisplaySize(96,144);
+    this.player.setDepth(200);
     this.player.setCollideWorldBounds(true);
     this.player.body.setAllowGravity(false);
     this.player.body.setVelocity(0,0);
 
-    // FLOAT BOUNCE (GAME FEEL)
+    // IDLE BOUNCE
     this.tweens.add({
       targets: this.player,
       y: this.player.y - 4,
@@ -147,6 +144,16 @@ class Game extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       ease: "sine.inOut"
+    });
+
+    // BREATH SCALE
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 1.02,
+      scaleY: 1.02,
+      duration: 900,
+      yoyo: true,
+      repeat: -1
     });
 
     this.moveX = 0;
@@ -157,25 +164,48 @@ class Game extends Phaser.Scene {
 
   update(){
 
-    // RAIN FALL
+    // RAIN LOOP
     this.rain.children.iterate((drop)=>{
       drop.y += 8;
+
       if(drop.y > 540){
         drop.y = 0;
         drop.x = Phaser.Math.Between(0,960);
+
+        // SPLASH
+        let splash = this.add.circle(drop.x,500,2,0x77aaff,0.3)
+          .setDepth(85);
+
+        this.tweens.add({
+          targets: splash,
+          alpha: 0,
+          scale: 2,
+          duration: 200
+        });
       }
     });
 
-    // MOVEMENT
-    const speed = 200;
+    // SMOOTH MOVEMENT
+    this.player.body.velocity.x = Phaser.Math.Linear(
+      this.player.body.velocity.x,
+      this.moveX * 200,
+      0.2
+    );
 
-    this.player.setVelocity(this.moveX*speed,this.moveY*speed);
+    this.player.body.velocity.y = Phaser.Math.Linear(
+      this.player.body.velocity.y,
+      this.moveY * 200,
+      0.2
+    );
 
+    // GROUND LOCK
     this.player.y = Phaser.Math.Clamp(this.player.y,360,500);
 
+    // SHADOW FOLLOW
     this.shadow.x = this.player.x;
     this.shadow.y = this.player.y + 5;
 
+    // FLIP
     if(this.moveX < 0) this.player.setFlipX(true);
     if(this.moveX > 0) this.player.setFlipX(false);
   }
