@@ -5,8 +5,9 @@
   <title>Motel Pheromones - JT Test</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       background: #000;
       overflow: hidden;
     }
@@ -26,17 +27,7 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // PLACE YOUR SPRITES HERE:
-    // assets/sprites/jt/jt_idle.png
-    // assets/sprites/jt/jt_walk_down.png
-    // assets/sprites/jt/jt_walk_up.png
-    // assets/sprites/jt/jt_walk_left.png
-    // assets/sprites/jt/jt_walk_right.png
-    // assets/sprites/jt/jt_attack_light.png
-    // assets/sprites/jt/jt_attack_heavy.png
-    // assets/sprites/jt/jt_hurt.png
-    // assets/sprites/jt/jt_ko.png
-    // assets/sprites/jt/jt_taunt.png
+    this.load.image("level_bg", "assets/levels/leftys.png");
 
     this.load.spritesheet("jt_idle", "assets/sprites/jt/jt_idle.png", {
       frameWidth: 128,
@@ -73,16 +64,6 @@ class GameScene extends Phaser.Scene {
       frameHeight: 128
     });
 
-    this.load.spritesheet("jt_hurt", "assets/sprites/jt/jt_hurt.png", {
-      frameWidth: 128,
-      frameHeight: 128
-    });
-
-    this.load.spritesheet("jt_ko", "assets/sprites/jt/jt_ko.png", {
-      frameWidth: 128,
-      frameHeight: 128
-    });
-
     this.load.spritesheet("jt_taunt", "assets/sprites/jt/jt_taunt.png", {
       frameWidth: 128,
       frameHeight: 128
@@ -90,27 +71,21 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor("#1b1b1b");
+    this.cameras.main.setBackgroundColor("#000000");
 
-    this.ground = this.add.rectangle(640, 500, 1280, 220, 0x333333);
-    this.add.text(30, 30, "JT Sprite Test", {
-      fontSize: "28px",
-      color: "#ffaa00",
-      fontFamily: "monospace"
-    });
-
-    this.add.text(30, 65, "Move: WASD / Arrows | J: Light | K: Heavy | T: Taunt", {
-      fontSize: "18px",
-      color: "#ffffff",
-      fontFamily: "monospace"
-    });
+    this.bg = this.add.image(640, 360, "level_bg");
+    this.bg.setDisplaySize(1280, 720);
 
     this.createAnimations();
 
-    this.player = this.physics.add.sprite(300, 420, "jt_idle");
-    this.player.setScale(2);
+    this.player = this.physics.add.sprite(640, 555, "jt_idle");
+    this.player.setOrigin(0.5, 1);
+    this.player.setScale(0.65);
     this.player.setCollideWorldBounds(true);
     this.player.play("jt-idle");
+
+    this.player.setSize(50, 90);
+    this.player.setOffset(39, 30);
 
     this.keys = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.UP,
@@ -128,6 +103,8 @@ class GameScene extends Phaser.Scene {
 
     this.isAttacking = false;
     this.facing = "down";
+
+    this.makeTouchControls();
   }
 
   createAnimations() {
@@ -181,20 +158,6 @@ class GameScene extends Phaser.Scene {
     });
 
     this.anims.create({
-      key: "jt-hurt",
-      frames: this.anims.generateFrameNumbers("jt_hurt", { start: 0, end: 2 }),
-      frameRate: 8,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "jt-ko",
-      frames: this.anims.generateFrameNumbers("jt_ko", { start: 0, end: 2 }),
-      frameRate: 6,
-      repeat: 0
-    });
-
-    this.anims.create({
       key: "jt-taunt",
       frames: this.anims.generateFrameNumbers("jt_taunt", { start: 0, end: 2 }),
       frameRate: 6,
@@ -205,14 +168,14 @@ class GameScene extends Phaser.Scene {
   update() {
     if (this.isAttacking) return;
 
-    const speed = 220;
+    const speed = 180;
     let vx = 0;
     let vy = 0;
 
-    const up = this.keys.up.isDown || this.keys.w.isDown;
-    const down = this.keys.down.isDown || this.keys.s.isDown;
-    const left = this.keys.left.isDown || this.keys.a.isDown;
-    const right = this.keys.right.isDown || this.keys.d.isDown;
+    const up = this.keys.up.isDown || this.keys.w.isDown || this.touchUp;
+    const down = this.keys.down.isDown || this.keys.s.isDown || this.touchDown;
+    const left = this.keys.left.isDown || this.keys.a.isDown || this.touchLeft;
+    const right = this.keys.right.isDown || this.keys.d.isDown || this.touchRight;
 
     if (left) {
       vx = -speed;
@@ -232,17 +195,20 @@ class GameScene extends Phaser.Scene {
 
     this.player.setVelocity(vx, vy);
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.light)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.light) || this.touchLight) {
+      this.touchLight = false;
       this.playAction("jt-attack-light");
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.heavy)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.heavy) || this.touchHeavy) {
+      this.touchHeavy = false;
       this.playAction("jt-attack-heavy");
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.taunt)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.taunt) || this.touchTaunt) {
+      this.touchTaunt = false;
       this.playAction("jt-taunt");
       return;
     }
@@ -263,6 +229,66 @@ class GameScene extends Phaser.Scene {
       this.isAttacking = false;
       this.player.play("jt-idle", true);
     });
+  }
+
+  makeTouchControls() {
+    this.touchUp = false;
+    this.touchDown = false;
+    this.touchLeft = false;
+    this.touchRight = false;
+    this.touchLight = false;
+    this.touchHeavy = false;
+    this.touchTaunt = false;
+
+    const makeBtn = (x, y, label, callback) => {
+      const btn = this.add.circle(x, y, 38, 0xffffff, 0.18);
+      const text = this.add.text(x, y, label, {
+        fontSize: "22px",
+        color: "#ffffff",
+        fontFamily: "monospace"
+      }).setOrigin(0.5);
+
+      btn.setInteractive();
+
+      btn.on("pointerdown", callback);
+      text.setInteractive();
+      text.on("pointerdown", callback);
+
+      return btn;
+    };
+
+    const holdBtn = (x, y, label, prop) => {
+      const btn = this.add.circle(x, y, 34, 0xffffff, 0.12);
+      const text = this.add.text(x, y, label, {
+        fontSize: "20px",
+        color: "#ffffff",
+        fontFamily: "monospace"
+      }).setOrigin(0.5);
+
+      btn.setInteractive();
+      text.setInteractive();
+
+      const down = () => this[prop] = true;
+      const up = () => this[prop] = false;
+
+      btn.on("pointerdown", down);
+      btn.on("pointerup", up);
+      btn.on("pointerout", up);
+
+      text.on("pointerdown", down);
+      text.on("pointerup", up);
+      text.on("pointerout", up);
+    };
+
+    holdBtn(95, 585, "←", "touchLeft");
+    holdBtn(185, 585, "→", "touchRight");
+    holdBtn(140, 540, "↑", "touchUp");
+    holdBtn(140, 635, "↓", "touchDown");
+
+    makeBtn(1130, 560, "X", () => this.touchLight = true);
+    makeBtn(1210, 610, "A", () => this.touchHeavy = true);
+    makeBtn(1050, 610, "Y", () => this.touchTaunt = true);
+    makeBtn(1130, 670, "B", () => this.touchLight = true);
   }
 }
 
