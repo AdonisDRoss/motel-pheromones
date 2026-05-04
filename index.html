@@ -161,10 +161,11 @@ class Game extends Phaser.Scene {
 
     this.player=this.physics.add.sprite(300,450,"jtSingle");
     this.player.setOrigin(0.5,1);
-    this.player.setScale(1.2);
+    this.player.setDisplaySize(96,96);
     this.player.setDepth(50);
     this.player.setCollideWorldBounds(true);
-
+this.player.body.setAllowGravity(false);
+this.player.body.setVelocity(0,0);
     this.moveX=0;
     this.moveY=0;
 
