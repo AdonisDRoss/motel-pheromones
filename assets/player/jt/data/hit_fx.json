@@ -1,0 +1,31 @@
+
+
+{
+  "frameWidth": 128,
+  "frameHeight": 128,
+  "columns": 5,
+  "rows": 3,
+  "animations": [
+    {
+      "key": "hit_small",
+      "start": 0,
+      "end": 4,
+      "frameRate": 18,
+      "repeat": 0
+    },
+    {
+      "key": "hit_medium",
+      "start": 5,
+      "end": 9,
+      "frameRate": 20,
+      "repeat": 0
+    },
+    {
+      "key": "hit_heavy",
+      "start": 10,
+      "end": 14,
+      "frameRate": 22,
+      "repeat": 0
+    }
+  ]
+}
