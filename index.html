@@ -27,7 +27,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 501;
+const VERSION = 502;
 
 let selectedFighter = "GIGI";
 let selectedLevel = "outdoor";
@@ -194,63 +194,20 @@ class Game extends Phaser.Scene {
   }
 
   createPlatformZones(){
-  const alpha = 0.08;
-  const zoneDepth = 10;
+    const alpha=0.08;
+    const zoneDepth=10;
 
-  this.leftLadder = this.add.rectangle(250,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
-  this.rightLadder = this.add.rectangle(775,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
+    this.leftLadder=this.add.rectangle(250,390,70,160,0x00ff00,alpha)
+      .setDepth(zoneDepth);
 
-  this.downStairs = this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(zoneDepth);
-  this.upStairs = this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(zoneDepth);
+    this.rightLadder=this.add.rectangle(775,390,70,160,0x00ff00,alpha)
+      .setDepth(zoneDepth);
 
-  this.zoneText.setText("MIDDLE PLATFORM");
-}
-    });
+    this.downStairs=this.add.rectangle(500,420,260,80,0xff00ff,alpha)
+      .setDepth(zoneDepth);
 
-    this.rightLadder.on("pointerdown",()=>{
-      if(this.platform==="middle"){
-        this.platform="top";
-        this.player.x=765;
-        this.player.y=250;
-        this.zoneText.setText("TOP PLATFORM");
-      }
-    });
-
-    this.topDownLeft.on("pointerdown",()=>{
-      if(this.platform==="top"){
-        this.platform="middle";
-        this.player.x=245;
-        this.player.y=390;
-        this.zoneText.setText("MIDDLE PLATFORM");
-      }
-    });
-
-    this.topDownRight.on("pointerdown",()=>{
-      if(this.platform==="top"){
-        this.platform="middle";
-        this.player.x=765;
-        this.player.y=390;
-        this.zoneText.setText("MIDDLE PLATFORM");
-      }
-    });
-
-    this.downStairs.on("pointerdown",()=>{
-      if(this.platform==="middle"){
-        this.platform="bottom";
-        this.player.x=470;
-        this.player.y=505;
-        this.zoneText.setText("BOTTOM LEVEL");
-      }
-    });
-
-    this.upStairs.on("pointerdown",()=>{
-      if(this.platform==="bottom"){
-        this.platform="middle";
-        this.player.x=470;
-        this.player.y=390;
-        this.zoneText.setText("MIDDLE PLATFORM");
-      }
-    });
+    this.upStairs=this.add.rectangle(500,505,300,90,0x00ffff,alpha)
+      .setDepth(zoneDepth);
   }
 
   addRain(){
@@ -303,12 +260,10 @@ class Game extends Phaser.Scene {
       0.2
     );
 
-    this.player.body.velocity.y=Phaser.Math.Linear(
-      this.player.body.velocity.y,
-      this.moveY*speed,
-      0.2
-    );
+    // IMPORTANT: no free Y movement. Platforms control Y.
+    this.player.body.velocity.y=0;
 
+    this.handlePlatformTransitions();
     this.applyPlatformBounds();
 
     this.shadow.x=this.player.x;
@@ -318,18 +273,54 @@ class Game extends Phaser.Scene {
     if(this.moveX>0)this.player.setFlipX(false);
   }
 
-  createPlatformZones(){
-  const alpha = 0.08;
-  const zoneDepth = 10;
+  handlePlatformTransitions(){
+    const nearLeftLadder=Math.abs(this.player.x-250)<45;
+    const nearRightLadder=Math.abs(this.player.x-775)<45;
+    const nearLadder=nearLeftLadder || nearRightLadder;
+    const nearStairs=Math.abs(this.player.x-500)<150;
 
-  this.leftLadder = this.add.rectangle(250,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
-  this.rightLadder = this.add.rectangle(775,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
+    if(this.platform==="middle" && this.moveY<-0.45 && nearLadder){
+      this.platform="top";
+      this.player.y=250;
+      this.zoneText.setText("TOP PLATFORM");
+    }
 
-  this.downStairs = this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(zoneDepth);
-  this.upStairs = this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(zoneDepth);
+    if(this.platform==="top" && this.moveY>0.45 && nearLadder){
+      this.platform="middle";
+      this.player.y=390;
+      this.zoneText.setText("MIDDLE PLATFORM");
+    }
 
-  this.zoneText.setText("MIDDLE PLATFORM");
-}
+    if(this.platform==="middle" && this.moveY>0.45 && nearStairs){
+      this.platform="bottom";
+      this.player.y=505;
+      this.zoneText.setText("BOTTOM LEVEL");
+    }
+
+    if(this.platform==="bottom" && this.moveY<-0.45 && nearStairs){
+      this.platform="middle";
+      this.player.y=390;
+      this.zoneText.setText("MIDDLE PLATFORM");
+    }
+  }
+
+  applyPlatformBounds(){
+    if(this.platform==="bottom"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
+      this.player.y=505;
+    }
+
+    if(this.platform==="middle"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
+      this.player.y=390;
+    }
+
+    if(this.platform==="top"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
+      this.player.y=250;
+    }
+  }
+
   makeControls(){
     const baseX=120;
     const baseY=420;
