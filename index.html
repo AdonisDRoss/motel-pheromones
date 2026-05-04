@@ -6,32 +6,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 <style>
-html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:hidden;touch-action:none;}
-canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{
+  width:100vw!important;
+  height:100vh!important;
+  object-fit:contain;
+  image-rendering:pixelated;
+}
 </style>
 </head>
+
 <body>
 <script>
 
-const VERSION = 400;
+const VERSION = 500;
 
-let selectedFighter = "gigi";
+let selectedFighter = "GIGI";
 let selectedLevel = "outdoor";
+let selectedLevelName = "OUTDOOR";
 
 class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
 
   preload(){
+    // TITLE / UI
     this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
     this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
     this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
 
-    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
-    this.load.imagety("house","assets/levels/house-party.png?v="+VERSION);
+    // LEVELS
+    this.load.image("house","assets/levels/house-party.png?v="+VERSION);
     this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
+    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
+    // SINGLE CLEAN PLAYER SPRITE
     this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
@@ -49,9 +67,11 @@ class Title extends Phaser.Scene {
     this.add.text(480,480,"TAP TO START",{
       font:"22px monospace",
       fill:"#ff4fc3"
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(10);
 
-    this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
+    this.input.once("pointerdown",()=>{
+      this.scene.start("CharacterSelect");
+    });
   }
 }
 
@@ -116,12 +136,14 @@ class LevelSelect extends Phaser.Scene {
         .setDepth(40)
         .on("pointerdown",()=>{
           selectedLevel=l.key;
+          selectedLevelName=l.name;
+
           this.outline.setPosition(l.x,l.y);
           this.outline.setSize(l.w,l.h);
           this.status.setText("LOADING: "+l.name);
 
           this.time.delayedCall(300,()=>{
-            this.scene.start("Game",{levelName:l.name});
+            this.scene.start("Game");
           });
         });
     });
@@ -131,29 +153,38 @@ class LevelSelect extends Phaser.Scene {
 class Game extends Phaser.Scene {
   constructor(){ super("Game"); }
 
-  create(data){
-    this.levelName=data.levelName || "OUTDOOR";
+  create(){
+    // BACKGROUND
+    this.bg=this.add.image(480,270,selectedLevel)
+      .setDisplaySize(960,540)
+      .setDepth(0);
 
-    this.bg=this.add.image(480,270,selectedLevel).setDisplaySize(960,540).setDepth(0);
-
-    this.platform="street";
+    this.platform="middle";
 
     this.addRain();
     this.addFog();
 
     this.add.text(20,20,"CHAR: "+selectedFighter,{
       font:"16px monospace",
-      fill:"#fff"
+      fill:"#ffffff"
     }).setDepth(1000);
 
-    this.add.text(20,45,"LEVEL: "+this.levelName,{
+    this.add.text(20,45,"LEVEL: "+selectedLevelName,{
       font:"16px monospace",
       fill:"#ff4fc3"
     }).setDepth(1000);
 
-    this.shadow=this.add.ellipse(300,465,50,14,0x000000,0.4).setDepth(99);
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
+      font:"16px monospace",
+      fill:"#ffff00"
+    }).setOrigin(0.5).setDepth(1000);
 
-    this.player=this.physics.add.sprite(300,460,"jtSingle");
+    // SHADOW
+    this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4)
+      .setDepth(199);
+
+    // PLAYER
+    this.player=this.physics.add.sprite(470,390,"jtSingle");
     this.player.setOrigin(0.5,1);
     this.player.setDisplaySize(96,144);
     this.player.setDepth(200);
@@ -168,7 +199,95 @@ class Game extends Phaser.Scene {
     this.makeControls();
   }
 
-  https://adonisdross.github.io/motel-pheromones/
+  createPlatformZones(){
+    // keep controller how you liked it; zones are semi-visible for testing
+    // change alpha to 0 when finished testing
+    const alpha=0.08;
+
+    // LEFT LADDER: middle -> top
+    this.leftLadder=this.add.rectangle(245,345,70,170,0x00ff00,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    // RIGHT LADDER: middle -> top
+    this.rightLadder=this.add.rectangle(765,345,70,170,0x00ff00,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    // STAIRS/DROP: middle -> bottom
+    this.downStairs=this.add.rectangle(470,455,260,90,0xff00ff,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    // BOTTOM STAIRS: bottom -> middle
+    this.upStairs=this.add.rectangle(470,500,300,90,0x00ffff,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    // TOP LADDER DOWN
+    this.topDownLeft=this.add.rectangle(245,245,80,90,0xffff00,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    this.topDownRight=this.add.rectangle(765,245,80,90,0xffff00,alpha)
+      .setInteractive()
+      .setDepth(300);
+
+    this.leftLadder.on("pointerdown",()=>{
+      if(this.platform==="middle"){
+        this.platform="top";
+        this.player.x=245;
+        this.player.y=250;
+        this.zoneText.setText("TOP PLATFORM");
+      }
+    });
+
+    this.rightLadder.on("pointerdown",()=>{
+      if(this.platform==="middle"){
+        this.platform="top";
+        this.player.x=765;
+        this.player.y=250;
+        this.zoneText.setText("TOP PLATFORM");
+      }
+    });
+
+    this.topDownLeft.on("pointerdown",()=>{
+      if(this.platform==="top"){
+        this.platform="middle";
+        this.player.x=245;
+        this.player.y=390;
+        this.zoneText.setText("MIDDLE PLATFORM");
+      }
+    });
+
+    this.topDownRight.on("pointerdown",()=>{
+      if(this.platform==="top"){
+        this.platform="middle";
+        this.player.x=765;
+        this.player.y=390;
+        this.zoneText.setText("MIDDLE PLATFORM");
+      }
+    });
+
+    this.downStairs.on("pointerdown",()=>{
+      if(this.platform==="middle"){
+        this.platform="bottom";
+        this.player.x=470;
+        this.player.y=505;
+        this.zoneText.setText("BOTTOM LEVEL");
+      }
+    });
+
+    this.upStairs.on("pointerdown",()=>{
+      if(this.platform==="bottom"){
+        this.platform="middle";
+        this.player.x=470;
+        this.player.y=390;
+        this.zoneText.setText("MIDDLE PLATFORM");
+      }
+    });
+  }
+
   addRain(){
     this.rain=this.add.group();
 
@@ -201,6 +320,7 @@ class Game extends Phaser.Scene {
   }
 
   update(){
+    // RAIN
     this.rain.children.iterate(drop=>{
       drop.y += drop.speed;
       drop.x -= 1;
@@ -235,19 +355,19 @@ class Game extends Phaser.Scene {
   }
 
   applyPlatformBounds(){
-    if(this.platform==="street"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,100,860);
-      this.player.y=Phaser.Math.Clamp(this.player.y,420,480);
+    if(this.platform==="bottom"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
+      this.player.y=Phaser.Math.Clamp(this.player.y,485,520);
     }
 
-    if(this.platform==="roof"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,300,780);
-      this.player.y=Phaser.Math.Clamp(this.player.y,285,325);
+    if(this.platform==="middle"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
+      this.player.y=Phaser.Math.Clamp(this.player.y,375,420);
     }
 
-    if(this.platform==="lower"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,760);
-      this.player.y=Phaser.Math.Clamp(this.player.y,500,525);
+    if(this.platform==="top"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
+      this.player.y=Phaser.Math.Clamp(this.player.y,230,270);
     }
   }
 
@@ -256,8 +376,11 @@ class Game extends Phaser.Scene {
     const baseY=420;
     const r=60;
 
-    this.add.circle(baseX,baseY,r,0xffffff,0.12).setDepth(999);
-    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.35).setDepth(1000);
+    this.add.circle(baseX,baseY,r,0xffffff,0.12)
+      .setDepth(2000);
+
+    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.35)
+      .setDepth(2001);
 
     let dragging=false;
 
@@ -306,12 +429,12 @@ class Game extends Phaser.Scene {
   makeButton(x,y,label){
     this.add.circle(x,y,32,0xffffff,0.22)
       .setInteractive()
-      .setDepth(999);
+      .setDepth(2000);
 
     this.add.text(x,y,label,{
       font:"18px monospace",
       fill:"#fff"
-    }).setOrigin(0.5).setDepth(1000);
+    }).setOrigin(0.5).setDepth(2001);
   }
 }
 
