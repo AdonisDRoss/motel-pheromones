@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Motel Pheromones - JT</title>
-
+<title>Motel Pheromones</title>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
 <style>
@@ -22,8 +21,125 @@ canvas {
 </head>
 
 <body>
-
 <script>
+const GAME_W = 1280;
+const GAME_H = 720;
+
+const JT_SCALE = 0.65;
+const JT_W = 128;
+const JT_H = 128;
+
+class TitleScene extends Phaser.Scene {
+  constructor() {
+    super("TitleScene");
+  }
+
+  preload() {
+    this.load.image("title", "assets/ui/title_screen.png");
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#000");
+
+    this.add.image(640, 360, "title").setDisplaySize(1280, 720);
+
+    this.add.text(640, 620, "TAP / CLICK TO START", {
+      fontSize: "34px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    this.input.once("pointerdown", () => {
+      this.scene.start("CharacterSelectScene");
+    });
+  }
+}
+
+class CharacterSelectScene extends Phaser.Scene {
+  constructor() {
+    super("CharacterSelectScene");
+  }
+
+  preload() {
+    this.load.image("jt_portrait", "assets/ui/jt_portrait.png");
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#120012");
+
+    this.add.text(640, 70, "CHARACTER SELECT", {
+      fontSize: "48px",
+      color: "#ffb000",
+      fontFamily: "monospace",
+      stroke: "#000",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    this.add.rectangle(640, 360, 260, 360, 0x000000, 0.65);
+    this.add.rectangle(640, 360, 270, 370, 0x00ffff, 0.25);
+
+    this.add.image(640, 320, "jt_portrait").setDisplaySize(220, 260);
+
+    this.add.text(640, 505, "JT - THE DRUMMER", {
+      fontSize: "28px",
+      color: "#ffffff",
+      fontFamily: "monospace"
+    }).setOrigin(0.5);
+
+    this.add.text(640, 610, "TAP TO SELECT", {
+      fontSize: "30px",
+      color: "#00ff66",
+      fontFamily: "monospace"
+    }).setOrigin(0.5);
+
+    this.input.once("pointerdown", () => {
+      this.scene.start("LevelSelectScene");
+    });
+  }
+}
+
+class LevelSelectScene extends Phaser.Scene {
+  constructor() {
+    super("LevelSelectScene");
+  }
+
+  preload() {
+    this.load.image("leftys_thumb", "assets/levels/leftys.png");
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#000");
+
+    this.add.text(640, 70, "LEVEL SELECT", {
+      fontSize: "48px",
+      color: "#ffb000",
+      fontFamily: "monospace",
+      stroke: "#000",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    this.add.rectangle(640, 360, 620, 360, 0x111111, 1);
+    this.add.image(640, 330, "leftys_thumb").setDisplaySize(560, 280);
+
+    this.add.text(640, 520, "LEFTY'S LIVE MUSIC", {
+      fontSize: "34px",
+      color: "#ffffff",
+      fontFamily: "monospace"
+    }).setOrigin(0.5);
+
+    this.add.text(640, 620, "TAP TO START LEVEL", {
+      fontSize: "30px",
+      color: "#00ff66",
+      fontFamily: "monospace"
+    }).setOrigin(0.5);
+
+    this.input.once("pointerdown", () => {
+      this.scene.start("GameScene");
+    });
+  }
+}
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -31,7 +147,6 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-
     this.load.image("bg", "assets/levels/leftys.png");
 
     this.load.spritesheet("jt_idle", "assets/sprites/jt/jt_idle.png", {
@@ -84,26 +199,33 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-
     this.add.image(640, 360, "bg").setDisplaySize(1280, 720);
 
     this.createAnimations();
 
     this.player = this.physics.add.sprite(640, 560, "jt_idle");
 
+    // SPRITE FIX
     this.player.setOrigin(0.5, 1);
-    this.player.setDisplaySize(128, 128); // 🔥 HARD LOCK SIZE
+    this.player.setScale(JT_SCALE);
+    this.player.setDisplaySize(JT_W * JT_SCALE, JT_H * JT_SCALE);
     this.player.setCollideWorldBounds(true);
+    this.player.setSize(50, 90);
+    this.player.setOffset(39, 30);
     this.player.play("jt-idle");
 
     this.keys = this.input.keyboard.addKeys({
-      up: 'W',
-      down: 'S',
-      left: 'A',
-      right: 'D',
-      light: 'J',
-      heavy: 'K',
-      taunt: 'T'
+      up: Phaser.Input.Keyboard.KeyCodes.W,
+      down: Phaser.Input.Keyboard.KeyCodes.S,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+      arrowUp: Phaser.Input.Keyboard.KeyCodes.UP,
+      arrowDown: Phaser.Input.Keyboard.KeyCodes.DOWN,
+      arrowLeft: Phaser.Input.Keyboard.KeyCodes.LEFT,
+      arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      light: Phaser.Input.Keyboard.KeyCodes.J,
+      heavy: Phaser.Input.Keyboard.KeyCodes.K,
+      taunt: Phaser.Input.Keyboard.KeyCodes.T
     });
 
     this.isBusy = false;
@@ -113,7 +235,6 @@ class GameScene extends Phaser.Scene {
   }
 
   createAnimations() {
-
     this.anims.create({
       key: "jt-idle",
       frames: this.anims.generateFrameNumbers("jt_idle", { start: 0, end: 3 }),
@@ -121,57 +242,80 @@ class GameScene extends Phaser.Scene {
       repeat: -1
     });
 
-    ["down","up","left","right"].forEach(dir => {
-      this.anims.create({
-        key: "jt-walk-" + dir,
-        frames: this.anims.generateFrameNumbers("jt_walk_" + dir, { start: 0, end: 7 }),
-        frameRate: 10,
-        repeat: -1
-      });
+    this.anims.create({
+      key: "jt-walk-down",
+      frames: this.anims.generateFrameNumbers("jt_walk_down", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-walk-up",
+      frames: this.anims.generateFrameNumbers("jt_walk_up", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-walk-left",
+      frames: this.anims.generateFrameNumbers("jt_walk_left", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-walk-right",
+      frames: this.anims.generateFrameNumbers("jt_walk_right", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
     });
 
     this.anims.create({
       key: "jt-light",
       frames: this.anims.generateFrameNumbers("jt_attack_light", { start: 0, end: 3 }),
-      frameRate: 12
+      frameRate: 12,
+      repeat: 0
     });
 
     this.anims.create({
       key: "jt-heavy",
       frames: this.anims.generateFrameNumbers("jt_attack_heavy", { start: 0, end: 5 }),
-      frameRate: 10
+      frameRate: 10,
+      repeat: 0
     });
 
     this.anims.create({
       key: "jt-taunt",
       frames: this.anims.generateFrameNumbers("jt_taunt", { start: 0, end: 2 }),
-      frameRate: 6
+      frameRate: 6,
+      repeat: 0
     });
   }
 
   update() {
-
     if (this.isBusy) return;
 
     let vx = 0;
     let vy = 0;
-
     const speed = 180;
 
-    if (this.keys.left.isDown || this.touchLeft) {
+    const left = this.keys.left.isDown || this.keys.arrowLeft.isDown || this.touchLeft;
+    const right = this.keys.right.isDown || this.keys.arrowRight.isDown || this.touchRight;
+    const up = this.keys.up.isDown || this.keys.arrowUp.isDown || this.touchUp;
+    const down = this.keys.down.isDown || this.keys.arrowDown.isDown || this.touchDown;
+
+    if (left) {
       vx = -speed;
       this.facing = "left";
-    }
-    else if (this.keys.right.isDown || this.touchRight) {
+    } else if (right) {
       vx = speed;
       this.facing = "right";
     }
 
-    if (this.keys.up.isDown || this.touchUp) {
+    if (up) {
       vy = -speed;
       this.facing = "up";
-    }
-    else if (this.keys.down.isDown || this.touchDown) {
+    } else if (down) {
       vy = speed;
       this.facing = "down";
     }
@@ -197,25 +341,30 @@ class GameScene extends Phaser.Scene {
     }
 
     if (vx !== 0 || vy !== 0) {
-      this.player.play("jt-walk-" + this.facing, true);
+      this.safePlay("jt-walk-" + this.facing);
     } else {
-      this.player.play("jt-idle", true);
+      this.safePlay("jt-idle");
     }
   }
 
-  playAction(key) {
+  safePlay(animKey) {
+    if (!this.player.anims.currentAnim || this.player.anims.currentAnim.key !== animKey) {
+      this.player.play(animKey, true);
+    }
+  }
+
+  playAction(animKey) {
     this.isBusy = true;
     this.player.setVelocity(0, 0);
-    this.player.play(key);
+    this.player.play(animKey);
 
     this.player.once("animationcomplete", () => {
       this.isBusy = false;
-      this.player.play("jt-idle");
+      this.player.play("jt-idle", true);
     });
   }
 
   makeTouchControls() {
-
     this.touchUp = false;
     this.touchDown = false;
     this.touchLeft = false;
@@ -224,37 +373,54 @@ class GameScene extends Phaser.Scene {
     this.touchHeavy = false;
     this.touchTaunt = false;
 
-    const hold = (x,y,label,prop) => {
-      const btn = this.add.circle(x,y,30,0xffffff,0.15).setInteractive();
-      const txt = this.add.text(x,y,label).setOrigin(0.5);
+    const hold = (x, y, label, prop) => {
+      const btn = this.add.circle(x, y, 36, 0xffffff, 0.16).setInteractive();
+      const txt = this.add.text(x, y, label, {
+        fontSize: "24px",
+        color: "#fff",
+        fontFamily: "monospace"
+      }).setOrigin(0.5);
 
-      btn.on("pointerdown",()=>this[prop]=true);
-      btn.on("pointerup",()=>this[prop]=false);
-      btn.on("pointerout",()=>this[prop]=false);
+      btn.on("pointerdown", () => this[prop] = true);
+      btn.on("pointerup", () => this[prop] = false);
+      btn.on("pointerout", () => this[prop] = false);
+
+      txt.setInteractive();
+      txt.on("pointerdown", () => this[prop] = true);
+      txt.on("pointerup", () => this[prop] = false);
+      txt.on("pointerout", () => this[prop] = false);
     };
 
-    const tap = (x,y,label,prop) => {
-      const btn = this.add.circle(x,y,35,0xffffff,0.2).setInteractive();
-      const txt = this.add.text(x,y,label).setOrigin(0.5);
+    const tap = (x, y, label, prop) => {
+      const btn = this.add.circle(x, y, 40, 0xffffff, 0.18).setInteractive();
+      const txt = this.add.text(x, y, label, {
+        fontSize: "24px",
+        color: "#fff",
+        fontFamily: "monospace"
+      }).setOrigin(0.5);
 
-      btn.on("pointerdown",()=>this[prop]=true);
+      btn.on("pointerdown", () => this[prop] = true);
+      txt.setInteractive();
+      txt.on("pointerdown", () => this[prop] = true);
     };
 
-    hold(100,600,"←","touchLeft");
-    hold(180,600,"→","touchRight");
-    hold(140,550,"↑","touchUp");
-    hold(140,650,"↓","touchDown");
+    hold(90, 600, "←", "touchLeft");
+    hold(180, 600, "→", "touchRight");
+    hold(135, 545, "↑", "touchUp");
+    hold(135, 655, "↓", "touchDown");
 
-    tap(1100,600,"X","touchLight");
-    tap(1180,650,"A","touchHeavy");
-    tap(1020,650,"Y","touchTaunt");
+    tap(1130, 540, "X", "touchLight");
+    tap(1220, 610, "A", "touchHeavy");
+    tap(1040, 610, "Y", "touchTaunt");
+    tap(1130, 680, "B", "touchLight");
   }
 }
 
 const config = {
   type: Phaser.AUTO,
-  width: 1280,
-  height: 720,
+  width: GAME_W,
+  height: GAME_H,
+  backgroundColor: "#000000",
   pixelArt: true,
   render: {
     pixelArt: true,
@@ -262,9 +428,16 @@ const config = {
   },
   physics: {
     default: "arcade",
-    arcade: { debug: false }
+    arcade: {
+      debug: false
+    }
   },
-  scene: GameScene,
+  scene: [
+    TitleScene,
+    CharacterSelectScene,
+    LevelSelectScene,
+    GameScene
+  ],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -272,7 +445,6 @@ const config = {
 };
 
 new Phaser.Game(config);
-
 </script>
 </body>
 </html>
