@@ -194,40 +194,17 @@ class Game extends Phaser.Scene {
   }
 
   createPlatformZones(){
-    const alpha=0.08;
-    const zoneDepth=10;
+  const alpha = 0.08;
+  const zoneDepth = 10;
 
-    this.leftLadder=this.add.rectangle(245,345,70,170,0x00ff00,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
+  this.leftLadder = this.add.rectangle(250,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
+  this.rightLadder = this.add.rectangle(775,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
 
-    this.rightLadder=this.add.rectangle(765,345,70,170,0x00ff00,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
+  this.downStairs = this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(zoneDepth);
+  this.upStairs = this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(zoneDepth);
 
-    this.downStairs=this.add.rectangle(470,455,260,90,0xff00ff,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
-
-    this.upStairs=this.add.rectangle(470,500,300,90,0x00ffff,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
-
-    this.topDownLeft=this.add.rectangle(245,245,80,90,0xffff00,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
-
-    this.topDownRight=this.add.rectangle(765,245,80,90,0xffff00,alpha)
-      .setInteractive()
-      .setDepth(zoneDepth);
-
-    this.leftLadder.on("pointerdown",()=>{
-      if(this.platform==="middle"){
-        this.platform="top";
-        this.player.x=245;
-        this.player.y=250;
-        this.zoneText.setText("TOP PLATFORM");
-      }
+  this.zoneText.setText("MIDDLE PLATFORM");
+}
     });
 
     this.rightLadder.on("pointerdown",()=>{
@@ -341,23 +318,18 @@ class Game extends Phaser.Scene {
     if(this.moveX>0)this.player.setFlipX(false);
   }
 
-  applyPlatformBounds(){
-    if(this.platform==="bottom"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=Phaser.Math.Clamp(this.player.y,485,520);
-    }
+  createPlatformZones(){
+  const alpha = 0.08;
+  const zoneDepth = 10;
 
-    if(this.platform==="middle"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=Phaser.Math.Clamp(this.player.y,375,420);
-    }
+  this.leftLadder = this.add.rectangle(250,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
+  this.rightLadder = this.add.rectangle(775,390,70,160,0x00ff00,alpha).setDepth(zoneDepth);
 
-    if(this.platform==="top"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
-      this.player.y=Phaser.Math.Clamp(this.player.y,230,270);
-    }
-  }
+  this.downStairs = this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(zoneDepth);
+  this.upStairs = this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(zoneDepth);
 
+  this.zoneText.setText("MIDDLE PLATFORM");
+}
   makeControls(){
     const baseX=120;
     const baseY=420;
