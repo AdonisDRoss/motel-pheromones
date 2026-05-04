@@ -10,10 +10,11 @@ html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:h
 canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
+
 <body>
 <script>
 
-const VERSION = 111;
+const VERSION = 113;
 
 class Boot extends Phaser.Scene {
   constructor(){ super("Boot"); }
@@ -28,14 +29,14 @@ class Boot extends Phaser.Scene {
     this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-this.load.image("jtSingle","assets/player/jt/jt-single.png?v=112");
-    
-      margin:0,
-      spacing:0
-    });
+
+    // IMPORTANT: single clean sprite only. No jt-master spritesheet.
+    this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
-  create(){ this.scene.start("Title"); }
+  create(){
+    this.scene.start("Title");
+  }
 }
 
 class Title extends Phaser.Scene {
@@ -47,7 +48,8 @@ class Title extends Phaser.Scene {
     this.add.text(480,480,"TAP TO START",{
       font:"22px monospace",
       fill:"#ff4fc3"
-    }).setOrigin(0.5).setInteractive()
+    }).setOrigin(0.5)
+      .setInteractive()
       .on("pointerdown",()=>this.scene.start("FighterSelect"));
   }
 }
@@ -145,49 +147,28 @@ class Game extends Phaser.Scene {
     this.addRain();
     this.addFog();
 
-    this.add.text(20,20,"CHAR: "+this.fighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
-    this.add.text(20,45,"LEVEL: "+this.levelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
+    this.add.text(20,20,"CHAR: "+this.fighter,{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setDepth(1000);
 
-    this.createJTAnimations();
+    this.add.text(20,45,"LEVEL: "+this.levelName,{
+      font:"16px monospace",
+      fill:"#ff4fc3"
+    }).setDepth(1000);
 
     this.shadow=this.add.ellipse(300,452,42,12,0x000000,0.35).setDepth(40);
 
-    this.player=this.physics.add.sprite(300,450,"jt",0);
+    this.player=this.physics.add.sprite(300,450,"jtSingle");
     this.player.setOrigin(0.5,1);
-    this.player.setScale(1.1);
+    this.player.setScale(1.2);
     this.player.setDepth(50);
     this.player.setCollideWorldBounds(true);
 
-    if(this.anims.exists("idle")) this.player.play("idle");
-
     this.moveX=0;
     this.moveY=0;
-    this.isAttacking=false;
 
     this.makeControls();
-  }
-
-  createJTAnimations(){
-    if(!this.textures.exists("jt")) return;
-    const tex=this.textures.get("jt");
-
-    const safe=(key,start,end,rate,repeat=0)=>{
-      if(tex.frameTotal<=end) return;
-      if(this.anims.exists(key)) return;
-      this.anims.create({
-        key,
-        frames:this.anims.generateFrameNumbers("jt",{start,end}),
-        frameRate:rate,
-        repeat
-      });
-    };
-
-    safe("idle",0,3,6,-1);
-    safe("walk",16,21,10,-1);
-    safe("light",96,99,12,0);
-    safe("heavy",112,116,10,0);
-    safe("kick",128,131,10,0);
-    safe("spin",176,181,12,0);
   }
 
   addRain(){
@@ -198,6 +179,7 @@ class Game extends Phaser.Scene {
         Phaser.Math.Between(0,540),
         2,14,0x77aaff,0.4
       ).setDepth(90);
+
       drop.speed=Phaser.Math.Between(350,700);
       this.rainDrops.push(drop);
     }
@@ -205,6 +187,7 @@ class Game extends Phaser.Scene {
 
   addFog(){
     this.fog=this.add.rectangle(480,270,960,540,0xcccccc,0.06).setDepth(80);
+
     this.tweens.add({
       targets:this.fog,
       alpha:{from:0.04,to:0.11},
@@ -218,6 +201,7 @@ class Game extends Phaser.Scene {
     this.rainDrops.forEach(drop=>{
       drop.y += drop.speed * 0.016;
       drop.x -= 1.5;
+
       if(drop.y>560){
         drop.y=-20;
         drop.x=Phaser.Math.Between(0,960);
@@ -226,35 +210,14 @@ class Game extends Phaser.Scene {
 
     const speed=190;
 
-    if(!this.isAttacking){
-      this.player.setVelocity(this.moveX*speed,this.moveY*speed);
-      this.player.y=Phaser.Math.Clamp(this.player.y,330,470);
+    this.player.setVelocity(this.moveX*speed,this.moveY*speed);
+    this.player.y=Phaser.Math.Clamp(this.player.y,330,470);
 
-      if(this.moveX!==0 || this.moveY!==0){
-        if(this.anims.exists("walk")) this.player.play("walk",true);
-      } else {
-        if(this.anims.exists("idle")) this.player.play("idle",true);
-      }
-
-      if(this.moveX<0)this.player.setFlipX(true);
-      if(this.moveX>0)this.player.setFlipX(false);
-    }
+    if(this.moveX<0)this.player.setFlipX(true);
+    if(this.moveX>0)this.player.setFlipX(false);
 
     this.shadow.x=this.player.x;
     this.shadow.y=this.player.y+2;
-  }
-
-  playAttack(anim){
-    if(this.isAttacking) return;
-    this.isAttacking=true;
-    this.player.setVelocity(0,0);
-
-    if(this.anims.exists(anim)) this.player.play(anim,true);
-
-    this.time.delayedCall(450,()=>{
-      this.isAttacking=false;
-      if(this.anims.exists("idle")) this.player.play("idle",true);
-    });
   }
 
   makeControls(){
@@ -301,17 +264,16 @@ class Game extends Phaser.Scene {
       this.moveY=0;
     });
 
-    this.makeButton(860,350,"X","heavy");
-    this.makeButton(800,420,"Y","light");
-    this.makeButton(920,420,"A","kick");
-    this.makeButton(860,490,"B","spin");
+    this.makeButton(860,350,"X");
+    this.makeButton(800,420,"Y");
+    this.makeButton(920,420,"A");
+    this.makeButton(860,490,"B");
   }
 
-  makeButton(x,y,label,anim){
+  makeButton(x,y,label){
     this.add.circle(x,y,32,0xffffff,0.22)
       .setInteractive()
-      .setDepth(999)
-      .on("pointerdown",()=>this.playAttack(anim));
+      .setDepth(999);
 
     this.add.text(x,y,label,{
       font:"18px monospace",
