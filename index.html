@@ -168,69 +168,7 @@ class Game extends Phaser.Scene {
     this.makeControls();
   }
 
-  createPlatformZones(){
-    this.zoneText=this.add.text(480,25,"STREET",{
-      font:"16px monospace",
-      fill:"#ffff00"
-    }).setOrigin(0.5).setDepth(1000);
-
-    // Main ladder near center-left of outdoor image
-    this.roofLadder=this.add.rectangle(405,430,70,150,0x00ff00,0.08)
-      .setInteractive()
-      .setDepth(300);
-
-    // Roof down zone at top of ladder
-    this.roofDownZone=this.add.rectangle(405,300,70,90,0xffff00,0.08)
-      .setInteractive()
-      .setDepth(300);
-
-    // Lower stairs / drop zone on far left
-    this.lowerStairs=this.add.rectangle(120,455,100,100,0xff00ff,0.08)
-      .setInteractive()
-      .setDepth(300);
-
-    // Back up from lower platform
-    this.lowerUpZone=this.add.rectangle(170,505,110,80,0x00ffff,0.08)
-      .setInteractive()
-      .setDepth(300);
-
-    this.roofLadder.on("pointerdown",()=>{
-      if(this.platform==="street"){
-        this.platform="roof";
-        this.player.x=405;
-        this.player.y=315;
-        this.zoneText.setText("ROOF PLATFORM");
-      }
-    });
-
-    this.roofDownZone.on("pointerdown",()=>{
-      if(this.platform==="roof"){
-        this.platform="street";
-        this.player.x=405;
-        this.player.y=460;
-        this.zoneText.setText("STREET");
-      }
-    });
-
-    this.lowerStairs.on("pointerdown",()=>{
-      if(this.platform==="street"){
-        this.platform="lower";
-        this.player.x=210;
-        this.player.y=510;
-        this.zoneText.setText("LOWER PLATFORM");
-      }
-    });
-
-    this.lowerUpZone.on("pointerdown",()=>{
-      if(this.platform==="lower"){
-        this.platform="street";
-        this.player.x=180;
-        this.player.y=460;
-        this.zoneText.setText("STREET");
-      }
-    });
-  }
-
+  https://adonisdross.github.io/motel-pheromones/
   addRain(){
     this.rain=this.add.group();
 
