@@ -1,278 +1,291 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Motel Pheromones</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-
-<style>
-body { margin:0; background:black; overflow:hidden; }
-canvas {
-  width:100vw !important;
-  height:100vh !important;
-  image-rendering:pixelated;
-}
-</style>
+  <meta charset="UTF-8" />
+  <title>Motel Pheromones - JT Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+  </style>
 </head>
 
 <body>
 <script>
-
-const VERSION = 300;
-
-let selectedFighter = "gigi";
-let selectedLevel = "outdoor";
-
-class Boot extends Phaser.Scene {
-  constructor(){ super("Boot"); }
-
-  preload(){
-
-    // UI
-    this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
-    this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
-    this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
-
-    // LEVELS
-    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
-    this.load.image("house","assets/levels/house-party.png?v="+VERSION);
-    this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
-    this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
-    this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-
-    // PLAYER
-    this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
+class GameScene extends Phaser.Scene {
+  constructor() {
+    super("GameScene");
   }
 
-  create(){
-    this.scene.start("Title");
-  }
-}
+  preload() {
+    // PLACE YOUR SPRITES HERE:
+    // assets/sprites/jt/jt_idle.png
+    // assets/sprites/jt/jt_walk_down.png
+    // assets/sprites/jt/jt_walk_up.png
+    // assets/sprites/jt/jt_walk_left.png
+    // assets/sprites/jt/jt_walk_right.png
+    // assets/sprites/jt/jt_attack_light.png
+    // assets/sprites/jt/jt_attack_heavy.png
+    // assets/sprites/jt/jt_hurt.png
+    // assets/sprites/jt/jt_ko.png
+    // assets/sprites/jt/jt_taunt.png
 
-class Title extends Phaser.Scene {
-  constructor(){ super("Title"); }
+    this.load.spritesheet("jt_idle", "assets/sprites/jt/jt_idle.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
 
-  create(){
-    this.add.image(480,270,"title");
-    this.add.text(350,450,"TAP TO START",{font:"24px monospace",fill:"#fff"});
+    this.load.spritesheet("jt_walk_down", "assets/sprites/jt/jt_walk_down.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
 
-    this.input.once("pointerdown",()=>{
-      this.scene.start("CharacterSelect");
+    this.load.spritesheet("jt_walk_up", "assets/sprites/jt/jt_walk_up.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_walk_left", "assets/sprites/jt/jt_walk_left.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_walk_right", "assets/sprites/jt/jt_walk_right.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_attack_light", "assets/sprites/jt/jt_attack_light.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_attack_heavy", "assets/sprites/jt/jt_attack_heavy.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_hurt", "assets/sprites/jt/jt_hurt.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_ko", "assets/sprites/jt/jt_ko.png", {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+
+    this.load.spritesheet("jt_taunt", "assets/sprites/jt/jt_taunt.png", {
+      frameWidth: 128,
+      frameHeight: 128
     });
   }
-}
 
-class CharacterSelect extends Phaser.Scene {
-  constructor(){ super("CharacterSelect"); }
+  create() {
+    this.cameras.main.setBackgroundColor("#1b1b1b");
 
-  create(){
-    this.add.image(480,270,"charSelect");
-
-    this.add.text(20,20,"SELECT FIGHTER",{font:"18px monospace",fill:"#fff"});
-
-    this.input.on("pointerdown",(p)=>{
-      selectedFighter = (p.x < 480) ? "gigi" : "donny";
-      this.scene.start("LevelSelect");
+    this.ground = this.add.rectangle(640, 500, 1280, 220, 0x333333);
+    this.add.text(30, 30, "JT Sprite Test", {
+      fontSize: "28px",
+      color: "#ffaa00",
+      fontFamily: "monospace"
     });
-  }
-}
 
-class LevelSelect extends Phaser.Scene {
-  constructor(){ super("LevelSelect"); }
-
-  create(){
-    this.add.image(480,270,"levelSelect");
-
-    this.add.text(20,20,"SELECT LEVEL",{font:"18px monospace",fill:"#fff"});
-
-    this.input.on("pointerdown",(p)=>{
-      if(p.x < 200) selectedLevel = "house";
-      else if(p.x < 400) selectedLevel = "indoor";
-      else if(p.x < 600) selectedLevel = "outdoor";
-      else if(p.x < 800) selectedLevel = "lmnop";
-      else selectedLevel = "chicken";
-
-      this.scene.start("Game");
+    this.add.text(30, 65, "Move: WASD / Arrows | J: Light | K: Heavy | T: Taunt", {
+      fontSize: "18px",
+      color: "#ffffff",
+      fontFamily: "monospace"
     });
-  }
-}
 
-class Game extends Phaser.Scene {
-  constructor(){ super("Game"); }
+    this.createAnimations();
 
-  create(){
-
-    // BACKGROUND
-    this.bg = this.add.image(480,270,selectedLevel).setDepth(0);
-
-    // RAIN
-    this.rain = this.add.group();
-    for(let i=0;i<120;i++){
-      let drop = this.add.rectangle(
-        Phaser.Math.Between(0,960),
-        Phaser.Math.Between(0,540),
-        2,10,0x77aaff,0.4
-      ).setDepth(90);
-      this.rain.add(drop);
-    }
-
-    // FOG
-    this.fog = this.add.rectangle(480,500,960,200,0x000000,0.2)
-      .setDepth(95);
-
-    // SHADOW
-    this.shadow = this.add.ellipse(450,500,50,14,0x000000,0.4)
-      .setDepth(99);
-
-    // PLAYER (FIXED)
-    this.player = this.physics.add.sprite(450,460,"jtSingle");
-
-    this.player.setOrigin(0.5,1);
-    this.player.setDisplaySize(96,144);
-    this.player.setDepth(200);
+    this.player = this.physics.add.sprite(300, 420, "jt_idle");
+    this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
-    this.player.body.setAllowGravity(false);
-    this.player.body.setVelocity(0,0);
+    this.player.play("jt-idle");
 
-    // IDLE BOUNCE
-    this.tweens.add({
-      targets: this.player,
-      y: this.player.y - 4,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: "sine.inOut"
+    this.keys = this.input.keyboard.addKeys({
+      up: Phaser.Input.Keyboard.KeyCodes.UP,
+      down: Phaser.Input.Keyboard.KeyCodes.DOWN,
+      left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+      right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      w: Phaser.Input.Keyboard.KeyCodes.W,
+      a: Phaser.Input.Keyboard.KeyCodes.A,
+      s: Phaser.Input.Keyboard.KeyCodes.S,
+      d: Phaser.Input.Keyboard.KeyCodes.D,
+      light: Phaser.Input.Keyboard.KeyCodes.J,
+      heavy: Phaser.Input.Keyboard.KeyCodes.K,
+      taunt: Phaser.Input.Keyboard.KeyCodes.T
     });
 
-    // BREATH SCALE
-    this.tweens.add({
-      targets: this.player,
-      scaleX: 1.02,
-      scaleY: 1.02,
-      duration: 900,
-      yoyo: true,
+    this.isAttacking = false;
+    this.facing = "down";
+  }
+
+  createAnimations() {
+    this.anims.create({
+      key: "jt-idle",
+      frames: this.anims.generateFrameNumbers("jt_idle", { start: 0, end: 3 }),
+      frameRate: 5,
       repeat: -1
     });
 
-    this.moveX = 0;
-    this.moveY = 0;
+    this.anims.create({
+      key: "jt-walk-down",
+      frames: this.anims.generateFrameNumbers("jt_walk_down", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
 
-    this.makeControls();
+    this.anims.create({
+      key: "jt-walk-up",
+      frames: this.anims.generateFrameNumbers("jt_walk_up", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-walk-left",
+      frames: this.anims.generateFrameNumbers("jt_walk_left", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-walk-right",
+      frames: this.anims.generateFrameNumbers("jt_walk_right", { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: "jt-attack-light",
+      frames: this.anims.generateFrameNumbers("jt_attack_light", { start: 0, end: 3 }),
+      frameRate: 12,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: "jt-attack-heavy",
+      frames: this.anims.generateFrameNumbers("jt_attack_heavy", { start: 0, end: 5 }),
+      frameRate: 10,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: "jt-hurt",
+      frames: this.anims.generateFrameNumbers("jt_hurt", { start: 0, end: 2 }),
+      frameRate: 8,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: "jt-ko",
+      frames: this.anims.generateFrameNumbers("jt_ko", { start: 0, end: 2 }),
+      frameRate: 6,
+      repeat: 0
+    });
+
+    this.anims.create({
+      key: "jt-taunt",
+      frames: this.anims.generateFrameNumbers("jt_taunt", { start: 0, end: 2 }),
+      frameRate: 6,
+      repeat: 0
+    });
   }
 
-  update(){
+  update() {
+    if (this.isAttacking) return;
 
-    // RAIN LOOP
-    this.rain.children.iterate((drop)=>{
-      drop.y += 8;
+    const speed = 220;
+    let vx = 0;
+    let vy = 0;
 
-      if(drop.y > 540){
-        drop.y = 0;
-        drop.x = Phaser.Math.Between(0,960);
+    const up = this.keys.up.isDown || this.keys.w.isDown;
+    const down = this.keys.down.isDown || this.keys.s.isDown;
+    const left = this.keys.left.isDown || this.keys.a.isDown;
+    const right = this.keys.right.isDown || this.keys.d.isDown;
 
-        // SPLASH
-        let splash = this.add.circle(drop.x,500,2,0x77aaff,0.3)
-          .setDepth(85);
+    if (left) {
+      vx = -speed;
+      this.facing = "left";
+    } else if (right) {
+      vx = speed;
+      this.facing = "right";
+    }
 
-        this.tweens.add({
-          targets: splash,
-          alpha: 0,
-          scale: 2,
-          duration: 200
-        });
-      }
-    });
+    if (up) {
+      vy = -speed;
+      this.facing = "up";
+    } else if (down) {
+      vy = speed;
+      this.facing = "down";
+    }
 
-    // SMOOTH MOVEMENT
-    this.player.body.velocity.x = Phaser.Math.Linear(
-      this.player.body.velocity.x,
-      this.moveX * 200,
-      0.2
-    );
+    this.player.setVelocity(vx, vy);
 
-    this.player.body.velocity.y = Phaser.Math.Linear(
-      this.player.body.velocity.y,
-      this.moveY * 200,
-      0.2
-    );
+    if (Phaser.Input.Keyboard.JustDown(this.keys.light)) {
+      this.playAction("jt-attack-light");
+      return;
+    }
 
-    // GROUND LOCK
-    this.player.y = Phaser.Math.Clamp(this.player.y,360,500);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.heavy)) {
+      this.playAction("jt-attack-heavy");
+      return;
+    }
 
-    // SHADOW FOLLOW
-    this.shadow.x = this.player.x;
-    this.shadow.y = this.player.y + 5;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.taunt)) {
+      this.playAction("jt-taunt");
+      return;
+    }
 
-    // FLIP
-    if(this.moveX < 0) this.player.setFlipX(true);
-    if(this.moveX > 0) this.player.setFlipX(false);
+    if (vx !== 0 || vy !== 0) {
+      this.player.play("jt-walk-" + this.facing, true);
+    } else {
+      this.player.play("jt-idle", true);
+    }
   }
 
-  makeControls(){
+  playAction(animKey) {
+    this.isAttacking = true;
+    this.player.setVelocity(0, 0);
+    this.player.play(animKey);
 
-    const baseX = 120;
-    const baseY = 420;
-
-    this.add.circle(baseX,baseY,60,0xffffff,0.1);
-
-    let dragging = false;
-
-    this.input.on("pointerdown",(p)=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<80){
-        dragging = true;
-      }
+    this.player.once("animationcomplete", () => {
+      this.isAttacking = false;
+      this.player.play("jt-idle", true);
     });
-
-    this.input.on("pointermove",(p)=>{
-      if(!dragging) return;
-
-      let dx = p.x - baseX;
-      let dy = p.y - baseY;
-
-      const len = Math.sqrt(dx*dx+dy*dy);
-      if(len>60){
-        dx/=len; dy/=len;
-        dx*=60; dy*=60;
-      }
-
-      this.moveX = dx/60;
-      this.moveY = dy/60;
-    });
-
-    this.input.on("pointerup",()=>{
-      dragging=false;
-      this.moveX=0;
-      this.moveY=0;
-    });
-
-    this.makeBtn(860,380,"X",()=>{});
-    this.makeBtn(800,450,"Y",()=>{});
-    this.makeBtn(920,450,"A",()=>{});
-    this.makeBtn(860,520,"B",()=>{});
-  }
-
-  makeBtn(x,y,label,fn){
-    this.add.circle(x,y,30,0xffffff,0.2)
-      .setInteractive()
-      .on("pointerdown",fn);
-
-    this.add.text(x,y,label,{font:"18px monospace",fill:"#fff"})
-      .setOrigin(0.5);
   }
 }
 
 const config = {
   type: Phaser.AUTO,
-  width:960,
-  height:540,
-  physics:{ default:"arcade" },
-  scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
+  width: 1280,
+  height: 720,
+  backgroundColor: "#000000",
+  pixelArt: true,
+  physics: {
+    default: "arcade",
+    arcade: {
+      debug: false
+    }
+  },
+  scene: GameScene,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  }
 };
 
 new Phaser.Game(config);
-
 </script>
 </body>
 </html>
