@@ -1,450 +1,404 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8" />
 <title>Motel Pheromones</title>
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #000;
-  overflow: hidden;
-}
-canvas {
-  display: block;
-  margin: 0 auto;
-  image-rendering: pixelated;
-}
+html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:hidden;touch-action:none;}
+canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
-
 <body>
 <script>
-const GAME_W = 1280;
-const GAME_H = 720;
 
-const JT_SCALE = 0.65;
-const JT_W = 128;
-const JT_H = 128;
+const VERSION = 400;
 
-class TitleScene extends Phaser.Scene {
-  constructor() {
-    super("TitleScene");
+let selectedFighter = "gigi";
+let selectedLevel = "outdoor";
+
+class Boot extends Phaser.Scene {
+  constructor(){ super("Boot"); }
+
+  preload(){
+    this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
+    this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
+    this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
+
+    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
+    this.load.image("house","assets/levels/house-party.png?v="+VERSION);
+    this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
+    this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
+    this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
+
+    this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
   }
 
-  preload() {
-    this.load.image("title", "assets/ui/title_screen.png");
+  create(){
+    this.scene.start("Title");
   }
+}
 
-  create() {
-    this.cameras.main.setBackgroundColor("#000");
+class Title extends Phaser.Scene {
+  constructor(){ super("Title"); }
 
-    this.add.image(640, 360, "title").setDisplaySize(1280, 720);
+  create(){
+    this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    this.add.text(640, 620, "TAP / CLICK TO START", {
-      fontSize: "34px",
-      color: "#ffffff",
-      fontFamily: "monospace",
-      stroke: "#000000",
-      strokeThickness: 6
+    this.add.text(480,480,"TAP TO START",{
+      font:"22px monospace",
+      fill:"#ff4fc3"
     }).setOrigin(0.5);
 
-    this.input.once("pointerdown", () => {
-      this.scene.start("CharacterSelectScene");
+    this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
+  }
+}
+
+class CharacterSelect extends Phaser.Scene {
+  constructor(){ super("CharacterSelect"); }
+
+  create(){
+    this.add.image(480,270,"charSelect").setDisplaySize(960,540);
+
+    const fighters=[
+      {name:"DOTTIE",x:260,y:300,w:170,h:260},
+      {name:"GIGI",x:480,y:300,w:170,h:260},
+      {name:"JT",x:700,y:300,w:170,h:260}
+    ];
+
+    this.outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
+
+    fighters.forEach(f=>{
+      this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
+        .setInteractive()
+        .setDepth(40)
+        .on("pointerdown",()=>{
+          selectedFighter=f.name;
+          this.outline.setPosition(f.x,f.y);
+
+          this.time.delayedCall(200,()=>{
+            this.scene.start("LevelSelect");
+          });
+        });
     });
   }
 }
 
-class CharacterSelectScene extends Phaser.Scene {
-  constructor() {
-    super("CharacterSelectScene");
-  }
+class LevelSelect extends Phaser.Scene {
+  constructor(){ super("LevelSelect"); }
 
-  preload() {
-    this.load.image("jt_portrait", "assets/ui/jt_portrait.png");
-  }
+  create(){
+    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
-  create() {
-    this.cameras.main.setBackgroundColor("#120012");
+    const levels=[
+      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
+      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
+      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
+      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
+      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
+    ];
 
-    this.add.text(640, 70, "CHARACTER SELECT", {
-      fontSize: "48px",
-      color: "#ffb000",
-      fontFamily: "monospace",
-      stroke: "#000",
-      strokeThickness: 6
-    }).setOrigin(0.5);
+    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
 
-    this.add.rectangle(640, 360, 260, 360, 0x000000, 0.65);
-    this.add.rectangle(640, 360, 270, 370, 0x00ffff, 0.25);
+    this.status=this.add.text(480,505,"TAP A LEVEL",{
+      font:"20px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(60);
 
-    this.add.image(640, 320, "jt_portrait").setDisplaySize(220, 260);
+    levels.forEach(l=>{
+      this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
+        .setInteractive()
+        .setDepth(40)
+        .on("pointerdown",()=>{
+          selectedLevel=l.key;
+          this.outline.setPosition(l.x,l.y);
+          this.outline.setSize(l.w,l.h);
+          this.status.setText("LOADING: "+l.name);
 
-    this.add.text(640, 505, "JT - THE DRUMMER", {
-      fontSize: "28px",
-      color: "#ffffff",
-      fontFamily: "monospace"
-    }).setOrigin(0.5);
-
-    this.add.text(640, 610, "TAP TO SELECT", {
-      fontSize: "30px",
-      color: "#00ff66",
-      fontFamily: "monospace"
-    }).setOrigin(0.5);
-
-    this.input.once("pointerdown", () => {
-      this.scene.start("LevelSelectScene");
+          this.time.delayedCall(300,()=>{
+            this.scene.start("Game",{levelName:l.name});
+          });
+        });
     });
   }
 }
 
-class LevelSelectScene extends Phaser.Scene {
-  constructor() {
-    super("LevelSelectScene");
-  }
+class Game extends Phaser.Scene {
+  constructor(){ super("Game"); }
 
-  preload() {
-    this.load.image("leftys_thumb", "assets/levels/leftys.png");
-  }
+  create(data){
+    this.levelName=data.levelName || "OUTDOOR";
 
-  create() {
-    this.cameras.main.setBackgroundColor("#000");
+    this.bg=this.add.image(480,270,selectedLevel).setDisplaySize(960,540).setDepth(0);
 
-    this.add.text(640, 70, "LEVEL SELECT", {
-      fontSize: "48px",
-      color: "#ffb000",
-      fontFamily: "monospace",
-      stroke: "#000",
-      strokeThickness: 6
-    }).setOrigin(0.5);
+    this.platform="street";
 
-    this.add.rectangle(640, 360, 620, 360, 0x111111, 1);
-    this.add.image(640, 330, "leftys_thumb").setDisplaySize(560, 280);
+    this.addRain();
+    this.addFog();
 
-    this.add.text(640, 520, "LEFTY'S LIVE MUSIC", {
-      fontSize: "34px",
-      color: "#ffffff",
-      fontFamily: "monospace"
-    }).setOrigin(0.5);
+    this.add.text(20,20,"CHAR: "+selectedFighter,{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setDepth(1000);
 
-    this.add.text(640, 620, "TAP TO START LEVEL", {
-      fontSize: "30px",
-      color: "#00ff66",
-      fontFamily: "monospace"
-    }).setOrigin(0.5);
+    this.add.text(20,45,"LEVEL: "+this.levelName,{
+      font:"16px monospace",
+      fill:"#ff4fc3"
+    }).setDepth(1000);
 
-    this.input.once("pointerdown", () => {
-      this.scene.start("GameScene");
-    });
-  }
-}
+    this.shadow=this.add.ellipse(300,465,50,14,0x000000,0.4).setDepth(99);
 
-class GameScene extends Phaser.Scene {
-  constructor() {
-    super("GameScene");
-  }
-
-  preload() {
-    this.load.image("bg", "assets/levels/leftys.png");
-
-    this.load.spritesheet("jt_idle", "assets/sprites/jt/jt_idle.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 3
-    });
-
-    this.load.spritesheet("jt_walk_down", "assets/sprites/jt/jt_walk_down.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 7
-    });
-
-    this.load.spritesheet("jt_walk_up", "assets/sprites/jt/jt_walk_up.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 7
-    });
-
-    this.load.spritesheet("jt_walk_left", "assets/sprites/jt/jt_walk_left.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 7
-    });
-
-    this.load.spritesheet("jt_walk_right", "assets/sprites/jt/jt_walk_right.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 7
-    });
-
-    this.load.spritesheet("jt_attack_light", "assets/sprites/jt/jt_attack_light.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 3
-    });
-
-    this.load.spritesheet("jt_attack_heavy", "assets/sprites/jt/jt_attack_heavy.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 5
-    });
-
-    this.load.spritesheet("jt_taunt", "assets/sprites/jt/jt_taunt.png", {
-      frameWidth: 128,
-      frameHeight: 128,
-      endFrame: 2
-    });
-  }
-
-  create() {
-    this.add.image(640, 360, "bg").setDisplaySize(1280, 720);
-
-    this.createAnimations();
-
-    this.player = this.physics.add.sprite(640, 560, "jt_idle");
-
-    // SPRITE FIX
-    this.player.setOrigin(0.5, 1);
-    this.player.setScale(JT_SCALE);
-    this.player.setDisplaySize(JT_W * JT_SCALE, JT_H * JT_SCALE);
+    this.player=this.physics.add.sprite(300,460,"jtSingle");
+    this.player.setOrigin(0.5,1);
+    this.player.setDisplaySize(96,144);
+    this.player.setDepth(200);
     this.player.setCollideWorldBounds(true);
-    this.player.setSize(50, 90);
-    this.player.setOffset(39, 30);
-    this.player.play("jt-idle");
+    this.player.body.setAllowGravity(false);
+    this.player.body.setVelocity(0,0);
 
-    this.keys = this.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
-      arrowUp: Phaser.Input.Keyboard.KeyCodes.UP,
-      arrowDown: Phaser.Input.Keyboard.KeyCodes.DOWN,
-      arrowLeft: Phaser.Input.Keyboard.KeyCodes.LEFT,
-      arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      light: Phaser.Input.Keyboard.KeyCodes.J,
-      heavy: Phaser.Input.Keyboard.KeyCodes.K,
-      taunt: Phaser.Input.Keyboard.KeyCodes.T
-    });
+    this.moveX=0;
+    this.moveY=0;
 
-    this.isBusy = false;
-    this.facing = "down";
-
-    this.makeTouchControls();
+    this.createPlatformZones();
+    this.makeControls();
   }
 
-  createAnimations() {
-    this.anims.create({
-      key: "jt-idle",
-      frames: this.anims.generateFrameNumbers("jt_idle", { start: 0, end: 3 }),
-      frameRate: 5,
-      repeat: -1
+  createPlatformZones(){
+    this.zoneText=this.add.text(480,25,"STREET",{
+      font:"16px monospace",
+      fill:"#ffff00"
+    }).setOrigin(0.5).setDepth(1000);
+
+    // Main ladder near center-left of outdoor image
+    this.roofLadder=this.add.rectangle(405,430,70,150,0x00ff00,0.08)
+      .setInteractive()
+      .setDepth(300);
+
+    // Roof down zone at top of ladder
+    this.roofDownZone=this.add.rectangle(405,300,70,90,0xffff00,0.08)
+      .setInteractive()
+      .setDepth(300);
+
+    // Lower stairs / drop zone on far left
+    this.lowerStairs=this.add.rectangle(120,455,100,100,0xff00ff,0.08)
+      .setInteractive()
+      .setDepth(300);
+
+    // Back up from lower platform
+    this.lowerUpZone=this.add.rectangle(170,505,110,80,0x00ffff,0.08)
+      .setInteractive()
+      .setDepth(300);
+
+    this.roofLadder.on("pointerdown",()=>{
+      if(this.platform==="street"){
+        this.platform="roof";
+        this.player.x=405;
+        this.player.y=315;
+        this.zoneText.setText("ROOF PLATFORM");
+      }
     });
 
-    this.anims.create({
-      key: "jt-walk-down",
-      frames: this.anims.generateFrameNumbers("jt_walk_down", { start: 0, end: 7 }),
-      frameRate: 10,
-      repeat: -1
+    this.roofDownZone.on("pointerdown",()=>{
+      if(this.platform==="roof"){
+        this.platform="street";
+        this.player.x=405;
+        this.player.y=460;
+        this.zoneText.setText("STREET");
+      }
     });
 
-    this.anims.create({
-      key: "jt-walk-up",
-      frames: this.anims.generateFrameNumbers("jt_walk_up", { start: 0, end: 7 }),
-      frameRate: 10,
-      repeat: -1
+    this.lowerStairs.on("pointerdown",()=>{
+      if(this.platform==="street"){
+        this.platform="lower";
+        this.player.x=210;
+        this.player.y=510;
+        this.zoneText.setText("LOWER PLATFORM");
+      }
     });
 
-    this.anims.create({
-      key: "jt-walk-left",
-      frames: this.anims.generateFrameNumbers("jt_walk_left", { start: 0, end: 7 }),
-      frameRate: 10,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "jt-walk-right",
-      frames: this.anims.generateFrameNumbers("jt_walk_right", { start: 0, end: 7 }),
-      frameRate: 10,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "jt-light",
-      frames: this.anims.generateFrameNumbers("jt_attack_light", { start: 0, end: 3 }),
-      frameRate: 12,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "jt-heavy",
-      frames: this.anims.generateFrameNumbers("jt_attack_heavy", { start: 0, end: 5 }),
-      frameRate: 10,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "jt-taunt",
-      frames: this.anims.generateFrameNumbers("jt_taunt", { start: 0, end: 2 }),
-      frameRate: 6,
-      repeat: 0
+    this.lowerUpZone.on("pointerdown",()=>{
+      if(this.platform==="lower"){
+        this.platform="street";
+        this.player.x=180;
+        this.player.y=460;
+        this.zoneText.setText("STREET");
+      }
     });
   }
 
-  update() {
-    if (this.isBusy) return;
+  addRain(){
+    this.rain=this.add.group();
 
-    let vx = 0;
-    let vy = 0;
-    const speed = 180;
+    for(let i=0;i<120;i++){
+      const drop=this.add.rectangle(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(0,540),
+        2,
+        12,
+        0x77aaff,
+        0.4
+      ).setDepth(90);
 
-    const left = this.keys.left.isDown || this.keys.arrowLeft.isDown || this.touchLeft;
-    const right = this.keys.right.isDown || this.keys.arrowRight.isDown || this.touchRight;
-    const up = this.keys.up.isDown || this.keys.arrowUp.isDown || this.touchUp;
-    const down = this.keys.down.isDown || this.keys.arrowDown.isDown || this.touchDown;
-
-    if (left) {
-      vx = -speed;
-      this.facing = "left";
-    } else if (right) {
-      vx = speed;
-      this.facing = "right";
-    }
-
-    if (up) {
-      vy = -speed;
-      this.facing = "up";
-    } else if (down) {
-      vy = speed;
-      this.facing = "down";
-    }
-
-    this.player.setVelocity(vx, vy);
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.light) || this.touchLight) {
-      this.touchLight = false;
-      this.playAction("jt-light");
-      return;
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.heavy) || this.touchHeavy) {
-      this.touchHeavy = false;
-      this.playAction("jt-heavy");
-      return;
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.taunt) || this.touchTaunt) {
-      this.touchTaunt = false;
-      this.playAction("jt-taunt");
-      return;
-    }
-
-    if (vx !== 0 || vy !== 0) {
-      this.safePlay("jt-walk-" + this.facing);
-    } else {
-      this.safePlay("jt-idle");
+      drop.speed=Phaser.Math.Between(5,10);
+      this.rain.add(drop);
     }
   }
 
-  safePlay(animKey) {
-    if (!this.player.anims.currentAnim || this.player.anims.currentAnim.key !== animKey) {
-      this.player.play(animKey, true);
-    }
-  }
+  addFog(){
+    this.fog=this.add.rectangle(480,500,960,200,0x000000,0.18)
+      .setDepth(95);
 
-  playAction(animKey) {
-    this.isBusy = true;
-    this.player.setVelocity(0, 0);
-    this.player.play(animKey);
-
-    this.player.once("animationcomplete", () => {
-      this.isBusy = false;
-      this.player.play("jt-idle", true);
+    this.tweens.add({
+      targets:this.fog,
+      alpha:{from:0.12,to:0.24},
+      duration:3000,
+      yoyo:true,
+      repeat:-1
     });
   }
 
-  makeTouchControls() {
-    this.touchUp = false;
-    this.touchDown = false;
-    this.touchLeft = false;
-    this.touchRight = false;
-    this.touchLight = false;
-    this.touchHeavy = false;
-    this.touchTaunt = false;
+  update(){
+    this.rain.children.iterate(drop=>{
+      drop.y += drop.speed;
+      drop.x -= 1;
 
-    const hold = (x, y, label, prop) => {
-      const btn = this.add.circle(x, y, 36, 0xffffff, 0.16).setInteractive();
-      const txt = this.add.text(x, y, label, {
-        fontSize: "24px",
-        color: "#fff",
-        fontFamily: "monospace"
-      }).setOrigin(0.5);
+      if(drop.y>540){
+        drop.y=0;
+        drop.x=Phaser.Math.Between(0,960);
+      }
+    });
 
-      btn.on("pointerdown", () => this[prop] = true);
-      btn.on("pointerup", () => this[prop] = false);
-      btn.on("pointerout", () => this[prop] = false);
+    const speed=200;
 
-      txt.setInteractive();
-      txt.on("pointerdown", () => this[prop] = true);
-      txt.on("pointerup", () => this[prop] = false);
-      txt.on("pointerout", () => this[prop] = false);
+    this.player.body.velocity.x=Phaser.Math.Linear(
+      this.player.body.velocity.x,
+      this.moveX*speed,
+      0.2
+    );
+
+    this.player.body.velocity.y=Phaser.Math.Linear(
+      this.player.body.velocity.y,
+      this.moveY*speed,
+      0.2
+    );
+
+    this.applyPlatformBounds();
+
+    this.shadow.x=this.player.x;
+    this.shadow.y=this.player.y+5;
+
+    if(this.moveX<0)this.player.setFlipX(true);
+    if(this.moveX>0)this.player.setFlipX(false);
+  }
+
+  applyPlatformBounds(){
+    if(this.platform==="street"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,100,860);
+      this.player.y=Phaser.Math.Clamp(this.player.y,420,480);
+    }
+
+    if(this.platform==="roof"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,300,780);
+      this.player.y=Phaser.Math.Clamp(this.player.y,285,325);
+    }
+
+    if(this.platform==="lower"){
+      this.player.x=Phaser.Math.Clamp(this.player.x,120,760);
+      this.player.y=Phaser.Math.Clamp(this.player.y,500,525);
+    }
+  }
+
+  makeControls(){
+    const baseX=120;
+    const baseY=420;
+    const r=60;
+
+    this.add.circle(baseX,baseY,r,0xffffff,0.12).setDepth(999);
+    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.35).setDepth(1000);
+
+    let dragging=false;
+
+    const moveStick=(p)=>{
+      let dx=p.x-baseX;
+      let dy=p.y-baseY;
+      const d=Math.sqrt(dx*dx+dy*dy);
+
+      if(d>r){
+        dx=dx/d*r;
+        dy=dy/d*r;
+      }
+
+      knob.x=baseX+dx;
+      knob.y=baseY+dy;
+
+      this.moveX=dx/r;
+      this.moveY=dy/r;
     };
 
-    const tap = (x, y, label, prop) => {
-      const btn = this.add.circle(x, y, 40, 0xffffff, 0.18).setInteractive();
-      const txt = this.add.text(x, y, label, {
-        fontSize: "24px",
-        color: "#fff",
-        fontFamily: "monospace"
-      }).setOrigin(0.5);
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<85){
+        dragging=true;
+        moveStick(p);
+      }
+    });
 
-      btn.on("pointerdown", () => this[prop] = true);
-      txt.setInteractive();
-      txt.on("pointerdown", () => this[prop] = true);
-    };
+    this.input.on("pointermove",p=>{
+      if(dragging)moveStick(p);
+    });
 
-    hold(90, 600, "←", "touchLeft");
-    hold(180, 600, "→", "touchRight");
-    hold(135, 545, "↑", "touchUp");
-    hold(135, 655, "↓", "touchDown");
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      knob.x=baseX;
+      knob.y=baseY;
+      this.moveX=0;
+      this.moveY=0;
+    });
 
-    tap(1130, 540, "X", "touchLight");
-    tap(1220, 610, "A", "touchHeavy");
-    tap(1040, 610, "Y", "touchTaunt");
-    tap(1130, 680, "B", "touchLight");
+    this.makeButton(860,350,"X");
+    this.makeButton(800,420,"Y");
+    this.makeButton(920,420,"A");
+    this.makeButton(860,490,"B");
+  }
+
+  makeButton(x,y,label){
+    this.add.circle(x,y,32,0xffffff,0.22)
+      .setInteractive()
+      .setDepth(999);
+
+    this.add.text(x,y,label,{
+      font:"18px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(1000);
   }
 }
 
-const config = {
-  type: Phaser.AUTO,
-  width: GAME_W,
-  height: GAME_H,
-  backgroundColor: "#000000",
-  pixelArt: true,
-  render: {
-    pixelArt: true,
-    roundPixels: true
+const config={
+  type:Phaser.AUTO,
+  width:960,
+  height:540,
+  backgroundColor:"#000",
+  pixelArt:true,
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH
   },
-  physics: {
-    default: "arcade",
-    arcade: {
-      debug: false
+  physics:{
+    default:"arcade",
+    arcade:{
+      gravity:{y:0},
+      debug:false
     }
   },
-  scene: [
-    TitleScene,
-    CharacterSelectScene,
-    LevelSelectScene,
-    GameScene
-  ],
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  }
+  scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
 
 new Phaser.Game(config);
+
 </script>
 </body>
 </html>
