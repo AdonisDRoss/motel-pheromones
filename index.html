@@ -5,32 +5,20 @@
 <title>Motel Pheromones</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  background:#000;
-  width:100vw;
-  height:100vh;
-  overflow:hidden;
-  touch-action:none;
-}
-canvas{
-  width:100vw!important;
-  height:100vh!important;
-  object-fit:contain;
-  image-rendering:pixelated;
-}
+html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:hidden;touch-action:none;}
+canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
-
 <body>
 <script>
 
-const VERSION = 508;
+const VERSION = 509;
 const W = 960;
 const H = 540;
+
+const MOVE_FRAME_W = 204;
+const MOVE_FRAME_H = 170;
 const FRAME = 128;
 
 let selectedFighter = "JT";
@@ -51,10 +39,9 @@ function safePlay(sprite,key){
 
 function loadJT(scene){
   scene.load.spritesheet("jt_movement", JT_BASE + "/movement.png?v=" + VERSION, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
+    frameWidth: MOVE_FRAME_W,
+    frameHeight: MOVE_FRAME_H
   });
-  scene.load.json("jt_movement_json", JT_BASE + "/data/movement.json?v=" + VERSION);
 
   scene.load.spritesheet("jt_actions", JT_BASE + "/actions.png?v=" + VERSION, {
     frameWidth: FRAME,
@@ -91,20 +78,15 @@ function getAnimations(data){
 
 function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
   if(!hasTex(scene,spriteKey)) return;
-
   const data = scene.cache.json.get(jsonKey);
   const anims = getAnimations(data);
 
   anims.forEach(a=>{
     const key = prefix + a.key;
     if(hasAnim(scene,key)) return;
-
     scene.anims.create({
       key,
-      frames: scene.anims.generateFrameNumbers(spriteKey,{
-        start:a.start,
-        end:a.end
-      }),
+      frames: scene.anims.generateFrameNumbers(spriteKey,{start:a.start,end:a.end}),
       frameRate:a.frameRate || 10,
       repeat:a.repeat ?? 0
     });
@@ -114,7 +96,6 @@ function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
 function makeAnim(scene, key, sheet, start, end, rate, repeat){
   if(!hasTex(scene, sheet)) return;
   if(hasAnim(scene, key)) return;
-
   scene.anims.create({
     key,
     frames: scene.anims.generateFrameNumbers(sheet, { start, end }),
@@ -124,28 +105,22 @@ function makeAnim(scene, key, sheet, start, end, rate, repeat){
 }
 
 function createAllAnims(scene){
-
-  // ===== IDLE =====
   makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
   makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
   makeAnim(scene,"jt_idle_side","jt_movement",10,14,6,-1);
 
-  // ===== WALK (reused row) =====
   makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
   makeAnim(scene,"jt_walk_up","jt_movement",15,19,8,-1);
   makeAnim(scene,"jt_walk_side","jt_movement",15,19,8,-1);
 
-  // ===== RUN (reused row) =====
   makeAnim(scene,"jt_run_down","jt_movement",20,24,12,-1);
-makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
-makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
+  makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
+  makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
-  // ===== ATTACKS =====
   makeAnim(scene,"jt_attack_light","jt_attack_light",0,4,16,0);
   makeAnim(scene,"jt_attack_heavy","jt_attack_heavy",0,4,13,0);
   makeAnim(scene,"jt_kick","jt_kick",0,4,14,0);
 
-  // ===== JSON-DRIVEN (actions + fx) =====
   createAnimsFromJson(scene,"jt_actions","jt_actions_json","jt_");
   createAnimsFromJson(scene,"hit_fx","hit_fx_json","");
 }
@@ -164,8 +139,6 @@ class Boot extends Phaser.Scene{
     this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
     this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
 
-    this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
-
     loadJT(this);
   }
 
@@ -177,15 +150,9 @@ class Boot extends Phaser.Scene{
 
 class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
-
   create(){
     this.add.image(480,270,"title").setDisplaySize(960,540);
-
-    this.add.text(480,480,"TAP TO START",{
-      font:"22px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(10);
-
+    this.add.text(480,480,"TAP TO START",{font:"22px monospace",fill:"#ff4fc3"}).setOrigin(0.5).setDepth(10);
     this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
     this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
   }
@@ -193,7 +160,6 @@ class Title extends Phaser.Scene{
 
 class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
-
   create(){
     this.add.image(480,270,"charSelect").setDisplaySize(960,540);
 
@@ -222,7 +188,6 @@ class CharacterSelect extends Phaser.Scene{
 
 class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
-
   create(){
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
@@ -238,10 +203,9 @@ class LevelSelect extends Phaser.Scene{
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
 
-    this.status=this.add.text(480,505,"TAP A LEVEL",{
-      font:"20px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(60);
+    this.status=this.add.text(480,505,"TAP A LEVEL",{font:"20px monospace",fill:"#ff4fc3"})
+      .setOrigin(0.5)
+      .setDepth(60);
 
     levels.forEach(l=>{
       this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
@@ -287,44 +251,25 @@ class Game extends Phaser.Scene{
     this.addRain();
     this.addFog();
 
-    this.add.text(20,20,"CHAR: "+selectedFighter,{
-      font:"16px monospace",
-      fill:"#fff"
-    }).setDepth(1000);
+    this.add.text(20,20,"CHAR: "+selectedFighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
+    this.add.text(20,45,"LEVEL: "+selectedLevelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
 
-    this.add.text(20,45,"LEVEL: "+selectedLevelName,{
-      font:"16px monospace",
-      fill:"#ff4fc3"
-    }).setDepth(1000);
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{font:"16px monospace",fill:"#ffff00"})
+      .setOrigin(0.5)
+      .setDepth(1000);
 
-    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
-      font:"16px monospace",
-      fill:"#ffff00"
-    }).setOrigin(0.5).setDepth(1000);
-
-    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
-      font:"16px monospace",
-      fill:"#00eaff"
-    }).setDepth(1000);
+    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{font:"16px monospace",fill:"#00eaff"}).setDepth(1000);
 
     this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4).setDepth(199);
 
-    const playerTex = "jt_movement"; // FORCE correct sprite
-
-this.player = this.physics.add.sprite(470, 390, playerTex);
-
-this.player.setOrigin(0.5, 1);
-this.player.setDepth(200);
-this.player.setCollideWorldBounds(true);
-
-this.player.body.setAllowGravity(false);
-this.player.body.setVelocity(0, 0);
-
-// 🔥 FIX: remove scaling
-this.player.setScale(1);
-
-// 🔥 FORCE animation
-this.player.play("jt_idle_down", true);
+    this.player=this.physics.add.sprite(470,390,"jt_movement");
+    this.player.setOrigin(0.5,1);
+    this.player.setDepth(200);
+    this.player.setCollideWorldBounds(true);
+    this.player.body.setAllowGravity(false);
+    this.player.body.setVelocity(0,0);
+    this.player.setDisplaySize(96,128);
+    this.player.play("jt_idle_down",true);
 
     this.createPlatformZones();
     this.createEnemies();
@@ -342,15 +287,8 @@ this.player.play("jt_idle_down", true);
 
   makeKeyboard(){
     this.keys=this.input.keyboard.addKeys({
-      up:"UP",
-      down:"DOWN",
-      left:"LEFT",
-      right:"RIGHT",
-      w:"W",
-      a:"A",
-      s:"S",
-      d:"D",
-      shift:"SHIFT"
+      up:"UP",down:"DOWN",left:"LEFT",right:"RIGHT",
+      w:"W",a:"A",s:"S",d:"D",shift:"SHIFT"
     });
   }
 
@@ -358,16 +296,11 @@ this.player.play("jt_idle_down", true);
     this.updateRain();
     this.readInput();
 
-    if(this.isClimbing){
-      this.updateClimbing();
-    } else {
-      this.updateMovement();
-    }
+    if(this.isClimbing) this.updateClimbing();
+    else this.updateMovement();
 
     this.updateEnemies();
-
     this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
-
     this.shadow.x=this.player.x;
     this.shadow.y=this.player.y+5;
   }
@@ -404,12 +337,7 @@ this.player.play("jt_idle_down", true);
       vy*=0.707;
     }
 
-    this.player.body.velocity.x=Phaser.Math.Linear(
-      this.player.body.velocity.x,
-      vx*speed,
-      0.22
-    );
-
+    this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
     this.player.body.velocity.y=0;
 
     if(Math.abs(vx)>0.1){
@@ -429,8 +357,6 @@ this.player.play("jt_idle_down", true);
   }
 
   playMoveAnim(moving,running){
-    if(!hasTex(this,"jt_movement")) return;
-
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
@@ -462,11 +388,7 @@ this.player.play("jt_idle_down", true);
 
   handlePlatformTransitions(){
     const nearLadder=this.ladders.find(l=>{
-      return Phaser.Geom.Rectangle.Contains(
-        l.zone.getBounds(),
-        this.player.x,
-        this.player.y-60
-      );
+      return Phaser.Geom.Rectangle.Contains(l.zone.getBounds(),this.player.x,this.player.y-60);
     });
 
     const nearStairs=Math.abs(this.player.x-500)<150;
@@ -493,13 +415,10 @@ this.player.play("jt_idle_down", true);
     this.currentLadder=ladder;
     this.canExitLadder=false;
     this.playerBusy=false;
-
     this.player.body.setVelocity(0,0);
     this.player.x=ladder.x;
-
     safePlay(this.player,"jt_climb_ladder");
     this.zoneText.setText("CLIMBING LADDER");
-
     this.time.delayedCall(200,()=>this.canExitLadder=true);
   }
 
@@ -509,12 +428,9 @@ this.player.play("jt_idle_down", true);
 
     this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.35);
     this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
-
-    if(Math.abs(this.moveY)>0.1){
-      safePlay(this.player,"jt_climb_ladder");
-    }
-
     this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
+
+    if(Math.abs(this.moveY)>0.1) safePlay(this.player,"jt_climb_ladder");
 
     if(this.player.y<=l.topY+2 && this.moveY<-0.45){
       this.isClimbing=false;
@@ -567,15 +483,13 @@ this.player.play("jt_idle_down", true);
       const e=this.add.rectangle(x,y-40,48,80,0x33ff66,0.85).setDepth(y);
       e.health=30;
       e.dead=false;
-
       this.physics.add.existing(e);
       e.body.setAllowGravity(false);
       this.enemies.add(e);
 
-      e.hpText=this.add.text(x,y-100,"HP 30",{
-        font:"12px monospace",
-        fill:"#fff"
-      }).setOrigin(0.5).setDepth(1000);
+      e.hpText=this.add.text(x,y-100,"HP 30",{font:"12px monospace",fill:"#fff"})
+        .setOrigin(0.5)
+        .setDepth(1000);
     });
   }
 
@@ -615,15 +529,7 @@ this.player.play("jt_idle_down", true);
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
 
-    const box=this.add.rectangle(
-      this.player.x + dir*62,
-      this.player.y - 70,
-      75,
-      42,
-      0xff0000,
-      0.25
-    ).setDepth(999);
-
+    const box=this.add.rectangle(this.player.x + dir*62,this.player.y - 70,75,42,0xff0000,0.25).setDepth(999);
     this.physics.add.existing(box);
     box.body.setAllowGravity(false);
 
@@ -635,7 +541,6 @@ this.player.play("jt_idle_down", true);
 
       e.health-=data[1];
       e.setFillStyle(0xff3333,0.95);
-
       this.spawnFx(e.x,e.y-45,data[2]);
 
       this.combo++;
@@ -666,7 +571,6 @@ this.player.play("jt_idle_down", true);
     fx.setBlendMode(Phaser.BlendModes.ADD);
     fx.setScale(key==="hit_heavy" ? 1.8 : key==="hit_medium" ? 1.4 : 1.15);
     fx.play(key);
-
     fx.once("animationcomplete",()=>fx.destroy());
   }
 
