@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 542;
+const VERSION = 543;
 const W = 960;
 const H = 540;
 
@@ -46,7 +46,6 @@ function safePlay(sprite,key){
 function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
-
   scene.anims.create({
     key,
     frames:scene.anims.generateFrameNumbers(sheet,{start,end}),
@@ -76,8 +75,6 @@ function loadAssets(scene){
     frameHeight:ATTACK_FRAME_H
   });
 
-  // USE YOUR GRID IMAGE SHEET HERE.
-  // Save file as: assets/sprites/enemies/corpo_sellout_grid.png
   scene.load.image("corpo_raw", ENEMY_BASE + "/corpo_sellout_grid.png?v=" + VERSION);
 }
 
@@ -90,12 +87,10 @@ function cutGridSheet(scene, rawKey, cleanKey){
   const ROWS = 6;
   const FRAME = 128;
 
-  // These numbers match the grid image you showed.
-  // If it cuts slightly wrong, adjust only these four.
-  const GRID_X = 50;
-  const GRID_Y = 125;
-  const CELL_W = 91;
-  const CELL_H = 91;
+  const GRID_X = 60;
+  const GRID_Y = 140;
+  const CELL_W = 85;
+  const CELL_H = 85;
 
   const canvas = document.createElement("canvas");
   canvas.width = COLS * FRAME;
@@ -143,11 +138,11 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
 
-  makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
-  makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
-  makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
-  makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
-  makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
+  makeAnim(scene,"enemy_idle","corpo_sellout",0,4,6,-1);
+  makeAnim(scene,"enemy_walk","corpo_sellout",16,23,10,-1);
+  makeAnim(scene,"enemy_punch","corpo_sellout",32,39,14,0);
+  makeAnim(scene,"enemy_kick","corpo_sellout",48,54,12,0);
+  makeAnim(scene,"enemy_hurt","corpo_sellout",64,70,10,0);
   makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
 }
 
@@ -507,7 +502,7 @@ class Game extends Phaser.Scene{
   }
 
   spawnEnemy(x,y){
-    const e=this.physics.add.sprite(x,y,"corpo_sellout",0);
+    const e=this.physics.add.sprite(x,390,"corpo_sellout",0);
 
     e.setOrigin(0.5,1);
     e.setScale(ENEMY_SCALE);
@@ -520,7 +515,7 @@ class Game extends Phaser.Scene{
 
     safePlay(e,"enemy_idle");
 
-    e.hpText=this.add.text(x,y-110,"HP 30",{
+    e.hpText=this.add.text(x,390-110,"HP 30",{
       font:"12px monospace",
       fill:"#fff"
     }).setOrigin(0.5).setDepth(1000);
@@ -534,6 +529,7 @@ class Game extends Phaser.Scene{
     this.enemies.children.each(e=>{
       if(!e || e.dead) return;
 
+      e.y=390;
       e.setDepth(e.y);
 
       if(e.hpText){
