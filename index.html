@@ -125,14 +125,15 @@ function makeAnim(scene, key, sheet, start, end, rate, repeat){
 
 function createAllAnims(scene){
 
-  makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
-  makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
-  makeAnim(scene,"jt_idle_side","jt_movement",10,14,6,-1);
+  // WALK (reuse your existing row)
+makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
+makeAnim(scene,"jt_walk_up","jt_movement",15,19,8,-1);
+makeAnim(scene,"jt_walk_side","jt_movement",15,19,8,-1);
 
-  makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
-  makeAnim(scene,"jt_walk_up","jt_movement",20,24,8,-1);
-  makeAnim(scene,"jt_walk_side","jt_movement",25,29,8,-1);
-
+// RUN (reuse your run row)
+makeAnim(scene,"jt_run_down","jt_movement",25,29,12,-1);
+makeAnim(scene,"jt_run_up","jt_movement",25,29,12,-1);
+makeAnim(scene,"jt_run_side","jt_movement",25,29,12,-1);
   makeAnim(scene,"jt_run_down","jt_movement",30,34,12,-1);
   makeAnim(scene,"jt_run_up","jt_movement",35,39,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",40,44,12,-1);
