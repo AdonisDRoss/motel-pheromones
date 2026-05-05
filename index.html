@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 552;
+const VERSION = 553;
 const W = 960;
 const H = 540;
 
@@ -26,7 +26,7 @@ const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.44;
-const ENEMY_SCALE = 0.42;
+const ENEMY_SCALE = 0.55;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -48,6 +48,7 @@ function safePlay(sprite,key){
 function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
+
   scene.anims.create({
     key,
     frames:scene.anims.generateFrameNumbers(sheet,{start,end}),
@@ -113,7 +114,11 @@ function createAllAnims(scene){
 
 class Boot extends Phaser.Scene{
   constructor(){ super("Boot"); }
-  preload(){ loadAssets(this); }
+
+  preload(){
+    loadAssets(this);
+  }
+
   create(){
     createAllAnims(this);
     this.scene.start("Title");
@@ -124,8 +129,15 @@ class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
 
   create(){
-    if(hasTex(this,"title")) this.add.image(480,270,"title").setDisplaySize(960,540);
-    else this.add.rectangle(480,270,960,540,0x000000,1);
+    if(hasTex(this,"title")){
+      this.add.image(480,270,"title").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x000000,1);
+      this.add.text(480,220,"MOTEL PHEROMONES",{
+        font:"36px monospace",
+        fill:"#ff4fc3"
+      }).setOrigin(0.5);
+    }
 
     this.add.text(480,485,"TAP TO START",{
       font:"24px monospace",
@@ -144,8 +156,15 @@ class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
 
   create(){
-    if(hasTex(this,"charSelect")) this.add.image(480,270,"charSelect").setDisplaySize(960,540);
-    else this.add.rectangle(480,270,960,540,0x120012,1);
+    if(hasTex(this,"charSelect")){
+      this.add.image(480,270,"charSelect").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x120012,1);
+      this.add.text(480,90,"CHARACTER SELECT",{
+        font:"30px monospace",
+        fill:"#ff4fc3"
+      }).setOrigin(0.5);
+    }
 
     const fighters=[
       {name:"DOTTIE",x:260,y:300,w:170,h:260},
@@ -176,8 +195,15 @@ class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
 
   create(){
-    if(hasTex(this,"levelSelect")) this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
-    else this.add.rectangle(480,270,960,540,0x001111,1);
+    if(hasTex(this,"levelSelect")){
+      this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x001111,1);
+      this.add.text(480,90,"LEVEL SELECT",{
+        font:"30px monospace",
+        fill:"#00eaff"
+      }).setOrigin(0.5);
+    }
 
     const levels=[
       {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
@@ -218,7 +244,9 @@ class Game extends Phaser.Scene{
   constructor(){ super("Game"); }
 
   create(){
-    this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor").setDisplaySize(960,540).setDepth(0);
+    this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
+      .setDisplaySize(960,540)
+      .setDepth(0);
 
     this.platform="middle";
     this.isClimbing=false;
@@ -241,17 +269,28 @@ class Game extends Phaser.Scene{
     this.addRain();
     this.addFog();
 
-    this.add.text(20,20,"CHAR: "+selectedFighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
-    this.add.text(20,45,"LEVEL: "+selectedLevelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
+    this.add.text(20,20,"CHAR: "+selectedFighter,{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setDepth(1000);
 
-    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{font:"16px monospace",fill:"#ffff00"})
-      .setOrigin(0.5)
-      .setDepth(1000);
+    this.add.text(20,45,"LEVEL: "+selectedLevelName,{
+      font:"16px monospace",
+      fill:"#ff4fc3"
+    }).setDepth(1000);
 
-    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{font:"16px monospace",fill:"#00eaff"})
-      .setDepth(1000);
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
+      font:"16px monospace",
+      fill:"#ffff00"
+    }).setOrigin(0.5).setDepth(1000);
 
-    this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38).setDepth(199);
+    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
+      font:"16px monospace",
+      fill:"#00eaff"
+    }).setDepth(1000);
+
+    this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
+      .setDepth(199);
 
     this.player=this.physics.add.sprite(470,390,"jt_movement");
     this.player.setOrigin(0.5,1);
@@ -286,8 +325,15 @@ class Game extends Phaser.Scene{
 
   makeKeyboard(){
     this.keys=this.input.keyboard.addKeys({
-      up:"UP",down:"DOWN",left:"LEFT",right:"RIGHT",
-      w:"W",a:"A",s:"S",d:"D",shift:"SHIFT"
+      up:"UP",
+      down:"DOWN",
+      left:"LEFT",
+      right:"RIGHT",
+      w:"W",
+      a:"A",
+      s:"S",
+      d:"D",
+      shift:"SHIFT"
     });
   }
 
@@ -295,8 +341,11 @@ class Game extends Phaser.Scene{
     this.updateRain();
     this.readInput();
 
-    if(this.isClimbing) this.updateClimbing();
-    else this.updateMovement();
+    if(this.isClimbing){
+      this.updateClimbing();
+    }else{
+      this.updateMovement();
+    }
 
     this.updateEnemyAI();
 
@@ -472,8 +521,9 @@ class Game extends Phaser.Scene{
 
   createEnemies(){
     this.enemies=this.physics.add.group();
-    this.spawnEnemy(720,390);
-    this.spawnEnemy(830,390);
+
+    this.spawnEnemy(690,390);
+    this.spawnEnemy(800,390);
   }
 
   spawnEnemy(x,y){
@@ -481,6 +531,7 @@ class Game extends Phaser.Scene{
 
     e.setOrigin(0.5,1);
     e.setScale(ENEMY_SCALE);
+    e.setTint(0xffffff);
     e.setDepth(210);
     e.body.setAllowGravity(false);
     e.body.setVelocity(0,0);
@@ -490,7 +541,7 @@ class Game extends Phaser.Scene{
 
     safePlay(e,"enemy_idle");
 
-    e.hpText=this.add.text(x,y-110,"HP 30",{
+    e.hpText=this.add.text(x,y-75,"HP 30",{
       font:"12px monospace",
       fill:"#fff"
     }).setOrigin(0.5).setDepth(1000);
@@ -512,7 +563,7 @@ class Game extends Phaser.Scene{
 
       if(e.hpText){
         e.hpText.x=e.x;
-        e.hpText.y=e.y-110;
+        e.hpText.y=e.y-75;
       }
 
       if(e.busy) return;
@@ -764,9 +815,10 @@ class Game extends Phaser.Scene{
     this.mobileButton(700,405,"RUN",()=>{this.mobileRun=true;},()=>{this.mobileRun=false;});
     this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
 
-    this.add.text(480,505,"MENU",{font:"16px monospace",fill:"#fff"})
-      .setOrigin(0.5)
-      .setDepth(9502);
+    this.add.text(480,505,"MENU",{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(9502);
   }
 
   mobileButton(x,y,label,down,up=null){
