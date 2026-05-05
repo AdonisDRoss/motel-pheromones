@@ -28,7 +28,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 507;
+const VERSION = 508;
 const W = 960;
 const H = 540;
 const FRAME = 128;
@@ -111,54 +111,39 @@ function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
   });
 }
 
-function createAllAnims(scene){
-
-  // 🔥 FORCE movement animations (NO JSON needed)
-
-  scene.anims.create({
-    key: "jt_idle_down",
-    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 0, end: 4 }),
-    frameRate: 6,
-    repeat: -1
-  });
+function makeAnim(scene, key, sheet, start, end, rate, repeat){
+  if(!hasTex(scene, sheet)) return;
+  if(hasAnim(scene, key)) return;
 
   scene.anims.create({
-    key: "jt_walk_down",
-    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 5, end: 9 }),
-    frameRate: 10,
-    repeat: -1
-  });
-
-  scene.anims.create({
-    key: "jt_run_down",
-    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 10, end: 14 }),
-    frameRate: 14,
-    repeat: -1
-  });
-
-  // attacks
-  scene.anims.create({
-    key:"jt_attack_light",
-    frames:scene.anims.generateFrameNumbers("jt_attack_light",{start:0,end:4}),
-    frameRate:16,
-    repeat:0
-  });
-
-  scene.anims.create({
-    key:"jt_attack_heavy",
-    frames:scene.anims.generateFrameNumbers("jt_attack_heavy",{start:0,end:4}),
-    frameRate:13,
-    repeat:0
-  });
-
-  scene.anims.create({
-    key:"jt_kick",
-    frames:scene.anims.generateFrameNumbers("jt_kick",{start:0,end:4}),
-    frameRate:14,
-    repeat:0
+    key,
+    frames: scene.anims.generateFrameNumbers(sheet, { start, end }),
+    frameRate: rate,
+    repeat
   });
 }
 
+function createAllAnims(scene){
+
+  makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
+  makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
+  makeAnim(scene,"jt_idle_side","jt_movement",10,14,6,-1);
+
+  makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
+  makeAnim(scene,"jt_walk_up","jt_movement",20,24,8,-1);
+  makeAnim(scene,"jt_walk_side","jt_movement",25,29,8,-1);
+
+  makeAnim(scene,"jt_run_down","jt_movement",30,34,12,-1);
+  makeAnim(scene,"jt_run_up","jt_movement",35,39,12,-1);
+  makeAnim(scene,"jt_run_side","jt_movement",40,44,12,-1);
+
+  makeAnim(scene,"jt_attack_light","jt_attack_light",0,4,16,0);
+  makeAnim(scene,"jt_attack_heavy","jt_attack_heavy",0,4,13,0);
+  makeAnim(scene,"jt_kick","jt_kick",0,4,14,0);
+
+  createAnimsFromJson(scene,"jt_actions","jt_actions_json","jt_");
+  createAnimsFromJson(scene,"hit_fx","hit_fx_json","");
+}
   
 
 class Boot extends Phaser.Scene{
