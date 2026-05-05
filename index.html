@@ -28,7 +28,7 @@ const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.44;
-const ENEMY_SCALE = 1.0;
+const ENEMY_SCALE = 0.42;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -476,7 +476,7 @@ spawnEnemy(x,y){
   const e = this.physics.add.sprite(x, y, "corpo_sellout", 0);
 
   e.setOrigin(0.5,1);
-  e.setScale(0.42);
+  e.setScale(ENEMY_SCALE);
   e.setDepth(210);
   e.body.setAllowGravity(false);
   e.body.setVelocity(0,0);
