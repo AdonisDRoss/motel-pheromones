@@ -159,24 +159,7 @@ function createAllAnims(scene){
   });
 }
 
-  if(hasTex(scene,"jt_attack_heavy") && !hasAnim(scene,"jt_attack_heavy")){
-    scene.anims.create({
-      key:"jt_attack_heavy",
-      frames:scene.anims.generateFrameNumbers("jt_attack_heavy",{start:0,end:5}),
-      frameRate:13,
-      repeat:0
-    });
-  }
-
-  if(hasTex(scene,"jt_kick") && !hasAnim(scene,"jt_kick")){
-    scene.anims.create({
-      key:"jt_kick",
-      frames:scene.anims.generateFrameNumbers("jt_kick",{start:0,end:4}),
-      frameRate:14,
-      repeat:0
-    });
-  }
-}
+  
 
 class Boot extends Phaser.Scene{
   constructor(){ super("Boot"); }
