@@ -10,11 +10,10 @@ html,body{margin:0;padding:0;background:#000;width:100vw;height:100vh;overflow:h
 canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-rendering:pixelated;}
 </style>
 </head>
-
 <body>
 <script>
 
-const VERSION = 530;
+const VERSION = 540;
 const W = 960;
 const H = 540;
 
@@ -22,16 +21,19 @@ const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 const ATTACK_FRAME_W = 204;
 const ATTACK_FRAME_H = 204;
+const ENEMY_FRAME = 128;
 
-const PLAYER_MOVE_SCALE = 0.48;
-const PLAYER_ATTACK_W = 92;
-const PLAYER_ATTACK_H = 118;
+const PLAYER_MOVE_SCALE = 0.44;
+const PLAYER_ATTACK_W = 72;
+const PLAYER_ATTACK_H = 96;
+const ENEMY_SCALE = 1.0;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 
 const JT_BASE = "assets/sprites/player/jt";
+const ENEMY_BASE = "assets/sprites/enemies";
 
 function hasTex(scene,key){ return scene.textures.exists(key); }
 function hasAnim(scene,key){ return scene.anims.exists(key); }
@@ -54,7 +56,17 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
   });
 }
 
-function loadJT(scene){
+function loadAssets(scene){
+  scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
+  scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
+  scene.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
+
+  scene.load.image("house","assets/levels/house-party.png?v="+VERSION);
+  scene.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
+  scene.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
+  scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
+  scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
+
   scene.load.spritesheet("jt_movement", JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
     frameHeight:MOVE_FRAME_H
@@ -63,6 +75,11 @@ function loadJT(scene){
   scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
     frameWidth:ATTACK_FRAME_W,
     frameHeight:ATTACK_FRAME_H
+  });
+
+  scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME,
+    frameHeight:ENEMY_FRAME
   });
 }
 
@@ -83,25 +100,18 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_attack_heavy","jt_attacks",5,8,12,0);
   makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
+
+  makeAnim(scene,"enemy_idle","corpo_sellout",0,9,8,-1);
+  makeAnim(scene,"enemy_walk","corpo_sellout",10,19,10,-1);
+  makeAnim(scene,"enemy_punch","corpo_sellout",20,29,14,0);
+  makeAnim(scene,"enemy_kick","corpo_sellout",30,34,12,0);
+  makeAnim(scene,"enemy_hurt","corpo_sellout",35,39,10,0);
+  makeAnim(scene,"enemy_ko","corpo_sellout",44,47,8,0);
 }
 
 class Boot extends Phaser.Scene{
   constructor(){ super("Boot"); }
-
-  preload(){
-    this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
-    this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
-    this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
-
-    this.load.image("house","assets/levels/house-party.png?v="+VERSION);
-    this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
-    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
-    this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
-    this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-
-    loadJT(this);
-  }
-
+  preload(){ loadAssets(this); }
   create(){
     createAllAnims(this);
     this.scene.start("Title");
@@ -110,17 +120,11 @@ class Boot extends Phaser.Scene{
 
 class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
-
   create(){
-    if(hasTex(this,"title")){
-      this.add.image(480,270,"title").setDisplaySize(960,540);
-    }else{
-      this.add.rectangle(480,270,960,540,0x000000,1);
-      this.add.text(480,220,"MOTEL PHEROMONES",{font:"36px monospace",fill:"#ff4fc3"}).setOrigin(0.5);
-    }
+    if(hasTex(this,"title")) this.add.image(480,270,"title").setDisplaySize(960,540);
+    else this.add.rectangle(480,270,960,540,0x000000,1);
 
     this.add.text(480,485,"TAP TO START",{font:"22px monospace",fill:"#fff"}).setOrigin(0.5);
-
     this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
     this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
   }
@@ -128,14 +132,9 @@ class Title extends Phaser.Scene{
 
 class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
-
   create(){
-    if(hasTex(this,"charSelect")){
-      this.add.image(480,270,"charSelect").setDisplaySize(960,540);
-    }else{
-      this.add.rectangle(480,270,960,540,0x120012,1);
-      this.add.text(480,70,"CHARACTER SELECT",{font:"30px monospace",fill:"#ff4fc3"}).setOrigin(0.5);
-    }
+    if(hasTex(this,"charSelect")) this.add.image(480,270,"charSelect").setDisplaySize(960,540);
+    else this.add.rectangle(480,270,960,540,0x120012,1);
 
     const fighters=[
       {name:"DOTTIE",x:260,y:300,w:170,h:260},
@@ -162,14 +161,9 @@ class CharacterSelect extends Phaser.Scene{
 
 class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
-
   create(){
-    if(hasTex(this,"levelSelect")){
-      this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
-    }else{
-      this.add.rectangle(480,270,960,540,0x001111,1);
-      this.add.text(480,70,"LEVEL SELECT",{font:"30px monospace",fill:"#00eaff"}).setOrigin(0.5);
-    }
+    if(hasTex(this,"levelSelect")) this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+    else this.add.rectangle(480,270,960,540,0x001111,1);
 
     const levels=[
       {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
@@ -207,11 +201,7 @@ class Game extends Phaser.Scene{
   constructor(){ super("Game"); }
 
   create(){
-    if(hasTex(this,selectedLevel)){
-      this.add.image(480,270,selectedLevel).setDisplaySize(960,540).setDepth(0);
-    }else{
-      this.add.image(480,270,"outdoor").setDisplaySize(960,540).setDepth(0);
-    }
+    this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor").setDisplaySize(960,540).setDepth(0);
 
     this.platform="middle";
     this.isClimbing=false;
@@ -230,6 +220,7 @@ class Game extends Phaser.Scene{
 
     this.combo=0;
     this.rhythm=0;
+    this.enemyAttacking=false;
 
     this.addRain();
     this.addFog();
@@ -238,8 +229,7 @@ class Game extends Phaser.Scene{
     this.add.text(20,45,"LEVEL: "+selectedLevelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
 
     this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{font:"16px monospace",fill:"#ffff00"})
-      .setOrigin(0.5)
-      .setDepth(1000);
+      .setOrigin(0.5).setDepth(1000);
 
     this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{font:"16px monospace",fill:"#00eaff"})
       .setDepth(1000);
@@ -291,14 +281,12 @@ class Game extends Phaser.Scene{
     if(this.isClimbing) this.updateClimbing();
     else this.updateMovement();
 
-    this.updateEnemies();
+    this.updateEnemyAI();
 
     this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
 
-    if(this.shadow && this.player){
-      this.shadow.x=this.player.x;
-      this.shadow.y=this.player.y+5;
-    }
+    this.shadow.x=this.player.x;
+    this.shadow.y=this.player.y+5;
   }
 
   readInput(){
@@ -379,9 +367,6 @@ class Game extends Phaser.Scene{
     this.ladders.forEach(l=>{
       l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
     });
-
-    this.downStairs=this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(10);
-    this.upStairs=this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(10);
   }
 
   handlePlatformTransitions(){
@@ -430,7 +415,6 @@ class Game extends Phaser.Scene{
       this.isClimbing=false;
       this.platform="top";
       this.player.y=l.topY;
-      this.player.x=l.x;
       this.zoneText.setText("TOP PLATFORM");
       this.currentLadder=null;
     }
@@ -439,7 +423,6 @@ class Game extends Phaser.Scene{
       this.isClimbing=false;
       this.platform="middle";
       this.player.y=l.middleY;
-      this.player.x=l.x;
       this.zoneText.setText("MIDDLE PLATFORM");
       this.currentLadder=null;
     }
@@ -473,30 +456,68 @@ class Game extends Phaser.Scene{
   createEnemies(){
     this.enemies=this.physics.add.group();
 
-    [[650,390],[760,390],[580,505]].forEach(([x,y])=>{
-      const e=this.add.rectangle(x,y-40,48,80,0x33ff66,0.85).setDepth(y);
-      e.health=30;
-      e.dead=false;
-
-      this.physics.add.existing(e);
-      e.body.setAllowGravity(false);
-
-      this.enemies.add(e);
-
-      e.hpText=this.add.text(x,y-100,"HP 30",{font:"12px monospace",fill:"#fff"})
-        .setOrigin(0.5)
-        .setDepth(1000);
-    });
+    this.spawnEnemy(720,390);
+    this.spawnEnemy(820,390);
   }
 
-  updateEnemies(){
+  spawnEnemy(x,y){
+    const e=this.physics.add.sprite(x,y,"corpo_sellout");
+    e.setOrigin(0.5,1);
+    e.setScale(ENEMY_SCALE);
+    e.setDepth(210);
+    e.setCollideWorldBounds(true);
+    e.body.setAllowGravity(false);
+    e.health=30;
+    e.dead=false;
+    e.busy=false;
+    safePlay(e,"enemy_idle");
+
+    e.hpText=this.add.text(x,y-110,"HP 30",{font:"12px monospace",fill:"#fff"})
+      .setOrigin(0.5)
+      .setDepth(1000);
+
+    this.enemies.add(e);
+  }
+
+  updateEnemyAI(){
     this.enemies.children.each(e=>{
       if(!e || e.dead) return;
+
       e.setDepth(e.y);
 
       if(e.hpText){
         e.hpText.x=e.x;
-        e.hpText.y=e.y-100;
+        e.hpText.y=e.y-110;
+      }
+
+      if(e.busy) return;
+
+      const dx=this.player.x-e.x;
+      const dy=this.player.y-e.y;
+      const dist=Math.abs(dx);
+
+      e.setFlipX(dx<0);
+
+      if(Math.abs(dy)>45){
+        e.setVelocityX(0);
+        safePlay(e,"enemy_idle");
+        return;
+      }
+
+      if(dist>70){
+        e.setVelocityX(dx>0 ? 55 : -55);
+        safePlay(e,"enemy_walk");
+      }else{
+        e.setVelocityX(0);
+        e.busy=true;
+        safePlay(e,"enemy_punch");
+
+        this.time.delayedCall(550,()=>{
+          if(!e.dead){
+            e.busy=false;
+            safePlay(e,"enemy_idle");
+          }
+        });
       }
     });
   }
@@ -522,7 +543,6 @@ class Game extends Phaser.Scene{
     this.attackSprite.setDisplaySize(PLAYER_ATTACK_W,PLAYER_ATTACK_H);
 
     this.player.setVisible(false);
-
     safePlay(this.attackSprite,data[0]);
 
     this.time.delayedCall(100,()=>this.createHitbox(data));
@@ -552,7 +572,9 @@ class Game extends Phaser.Scene{
 
       hit.add(e);
       e.health-=data[1];
-      e.setFillStyle(0xff3333,0.95);
+      e.busy=true;
+      e.setVelocityX((e.x<this.player.x ? -1 : 1)*120);
+      safePlay(e,"enemy_hurt");
 
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
@@ -563,12 +585,17 @@ class Game extends Phaser.Scene{
 
       if(e.health<=0){
         e.dead=true;
-        e.body.enable=false;
-        e.setAlpha(0.35);
+        e.setVelocityX(0);
+        safePlay(e,"enemy_ko");
+        if(e.hpText) e.hpText.setText("KO");
+        return;
       }
 
-      this.time.delayedCall(90,()=>{
-        if(!e.dead) e.setFillStyle(0x33ff66,0.85);
+      this.time.delayedCall(300,()=>{
+        if(!e.dead){
+          e.busy=false;
+          safePlay(e,"enemy_idle");
+        }
       });
     });
 
@@ -626,10 +653,8 @@ class Game extends Phaser.Scene{
 
     this.rain.children.iterate(r=>{
       if(!r) return;
-
       r.y+=r.speed;
       r.x-=1;
-
       if(r.y>540){
         r.y=0;
         r.x=Phaser.Math.Between(0,960);
@@ -639,7 +664,6 @@ class Game extends Phaser.Scene{
 
   addFog(){
     this.fog=this.add.rectangle(480,500,960,200,0x000000,0.16).setDepth(95);
-
     this.tweens.add({
       targets:this.fog,
       alpha:{from:0.12,to:0.22},
@@ -671,7 +695,6 @@ class Game extends Phaser.Scene{
 
       knob.x=bx+dx;
       knob.y=by+dy;
-
       this.stickX=dx/r;
       this.stickY=dy/r;
     };
@@ -712,8 +735,7 @@ class Game extends Phaser.Scene{
       .setInteractive()
       .setDepth(9500);
 
-    this.add.circle(x,y,34,0xffffff,0.24)
-      .setDepth(9501);
+    this.add.circle(x,y,34,0xffffff,0.24).setDepth(9501);
 
     this.add.text(x,y,label,{
       font:"18px monospace",
