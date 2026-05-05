@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 545;
+const VERSION = 546;
 const W = 960;
 const H = 540;
 
@@ -120,16 +120,6 @@ function cutGridSheet(scene, rawKey, cleanKey){
   });
 }
 
-  if(hasTex(scene,cleanKey)) scene.textures.remove(cleanKey);
-
-  scene.textures.addSpriteSheet(cleanKey, canvas, {
-    frameWidth:FRAME,
-    frameHeight:FRAME,
-    margin:0,
-    spacing:0
-  });
-}
-
 function createAllAnims(scene){
   makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
   makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
@@ -148,11 +138,11 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
 
-  makeAnim(scene,"enemy_idle","corpo_sellout",0,4,6,-1);
-  makeAnim(scene,"enemy_walk","corpo_sellout",16,23,10,-1);
-  makeAnim(scene,"enemy_punch","corpo_sellout",32,39,14,0);
-  makeAnim(scene,"enemy_kick","corpo_sellout",48,54,12,0);
-  makeAnim(scene,"enemy_hurt","corpo_sellout",64,70,10,0);
+  makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
+  makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
+  makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
+  makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
+  makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
   makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
 }
 
@@ -168,13 +158,11 @@ class Boot extends Phaser.Scene{
 
 class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
-
   create(){
     if(hasTex(this,"title")) this.add.image(480,270,"title").setDisplaySize(960,540);
     else this.add.rectangle(480,270,960,540,0x000000,1);
 
     this.add.text(480,485,"TAP TO START",{font:"22px monospace",fill:"#fff"}).setOrigin(0.5);
-
     this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
     this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
   }
@@ -182,7 +170,6 @@ class Title extends Phaser.Scene{
 
 class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
-
   create(){
     if(hasTex(this,"charSelect")) this.add.image(480,270,"charSelect").setDisplaySize(960,540);
     else this.add.rectangle(480,270,960,540,0x120012,1);
@@ -212,7 +199,6 @@ class CharacterSelect extends Phaser.Scene{
 
 class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
-
   create(){
     if(hasTex(this,"levelSelect")) this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
     else this.add.rectangle(480,270,960,540,0x001111,1);
