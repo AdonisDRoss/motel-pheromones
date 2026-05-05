@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 559;
+const VERSION = 560;
 const W = 960;
 const H = 540;
 
@@ -109,7 +109,7 @@ function createAllAnims(scene){
   makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
   makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
 
-  /* fallback until real hurt / KO rows are added */
+  // Temporary fallback until real hurt / KO rows are added.
   makeAnim(scene,"enemy_hurt","corpo_sellout",32,39,10,0);
   makeAnim(scene,"enemy_ko","corpo_sellout",48,63,8,0);
 }
@@ -732,6 +732,16 @@ class Game extends Phaser.Scene{
     });
   }
 
+  quickBlock(){
+    if(this.playerBusy || this.isClimbing) return;
+
+    this.startBlock();
+
+    this.time.delayedCall(450,()=>{
+      this.forcePlayerReady();
+    });
+  }
+
   startBlock(){
     if(this.playerBusy || this.isClimbing) return;
 
@@ -748,7 +758,7 @@ class Game extends Phaser.Scene{
     this.player.setVisible(false);
     safePlay(this.attackSprite,"jt_block");
 
-    this.time.delayedCall(1200,()=>{
+    this.time.delayedCall(600,()=>{
       if(this.isBlocking) this.forcePlayerReady();
     });
   }
@@ -853,7 +863,10 @@ class Game extends Phaser.Scene{
     this.mobileButton(820,340,"X",()=>this.startAttack("light"));
     this.mobileButton(760,410,"Y",()=>this.startAttack("heavy"));
     this.mobileButton(880,410,"A",()=>this.startAttack("kick"));
-    this.mobileButton(820,480,"B",()=>this.startBlock(),()=>this.endBlock());
+
+    // B is now tap-block instead of hold-block to prevent mobile pointerup freezes.
+    this.mobileButton(820,480,"B",()=>this.quickBlock());
+
     this.mobileButton(700,405,"RUN",()=>{this.mobileRun=true;},()=>{this.mobileRun=false;});
     this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
 
