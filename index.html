@@ -342,6 +342,7 @@ class Game extends Phaser.Scene{
 
     const stickPower = Math.hypot(this.stickX, this.stickY);
 const running = (this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower > 0.75;
+const speed = running ? 260 : 200;
     let vx=this.moveX;
     let vy=this.moveY;
 
