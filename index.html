@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 510;
+const VERSION = 511;
 const W = 960;
 const H = 540;
 
@@ -255,6 +255,7 @@ class Game extends Phaser.Scene{
     this.isBlocking=false;
     this.combo=0;
     this.rhythm=0;
+    this.mobileRun=false;
 
     this.addRain();
     this.addFog();
@@ -338,7 +339,7 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    const running = this.keys && this.keys.shift.isDown;
+    const running = (this.keys && this.keys.shift.isDown) || this.mobileRun;
     const speed = running ? 260 : 200;
 
     let vx=this.moveX;
@@ -713,6 +714,10 @@ class Game extends Phaser.Scene{
     this.button(860,490,"B",()=>this.startBlock(),()=>this.endBlock());
     this.button(760,350,"SP",()=>this.playAction("jump"));
     this.button(760,500,"E",()=>this.interact());
+    this.button(700,420,"RUN",
+      ()=>{ this.mobileRun=true; },
+      ()=>{ this.mobileRun=false; }
+    );
 
     this.add.text(480,505,"MENU",{
       font:"16px monospace",
