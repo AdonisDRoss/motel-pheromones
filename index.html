@@ -13,12 +13,16 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 512;
+const VERSION = 513;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
+
+const ATTACK_FRAME_W = 204;
+const ATTACK_FRAME_H = 204;
+
 const FRAME = 128;
 
 let selectedFighter = "JT";
@@ -55,19 +59,9 @@ function loadJT(scene){
   });
   scene.load.json("hit_fx_json", JT_BASE + "/data/hit_fx.json?v=" + VERSION);
 
-  scene.load.spritesheet("jt_attack_light", JT_BASE + "/attacks/jt_attack_light.png?v=" + VERSION, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-
-  scene.load.spritesheet("jt_attack_heavy", JT_BASE + "/attacks/jt_attack_heavy.png?v=" + VERSION, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-
-  scene.load.spritesheet("jt_kick", JT_BASE + "/attacks/jt_kick.png?v=" + VERSION, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
+  scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION, {
+    frameWidth: ATTACK_FRAME_W,
+    frameHeight: ATTACK_FRAME_H
   });
 }
 
@@ -117,9 +111,11 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
-  makeAnim(scene,"jt_attack_light","jt_attack_light",0,4,16,0);
-  makeAnim(scene,"jt_attack_heavy","jt_attack_heavy",0,4,13,0);
-  makeAnim(scene,"jt_kick","jt_kick",0,4,14,0);
+  makeAnim(scene,"jt_attack_light","jt_attacks",0,3,16,0);
+  makeAnim(scene,"jt_attack_heavy","jt_attacks",5,9,13,0);
+  makeAnim(scene,"jt_kick","jt_attacks",10,13,14,0);
+  makeAnim(scene,"jt_back_kick","jt_attacks",15,19,14,0);
+  makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
 
   createAnimsFromJson(scene,"jt_actions","jt_actions_json","jt_");
   createAnimsFromJson(scene,"hit_fx","hit_fx_json","");
@@ -341,8 +337,9 @@ class Game extends Phaser.Scene{
     }
 
     const stickPower = Math.hypot(this.stickX, this.stickY);
-const running = (this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower > 0.75;
-const speed = running ? 260 : 200;
+    const running = (this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower > 0.75;
+    const speed = running ? 260 : 200;
+
     let vx=this.moveX;
     let vy=this.moveY;
 
@@ -518,37 +515,36 @@ const speed = running ? 260 : 200;
     });
   }
 
-startAttack(type){
-  if(this.playerBusy || this.isClimbing) return;
+  startAttack(type){
+    if(this.playerBusy || this.isClimbing) return;
 
-  const data={
-    light:["jt_attack_light",8,"hit_small"],
-    heavy:["jt_attack_heavy",16,"hit_heavy"],
-    kick:["jt_kick",11,"hit_medium"]
-  }[type];
+    const data={
+      light:["jt_attack_light",8,"hit_small"],
+      heavy:["jt_attack_heavy",16,"hit_heavy"],
+      kick:["jt_kick",11,"hit_medium"]
+    }[type];
 
-  if(!data) return;
+    if(!data) return;
 
-  this.playerBusy=true;
-  this.player.body.setVelocity(0,0);
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
 
-  console.log("ATTACK:", type, "ANIM EXISTS:", hasAnim(this,data[0]));
+    if(hasAnim(this,data[0])){
+      this.player.play(data[0],true);
+    } else {
+      this.player.setTint(0xff3333);
+      this.cameras.main.shake(80,0.004);
+      this.time.delayedCall(120,()=>this.player.clearTint());
+    }
 
-  if(hasAnim(this,data[0])){
-    this.player.play(data[0],true);
-  } else {
-    this.player.setTint(0xff3333);
-    this.cameras.main.shake(80,0.004);
-    this.time.delayedCall(120,()=>this.player.clearTint());
+    this.time.delayedCall(120,()=>this.createHitbox(data));
+    this.time.delayedCall(430,()=>this.playerBusy=false);
   }
 
-  this.time.delayedCall(120,()=>this.createHitbox(data));
-  this.time.delayedCall(430,()=>this.playerBusy=false);
-}  
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
 
-    const box=this.add.rectangle(this.player.x + dir*62,this.player.y - 70,75,42,0xff0000,0.25).setDepth(999);
+    const box=this.add.rectangle(this.player.x + dir*62,this.player.y - 70,75,42,0xff0000,0).setDepth(999);
     this.physics.add.existing(box);
     box.body.setAllowGravity(false);
 
