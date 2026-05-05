@@ -108,8 +108,10 @@ function createAllAnims(scene){
   makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
   makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
   makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
-  makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
-  makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
+
+  /* fallback until real hurt / KO rows are added */
+  makeAnim(scene,"enemy_hurt","corpo_sellout",32,39,10,0);
+  makeAnim(scene,"enemy_ko","corpo_sellout",48,63,8,0);
 }
 
 class Boot extends Phaser.Scene{
@@ -522,8 +524,8 @@ class Game extends Phaser.Scene{
   createEnemies(){
     this.enemies=this.physics.add.group();
 
-    this.spawnEnemy(690,390);
-    this.spawnEnemy(800,390);
+    this.spawnEnemy(640,390);
+    this.spawnEnemy(830,390);
   }
 
   spawnEnemy(x,y){
@@ -539,11 +541,14 @@ class Game extends Phaser.Scene{
     e.dead=false;
     e.busy=false;
 
+    e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
+
     safePlay(e,"enemy_idle");
 
-    e.hpText=this.add.text(x,y-75,"HP 30",{
-      font:"12px monospace",
-      fill:"#fff"
+    e.hpText=this.add.text(x,y-85,"HP 30",{
+      font:"11px monospace",
+      fill:"#ffffff",
+      backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(1000);
 
     this.enemies.add(e);
@@ -553,7 +558,23 @@ class Game extends Phaser.Scene{
     if(!this.enemies) return;
 
     this.enemies.children.each(e=>{
-      if(!e || e.dead) return;
+      if(!e) return;
+
+      if(e.dead){
+        e.setVelocityX(0);
+
+        if(e.hpText){
+          e.hpText.x=e.x;
+          e.hpText.y=e.y-85;
+        }
+
+        if(e.shadow){
+          e.shadow.x=e.x;
+          e.shadow.y=e.y+3;
+        }
+
+        return;
+      }
 
       if(this.platform==="bottom") e.y=505;
       else if(this.platform==="top") e.y=250;
@@ -563,7 +584,12 @@ class Game extends Phaser.Scene{
 
       if(e.hpText){
         e.hpText.x=e.x;
-        e.hpText.y=e.y-75;
+        e.hpText.y=e.y-85;
+      }
+
+      if(e.shadow){
+        e.shadow.x=e.x;
+        e.shadow.y=e.y+3;
       }
 
       if(e.busy) return;
@@ -598,6 +624,25 @@ class Game extends Phaser.Scene{
     });
   }
 
+  forcePlayerReady(){
+    this.playerBusy=false;
+    this.isBlocking=false;
+
+    if(this.attackSprite){
+      this.attackSprite.stop();
+      this.attackSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.body.setVelocity(0,0);
+
+      if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
+      else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
+      else safePlay(this.player,"jt_idle_down");
+    }
+  }
+
   startAttack(type){
     if(this.playerBusy || this.isClimbing) return;
 
@@ -625,14 +670,11 @@ class Game extends Phaser.Scene{
     this.time.delayedCall(100,()=>this.createHitbox(data));
 
     this.time.delayedCall(420,()=>{
-      this.attackSprite.stop();
-      this.attackSprite.setVisible(false);
-      this.player.setVisible(true);
-      this.playerBusy=false;
+      this.forcePlayerReady();
+    });
 
-      if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
-      else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
-      else safePlay(this.player,"jt_idle_down");
+    this.time.delayedCall(700,()=>{
+      if(this.playerBusy) this.forcePlayerReady();
     });
   }
 
@@ -656,21 +698,25 @@ class Game extends Phaser.Scene{
       e.busy=true;
       e.setVelocityX((e.x<this.player.x ? -1 : 1)*120);
 
-      safePlay(e,"enemy_hurt");
-
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
 
-      if(e.hpText){
-        e.hpText.setText(e.health<=0 ? "KO" : "HP "+e.health);
-      }
-
       if(e.health<=0){
+        e.health=0;
         e.dead=true;
+        e.busy=false;
         e.setVelocityX(0);
         safePlay(e,"enemy_ko");
+
         if(e.hpText) e.hpText.setText("KO");
+
         return;
+      }
+
+      safePlay(e,"enemy_hurt");
+
+      if(e.hpText){
+        e.hpText.setText("HP "+e.health);
       }
 
       this.time.delayedCall(300,()=>{
@@ -681,7 +727,9 @@ class Game extends Phaser.Scene{
       });
     });
 
-    this.time.delayedCall(120,()=>box.destroy());
+    this.time.delayedCall(120,()=>{
+      if(box && box.destroy) box.destroy();
+    });
   }
 
   startBlock(){
@@ -699,21 +747,15 @@ class Game extends Phaser.Scene{
 
     this.player.setVisible(false);
     safePlay(this.attackSprite,"jt_block");
+
+    this.time.delayedCall(1200,()=>{
+      if(this.isBlocking) this.forcePlayerReady();
+    });
   }
 
   endBlock(){
     if(!this.isBlocking) return;
-
-    this.isBlocking=false;
-    this.playerBusy=false;
-
-    this.attackSprite.stop();
-    this.attackSprite.setVisible(false);
-    this.player.setVisible(true);
-
-    if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
-    else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
-    else safePlay(this.player,"jt_idle_down");
+    this.forcePlayerReady();
   }
 
   addRain(){
