@@ -80,10 +80,13 @@ function loadAssets(scene){
     frameHeight:ATTACK_FRAME_H
   });
 
-  scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
-    frameWidth:ENEMY_FRAME_W,
-    frameHeight:ENEMY_FRAME_H
-  });
+  scene.load.spritesheet("corpo_sellout",
+  ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
+    frameWidth:128,
+    frameHeight:128,
+    margin:0,
+    spacing:0
+});
 }
 
 function createAllAnims(scene){
