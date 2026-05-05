@@ -87,10 +87,10 @@ function cutGridSheet(scene, rawKey, cleanKey){
   const ROWS = 6;
   const FRAME = 128;
 
- const GRID_X = 40;
-const GRID_Y = 110;
-const CELL_W = 96;
-const CELL_H = 96;
+  const GRID_X = 52;
+  const GRID_Y = 127;
+  const CELL_W = 91.56;
+  const CELL_H = 142.17;
 
   const canvas = document.createElement("canvas");
   canvas.width = COLS * FRAME;
@@ -109,6 +109,16 @@ const CELL_H = 96;
       ctx.drawImage(raw, sx, sy, CELL_W, CELL_H, dx, dy, FRAME, FRAME);
     }
   }
+
+  if(hasTex(scene,cleanKey)) scene.textures.remove(cleanKey);
+
+  scene.textures.addSpriteSheet(cleanKey, canvas, {
+    frameWidth:FRAME,
+    frameHeight:FRAME,
+    margin:0,
+    spacing:0
+  });
+}
 
   if(hasTex(scene,cleanKey)) scene.textures.remove(cleanKey);
 
