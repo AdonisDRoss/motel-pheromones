@@ -287,6 +287,7 @@ class Game extends Phaser.Scene{
     this.createPlatformZones();
     this.createEnemies();
     this.makeKeyboard();
+    this.input.addPointer(5);
     this.makeMobileControls();
 
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
@@ -339,9 +340,8 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    const running = (this.keys && this.keys.shift.isDown) || this.mobileRun;
-    const speed = running ? 260 : 200;
-
+    const stickPower = Math.hypot(this.stickX, this.stickY);
+const running = (this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower > 0.75;
     let vx=this.moveX;
     let vy=this.moveY;
 
