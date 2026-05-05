@@ -29,984 +29,135 @@ canvas{
 <body>
 <script>
 
-const VERSION = 504;
-const W = 960;
-const H = 540;
+const VERSION = 505;
 const FRAME = 128;
-
-let selectedFighter = "JT";
-let selectedLevel = "outdoor";
-let selectedLevelName = "OUTDOOR";
-
 const JT_BASE = "assets/sprites/player/jt";
 
-const ATTACK_DATA = {
-  light: {
-    anim: "jt_attack_light",
-    damage: 8,
-    knockback: 130,
-    hitFx: "hit_small",
-    width: 65,
-    height: 38,
-    startup: 110,
-    active: 110,
-    recovery: 180
-  },
-  heavy: {
-    anim: "jt_attack_heavy",
-    damage: 16,
-    knockback: 240,
-    hitFx: "hit_heavy",
-    width: 90,
-    height: 48,
-    startup: 180,
-    active: 140,
-    recovery: 280
-  },
-  kick: {
-    anim: "jt_kick",
-    damage: 11,
-    knockback: 170,
-    hitFx: "hit_medium",
-    width: 82,
-    height: 42,
-    startup: 130,
-    active: 120,
-    recovery: 210
-  },
-  back_attack: {
-    anim: "jt_back_attack",
-    damage: 10,
-    knockback: 145,
-    hitFx: "hit_small",
-    width: 65,
-    height: 38,
-    startup: 120,
-    active: 120,
-    recovery: 190
-  },
-  back_kick: {
-    anim: "jt_back_kick",
-    damage: 12,
-    knockback: 185,
-    hitFx: "hit_medium",
-    width: 82,
-    height: 42,
-    startup: 140,
-    active: 130,
-    recovery: 220
-  }
-};
+function textureExists(scene,key){return scene.textures.exists(key);}
+function animExists(scene,key){return scene.anims.exists(key);}
+function safePlay(sprite,key){ if(animExists(sprite.scene,key)) sprite.play(key,true); }
 
-function textureExists(scene, key){
-  return scene.textures.exists(key);
+// =======================
+// LOAD
+// =======================
+
+function loadAssets(scene){
+
+  scene.load.image("title","assets/levels/title-screen.png");
+  scene.load.image("charSelect","assets/levels/character-select.png");
+  scene.load.image("levelSelect","assets/levels/level-select.png");
+
+  scene.load.image("outdoor","assets/levels/outdoor.png");
+
+  scene.load.image("jtSingle","assets/player/jt/jt-single.png");
+
+  scene.load.spritesheet("jt_movement", JT_BASE+"/movement.png", {
+    frameWidth:128, frameHeight:128
+  });
+
+  scene.load.json("movement_json", JT_BASE+"/data/movement.json");
+
 }
 
-function animExists(scene, key){
-  return scene.anims.exists(key);
-}
+// =======================
+// ANIMS
+// =======================
 
-function safePlay(sprite, key, ignoreIfPlaying=true){
-  if (!sprite || !sprite.scene || !sprite.scene.anims.exists(key)) return;
-  sprite.play(key, ignoreIfPlaying);
-}
+function createMovementAnims(scene){
+  const data = scene.cache.json.get("movement_json");
+  if(!data) return;
 
-function loadCharacterAssets(scene){
-  scene.load.spritesheet("jt_movement", `${JT_BASE}/movement.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.json("jt_movement_json", `${JT_BASE}/data/movement.json?v=${VERSION}`);
-
-  scene.load.spritesheet("jt_actions", `${JT_BASE}/actions.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.json("jt_actions_json", `${JT_BASE}/data/actions.json?v=${VERSION}`);
-
-  scene.load.spritesheet("jt_reactions", `${JT_BASE}/reactions.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.json("jt_reactions_json", `${JT_BASE}/data/reactions.json?v=${VERSION}`);
-
-  scene.load.spritesheet("hit_fx", `${JT_BASE}/fx/hit_fx.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.json("hit_fx_json", `${JT_BASE}/data/hit_fx.json?v=${VERSION}`);
-
-  scene.load.spritesheet("jt_attack_light", `${JT_BASE}/attacks/jt_attack_light.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.spritesheet("jt_attack_heavy", `${JT_BASE}/attacks/jt_attack_heavy.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.spritesheet("jt_kick", `${JT_BASE}/attacks/jt_kick.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.spritesheet("jt_back_attack", `${JT_BASE}/attacks/jt_back_attack.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-  scene.load.spritesheet("jt_back_kick", `${JT_BASE}/attacks/jt_back_kick.png?v=${VERSION}`, {
-    frameWidth: FRAME,
-    frameHeight: FRAME
-  });
-}
-
-function normalizeAnimations(data){
-  if (!data) return [];
-
-  if (Array.isArray(data.animations)) {
-    return data.animations;
-  }
-
-  if (data.animations && typeof data.animations === "object") {
-    return Object.entries(data.animations).map(([key, v]) => {
-      const row = v.row ?? 0;
-      const frames = v.frames ?? 5;
-      const start = v.start ?? row * 5;
-      const end = v.end ?? start + frames - 1;
-
-      return {
-        key,
-        start,
-        end,
-        frameRate: v.frameRate ?? 10,
-        repeat: v.repeat ?? (v.loop ? -1 : 0)
-      };
-    });
-  }
-
-  return [];
-}
-
-function createAnimsFromJson(scene, spriteKey, jsonKey, prefix="jt_"){
-  if (!textureExists(scene, spriteKey)) return;
-
-  const data = scene.cache.json.get(jsonKey);
-  const animations = normalizeAnimations(data);
-
-  animations.forEach(anim => {
-    const key = prefix + anim.key;
-    if (animExists(scene, key)) return;
+  data.animations.forEach(anim=>{
+    const key = "jt_"+anim.key;
+    if(animExists(scene,key)) return;
 
     scene.anims.create({
-      key,
-      frames: scene.anims.generateFrameNumbers(spriteKey, {
-        start: anim.start,
-        end: anim.end
-      }),
-      frameRate: anim.frameRate ?? 10,
-      repeat: anim.repeat ?? 0
+      key:key,
+      frames:scene.anims.generateFrameNumbers("jt_movement",{start:anim.start,end:anim.end}),
+      frameRate:anim.frameRate,
+      repeat:anim.repeat
     });
   });
 }
 
-function createAttackAnims(scene){
-  const attacks = [
-    ["jt_attack_light", 0, 4, 16],
-    ["jt_attack_heavy", 0, 5, 13],
-    ["jt_kick", 0, 4, 14],
-    ["jt_back_attack", 0, 4, 14],
-    ["jt_back_kick", 0, 4, 14]
-  ];
+// =======================
+// BOOT
+// =======================
 
-  attacks.forEach(([key, start, end, rate]) => {
-    if (!textureExists(scene, key)) return;
-    if (animExists(scene, key)) return;
-
-    scene.anims.create({
-      key,
-      frames: scene.anims.generateFrameNumbers(key, { start, end }),
-      frameRate: rate,
-      repeat: 0
-    });
-  });
-}
-
-function createHitFxAnims(scene){
-  createAnimsFromJson(scene, "hit_fx", "hit_fx_json", "");
-}
-
-function createAllCharacterAnims(scene){
-  createAnimsFromJson(scene, "jt_movement", "jt_movement_json", "jt_");
-  createAnimsFromJson(scene, "jt_actions", "jt_actions_json", "jt_");
-  createAnimsFromJson(scene, "jt_reactions", "jt_reactions_json", "jt_");
-  createAttackAnims(scene);
-  createHitFxAnims(scene);
-}
-
-class Boot extends Phaser.Scene {
-  constructor(){ super("Boot"); }
+class Boot extends Phaser.Scene{
+  constructor(){super("Boot");}
 
   preload(){
-    this.load.image("title","assets/levels/title-screen.png?v="+VERSION);
-    this.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
-    this.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
-
-    this.load.image("house","assets/levels/house-party.png?v="+VERSION);
-    this.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
-    this.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
-    this.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
-    this.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-
-    this.load.image("jtSingle","assets/player/jt/jt-single.png?v="+VERSION);
-
-    loadCharacterAssets(this);
+    loadAssets(this);
   }
 
   create(){
-    createAllCharacterAnims(this);
-    this.scene.start("Title");
+    createMovementAnims(this);
+    this.scene.start("Game");
   }
 }
 
-class Title extends Phaser.Scene {
-  constructor(){ super("Title"); }
+// =======================
+// GAME
+// =======================
+
+class Game extends Phaser.Scene{
+  constructor(){super("Game");}
 
   create(){
-    this.add.image(480,270,"title").setDisplaySize(960,540);
 
-    this.add.text(480,480,"TAP TO START",{
-      font:"22px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(10);
+    this.add.image(480,270,"outdoor").setDisplaySize(960,540);
 
-    this.input.keyboard.once("keydown-ENTER",()=>{
-      this.scene.start("CharacterSelect");
-    });
+    this.player = this.physics.add.sprite(480,400,
+      textureExists(this,"jt_movement") ? "jt_movement" : "jtSingle"
+    );
 
-    this.input.once("pointerdown",()=>{
-      this.scene.start("CharacterSelect");
-    });
-  }
-}
+    this.player.setOrigin(0.5,1);
+    this.player.body.setAllowGravity(false);
 
-class CharacterSelect extends Phaser.Scene {
-  constructor(){ super("CharacterSelect"); }
+    // INPUT SYSTEM FIX
+    this.stickX=0;
+    this.stickY=0;
+    this.keyX=0;
+    this.keyY=0;
 
-  create(){
-    this.add.image(480,270,"charSelect").setDisplaySize(960,540);
-
-    const fighters=[
-      {name:"DOTTIE",x:260,y:300,w:170,h:260},
-      {name:"GIGI",x:480,y:300,w:170,h:260},
-      {name:"JT",x:700,y:300,w:170,h:260}
-    ];
-
-    this.outline=this.add.rectangle(700,300,170,260,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3)
-      .setDepth(50);
-
-    selectedFighter = "JT";
-
-    fighters.forEach(f=>{
-      this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
-        .setInteractive()
-        .setDepth(40)
-        .on("pointerdown",()=>{
-          selectedFighter=f.name;
-          this.outline.setPosition(f.x,f.y);
-
-          this.time.delayedCall(200,()=>{
-            this.scene.start("LevelSelect");
-          });
-        });
-    });
-  }
-}
-
-class LevelSelect extends Phaser.Scene {
-  constructor(){ super("LevelSelect"); }
-
-  create(){
-    this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
-
-    const levels=[
-      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
-      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
-      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
-      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
-      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
-    ];
-
-    this.outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3)
-      .setDepth(50);
-
-    this.status=this.add.text(480,505,"TAP A LEVEL",{
-      font:"20px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(60);
-
-    levels.forEach(l=>{
-      this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
-        .setInteractive()
-        .setDepth(40)
-        .on("pointerdown",()=>{
-          selectedLevel=l.key;
-          selectedLevelName=l.name;
-
-          this.outline.setPosition(l.x,l.y);
-          this.outline.setSize(l.w,l.h);
-          this.status.setText("LOADING: "+l.name);
-
-          this.time.delayedCall(300,()=>{
-            this.scene.start("Game");
-          });
-        });
-    });
-  }
-}
-
-class Game extends Phaser.Scene {
-  constructor(){ super("Game"); }
-
-  create(){
-    this.bg=this.add.image(480,270,selectedLevel)
-      .setDisplaySize(960,540)
-      .setDepth(0);
-
-    this.platform="middle";
-    this.isClimbing=false;
-    this.currentLadder=null;
-    this.canExitLadder=true;
-    this.climbSpeed=120;
-
-    this.moveX=0;
-    this.moveY=0;
     this.lastDir="down";
 
-    this.playerBusy=false;
-    this.isBlocking=false;
-    this.comboStep=0;
-    this.rhythmStacks=0;
-
-    this.addRain();
-    this.addFog();
-
-    this.add.text(20,20,"CHAR: "+selectedFighter,{
-      font:"16px monospace",
-      fill:"#ffffff"
-    }).setDepth(1000);
-
-    this.add.text(20,45,"LEVEL: "+selectedLevelName,{
-      font:"16px monospace",
-      fill:"#ff4fc3"
-    }).setDepth(1000);
-
-    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
-      font:"16px monospace",
-      fill:"#ffff00"
-    }).setOrigin(0.5).setDepth(1000);
-
-    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
-      font:"16px monospace",
-      fill:"#00eaff"
-    }).setDepth(1000);
-
-    this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4)
-      .setDepth(199);
-
-    const playerTexture = textureExists(this,"jt_movement") ? "jt_movement" : "jtSingle";
-
-    this.player=this.physics.add.sprite(470,390,playerTexture);
-    this.player.setOrigin(0.5,1);
-    this.player.setDepth(200);
-    this.player.setCollideWorldBounds(true);
-    this.player.body.setAllowGravity(false);
-    this.player.body.setVelocity(0,0);
-
-    if (playerTexture === "jt_movement") {
-      this.player.setScale(1.6);
-      safePlay(this.player,"jt_idle_down");
-    } else {
-      this.player.setDisplaySize(96,144);
-    }
-
-    this.createPlatformZones();
-    this.createEnemies();
-    this.makeControls();
     this.makeKeyboard();
+    this.makeMobile();
 
-    this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
-    this.input.keyboard.on("keydown-K",()=>this.startAttack("heavy"));
-    this.input.keyboard.on("keydown-U",()=>this.startAttack("kick"));
-    this.input.keyboard.on("keydown-I",()=>this.startAttack("back_attack"));
-    this.input.keyboard.on("keydown-L",()=>this.startBlock());
-    this.input.keyboard.on("keyup-L",()=>this.endBlock());
-    this.input.keyboard.on("keydown-SPACE",()=>this.playAction("jump"));
-    this.input.keyboard.on("keydown-E",()=>this.interact());
   }
 
   makeKeyboard(){
     this.keys=this.input.keyboard.addKeys({
-      up:"UP",
-      down:"DOWN",
-      left:"LEFT",
-      right:"RIGHT",
-      w:"W",
-      a:"A",
-      s:"S",
-      d:"D",
-      shift:"SHIFT"
+      left:"LEFT", right:"RIGHT",
+      up:"UP", down:"DOWN",
+      a:"A", d:"D", w:"W", s:"S"
     });
   }
 
-  createEnemies(){
-    this.enemies=this.physics.add.group();
+  makeMobile(){
 
-    [
-      [650,390],
-      [760,390],
-      [580,505]
-    ].forEach(([x,y],i)=>{
-      const e=this.add.rectangle(x,y-40,48,80,0x33ff66,0.85);
-      e.setDepth(y);
-      e.health=30;
-      e.dead=false;
-      e.bodySprite=true;
-
-      this.physics.add.existing(e);
-      e.body.setAllowGravity(false);
-      e.body.setImmovable(false);
-      this.enemies.add(e);
-
-      const hp=this.add.text(x,y-100,"HP 30",{
-        font:"12px monospace",
-        fill:"#fff"
-      }).setOrigin(0.5).setDepth(1000);
-
-      e.hpText=hp;
-    });
-  }
-
-  createPlatformZones(){
-    const alpha=0.08;
-    const zoneDepth=10;
-
-    this.ladders=[
-      {
-        name:"left",
-        x:250,
-        y:360,
-        w:70,
-        h:230,
-        topY:250,
-        middleY:390
-      },
-      {
-        name:"right",
-        x:775,
-        y:360,
-        w:70,
-        h:230,
-        topY:250,
-        middleY:390
-      }
-    ];
-
-    this.ladders.forEach(ladder=>{
-      ladder.zone=this.add.rectangle(
-        ladder.x,
-        ladder.y,
-        ladder.w,
-        ladder.h,
-        0x00ff00,
-        alpha
-      ).setDepth(zoneDepth);
-    });
-
-    this.downStairs=this.add.rectangle(500,420,260,80,0xff00ff,alpha)
-      .setDepth(zoneDepth);
-
-    this.upStairs=this.add.rectangle(500,505,300,90,0x00ffff,alpha)
-      .setDepth(zoneDepth);
-  }
-
-  addRain(){
-    this.rain=this.add.group();
-
-    for(let i=0;i<120;i++){
-      const drop=this.add.rectangle(
-        Phaser.Math.Between(0,960),
-        Phaser.Math.Between(0,540),
-        2,
-        12,
-        0x77aaff,
-        0.4
-      ).setDepth(90);
-
-      drop.speed=Phaser.Math.Between(5,10);
-      this.rain.add(drop);
-    }
-  }
-
-  addFog(){
-    this.fog=this.add.rectangle(480,500,960,200,0x000000,0.18)
-      .setDepth(95);
-
-    this.tweens.add({
-      targets:this.fog,
-      alpha:{from:0.12,to:0.24},
-      duration:3000,
-      yoyo:true,
-      repeat:-1
-    });
-  }
-
-  update(){
-    this.updateRain();
-
-    if (this.keys) {
-      let kx=0;
-      let ky=0;
-
-      if (this.keys.left.isDown || this.keys.a.isDown) kx=-1;
-      if (this.keys.right.isDown || this.keys.d.isDown) kx=1;
-      if (this.keys.up.isDown || this.keys.w.isDown) ky=-1;
-      if (this.keys.down.isDown || this.keys.s.isDown) ky=1;
-
-      if (kx !== 0 || ky !== 0) {
-        this.moveX=kx;
-        this.moveY=ky;
-      }
-    }
-
-    if(this.isClimbing){
-      this.updateClimbing();
-    } else {
-      this.updateMovement();
-    }
-
-    this.updateEnemies();
-    this.updateUI();
-
-    this.shadow.x=this.player.x;
-    this.shadow.y=this.player.y+5;
-  }
-
-  updateRain(){
-    this.rain.children.iterate(drop=>{
-      drop.y += drop.speed;
-      drop.x -= 1;
-
-      if(drop.y>540){
-        drop.y=0;
-        drop.x=Phaser.Math.Between(0,960);
-      }
-    });
-  }
-
-  updateMovement(){
-    if (this.playerBusy) {
-      this.player.body.setVelocity(0,0);
-      return;
-    }
-
-    const baseSpeed = this.keys && this.keys.shift.isDown ? 260 : 200;
-    const moving = Math.abs(this.moveX)>0.05 || Math.abs(this.moveY)>0.05;
-
-    let vx=this.moveX;
-    let vy=this.moveY;
-
-    if (vx!==0 && vy!==0) {
-      vx*=0.707;
-      vy*=0.707;
-    }
-
-    this.player.body.velocity.x=Phaser.Math.Linear(
-      this.player.body.velocity.x,
-      vx*baseSpeed,
-      0.22
-    );
-
-    this.player.body.velocity.y=0;
-
-    if (Math.abs(vx)>0.1) {
-      this.lastDir="side";
-      this.player.setFlipX(vx<0);
-    } else if (vy< -0.1) {
-      this.lastDir="up";
-    } else if (vy>0.1) {
-      this.lastDir="down";
-    }
-
-    this.handlePlatformTransitions();
-    this.applyPlatformBounds();
-    this.updateMovementAnimation(moving, baseSpeed > 200);
-  }
-
-  updateMovementAnimation(moving, running){
-    if (!textureExists(this,"jt_movement")) return;
-
-    if (!moving) {
-      if (this.lastDir==="up") safePlay(this.player,"jt_idle_up");
-      else if (this.lastDir==="side") safePlay(this.player,"jt_idle_side");
-      else safePlay(this.player,"jt_idle_down");
-      return;
-    }
-
-    if (this.lastDir==="up") safePlay(this.player, running ? "jt_run_up" : "jt_walk_up");
-    else if (this.lastDir==="side") safePlay(this.player, running ? "jt_run_side" : "jt_walk_side");
-    else safePlay(this.player, running ? "jt_run_down" : "jt_walk_down");
-  }
-
-  handlePlatformTransitions(){
-    const nearLadder=this.ladders.find(ladder=>{
-      return Phaser.Geom.Rectangle.Contains(
-        ladder.zone.getBounds(),
-        this.player.x,
-        this.player.y-60
-      );
-    });
-
-    const nearStairs=Math.abs(this.player.x-500)<150;
-
-    if(!this.isClimbing && nearLadder && Math.abs(this.moveY)>0.45){
-      this.startClimbing(nearLadder);
-    }
-
-    if(!this.isClimbing && this.platform==="middle" && this.moveY>0.45 && nearStairs){
-      this.platform="bottom";
-      this.player.y=505;
-      this.zoneText.setText("BOTTOM LEVEL");
-    }
-
-    if(!this.isClimbing && this.platform==="bottom" && this.moveY<-0.45 && nearStairs){
-      this.platform="middle";
-      this.player.y=390;
-      this.zoneText.setText("MIDDLE PLATFORM");
-    }
-  }
-
-  startClimbing(ladder){
-    this.isClimbing=true;
-    this.currentLadder=ladder;
-    this.canExitLadder=false;
-    this.playerBusy=false;
-
-    this.player.body.setVelocity(0,0);
-    this.player.x=ladder.x;
-
-    safePlay(this.player,"jt_climb_ladder");
-
-    this.zoneText.setText("CLIMBING LADDER");
-
-    this.time.delayedCall(200,()=>{
-      this.canExitLadder=true;
-    });
-  }
-
-  updateClimbing(){
-    if(!this.isClimbing || !this.currentLadder) return;
-
-    const ladder=this.currentLadder;
-
-    this.player.x=Phaser.Math.Linear(this.player.x,ladder.x,0.35);
-    this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
-
-    if (Math.abs(this.moveY)>0.1) {
-      safePlay(this.player,"jt_climb_ladder");
-    }
-
-    this.player.y=Phaser.Math.Clamp(this.player.y,ladder.topY,ladder.middleY);
-
-    if(this.player.y<=ladder.topY+2 && this.moveY<-0.45){
-      this.isClimbing=false;
-      this.platform="top";
-      this.player.y=ladder.topY;
-      this.player.x=ladder.x;
-      this.zoneText.setText("TOP PLATFORM");
-      this.currentLadder=null;
-    }
-
-    if(this.player.y>=ladder.middleY-2 && this.moveY>0.45){
-      this.isClimbing=false;
-      this.platform="middle";
-      this.player.y=ladder.middleY;
-      this.player.x=ladder.x;
-      this.zoneText.setText("MIDDLE PLATFORM");
-      this.currentLadder=null;
-    }
-
-    if(this.canExitLadder && Math.abs(this.moveX)>0.65){
-      this.isClimbing=false;
-      this.platform="middle";
-      this.player.y=ladder.middleY;
-      this.zoneText.setText("MIDDLE PLATFORM");
-      this.currentLadder=null;
-    }
-  }
-
-  applyPlatformBounds(){
-    if(this.platform==="bottom"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=505;
-    }
-
-    if(this.platform==="middle"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=390;
-    }
-
-    if(this.platform==="top"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
-      this.player.y=250;
-    }
-  }
-
-  startAttack(type){
-    if (this.playerBusy || this.isClimbing) return;
-
-    const attack = ATTACK_DATA[type];
-    if (!attack) return;
-
-    const animKey = attack.anim;
-
-    this.playerBusy=true;
-    this.isBlocking=false;
-    this.player.body.setVelocity(0,0);
-
-    if (animExists(this, animKey)) {
-      this.player.play(animKey, true);
-    }
-
-    this.time.delayedCall(attack.startup,()=>{
-      this.createAttackHitbox(attack);
-    });
-
-    this.time.delayedCall(attack.startup + attack.active + attack.recovery,()=>{
-      this.playerBusy=false;
-    });
-  }
-
-  createAttackHitbox(attack){
-    const dir = this.getAttackDirection();
-
-    let hx=this.player.x;
-    let hy=this.player.y-70;
-    let w=attack.width;
-    let h=attack.height;
-
-    if (dir.name==="side") {
-      hx += dir.x * 62;
-    } else if (dir.name==="up") {
-      hy -= 50;
-      h = attack.width;
-      w = attack.height + 20;
-    } else {
-      hy += 55;
-      h = attack.width;
-      w = attack.height + 20;
-    }
-
-    const box=this.add.rectangle(hx,hy,w,h,0xff0000,0.25).setDepth(999);
-    this.physics.add.existing(box);
-    box.body.setAllowGravity(false);
-
-    const hitSet = new Set();
-
-    this.physics.add.overlap(box,this.enemies,(b,e)=>{
-      if (hitSet.has(e) || e.dead) return;
-      hitSet.add(e);
-      this.damageEnemy(e,attack,dir);
-    });
-
-    this.time.delayedCall(attack.active,()=>{
-      box.destroy();
-    });
-  }
-
-  getAttackDirection(){
-    if (this.lastDir==="up") return {x:0,y:-1,name:"up"};
-    if (this.lastDir==="down") return {x:0,y:1,name:"down"};
-    return {x:this.player.flipX ? -1 : 1,y:0,name:"side"};
-  }
-
-  damageEnemy(enemy,attack,dir){
-    enemy.health -= attack.damage;
-
-    enemy.setFillStyle(0xff3333,0.95);
-
-    this.time.delayedCall(90,()=>{
-      if (!enemy.dead) enemy.setFillStyle(0x33ff66,0.85);
-    });
-
-    enemy.body.setVelocity(dir.x * attack.knockback, dir.y * attack.knockback * 0.45);
-
-    this.spawnHitFx(enemy.x,enemy.y-45,attack.hitFx);
-
-    this.cameras.main.shake(80,0.004);
-
-    this.comboStep++;
-    this.rhythmStacks=Math.min(10,this.rhythmStacks+1);
-
-    if (enemy.health<=0){
-      enemy.dead=true;
-      enemy.body.enable=false;
-      enemy.setFillStyle(0x555555,0.6);
-      enemy.setAlpha(0.4);
-      if (enemy.hpText) enemy.hpText.setText("KO");
-      return;
-    }
-
-    if (enemy.hpText) enemy.hpText.setText("HP "+enemy.health);
-  }
-
-  spawnHitFx(x,y,key){
-    if (!textureExists(this,"hit_fx") || !animExists(this,key)) return;
-
-    const fx=this.add.sprite(x,y,"hit_fx");
-    fx.setOrigin(0.5);
-    fx.setScale(key==="hit_heavy" ? 1.8 : key==="hit_medium" ? 1.4 : 1.15);
-    fx.setBlendMode(Phaser.BlendModes.ADD);
-    fx.setDepth(1200);
-    fx.play(key);
-
-    fx.once("animationcomplete",()=>{
-      fx.destroy();
-    });
-  }
-
-  startBlock(){
-    if (this.playerBusy || this.isClimbing) return;
-
-    this.playerBusy=true;
-    this.isBlocking=true;
-    this.player.body.setVelocity(0,0);
-    safePlay(this.player,"jt_block");
-  }
-
-  endBlock(){
-    if (!this.isBlocking) return;
-    this.playerBusy=false;
-    this.isBlocking=false;
-  }
-
-  playAction(key){
-    if (this.playerBusy || this.isClimbing) return;
-
-    const animKey = "jt_" + key;
-    if (!animExists(this,animKey)) return;
-
-    this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
-    this.player.play(animKey,true);
-
-    this.player.once("animationcomplete",()=>{
-      this.playerBusy=false;
-    });
-  }
-
-  interact(){
-    if (this.playerBusy || this.isClimbing) return;
-
-    const nearest = this.getNearestEnemy(90);
-
-    if (nearest) {
-      this.playAction("grab_enemy");
-
-      this.time.delayedCall(350,()=>{
-        this.throwEnemy(nearest);
-      });
-    } else {
-      this.playAction("pickup_item");
-    }
-  }
-
-  throwEnemy(enemy){
-    if (!enemy || enemy.dead) return;
-
-    const dir=this.getAttackDirection();
-
-    safePlay(this.player,"jt_judo_throw");
-
-    enemy.body.setVelocity(dir.x*320, -90 + dir.y*120);
-    enemy.health -= 12;
-    this.spawnHitFx(enemy.x,enemy.y-45,"hit_heavy");
-
-    if (enemy.health<=0){
-      enemy.dead=true;
-      enemy.body.enable=false;
-      enemy.setFillStyle(0x555555,0.6);
-      enemy.setAlpha(0.4);
-      if (enemy.hpText) enemy.hpText.setText("KO");
-    } else {
-      if (enemy.hpText) enemy.hpText.setText("HP "+enemy.health);
-    }
-  }
-
-  getNearestEnemy(range){
-    let best=null;
-    let bestDist=9999;
-
-    this.enemies.children.each(e=>{
-      if (!e || e.dead) return;
-
-      const d=Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y);
-      if (d<range && d<bestDist) {
-        best=e;
-        bestDist=d;
-      }
-    });
-
-    return best;
-  }
-
-  updateEnemies(){
-    this.enemies.children.each(e=>{
-      if (!e || e.dead) return;
-
-      e.setDepth(e.y);
-      if (e.hpText) {
-        e.hpText.x=e.x;
-        e.hpText.y=e.y-100;
-      }
-
-      const dx=this.player.x-e.x;
-      const dy=this.player.y-e.y;
-      const d=Math.sqrt(dx*dx+dy*dy);
-
-      if (d<260 && !this.playerBusy) {
-        e.body.setVelocity(
-          Phaser.Math.Clamp(dx,-55,55),
-          Phaser.Math.Clamp(dy,-25,25)
-        );
-      } else {
-        e.body.setVelocity(
-          Phaser.Math.Linear(e.body.velocity.x,0,0.08),
-          Phaser.Math.Linear(e.body.velocity.y,0,0.08)
-        );
-      }
-    });
-  }
-
-  updateUI(){
-    this.comboText.setText("COMBO: "+this.comboStep+"  RHYTHM: "+this.rhythmStacks);
-  }
-
-  makeControls(){
     const baseX=120;
     const baseY=420;
     const r=60;
 
-    this.add.circle(baseX,baseY,r,0xffffff,0.12)
-      .setDepth(2000);
-
-    const knob=this.add.circle(baseX,baseY,28,0xffffff,0.35)
-      .setDepth(2001);
+    const knob=this.add.circle(baseX,baseY,30,0xffffff,0.4).setDepth(1000);
 
     let dragging=false;
 
-    const moveStick=(p)=>{
+    this.input.on("pointerdown",(p)=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<80){
+        dragging=true;
+      }
+    });
+
+    this.input.on("pointermove",(p)=>{
+      if(!dragging) return;
+
       let dx=p.x-baseX;
       let dy=p.y-baseY;
+
       const d=Math.sqrt(dx*dx+dy*dy);
 
       if(d>r){
@@ -1017,89 +168,70 @@ class Game extends Phaser.Scene {
       knob.x=baseX+dx;
       knob.y=baseY+dy;
 
-      this.moveX=dx/r;
-      this.moveY=dy/r;
-    };
-
-    this.input.on("pointerdown",p=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,baseX,baseY)<85){
-        dragging=true;
-        moveStick(p);
-      }
-    });
-
-    this.input.on("pointermove",p=>{
-      if(dragging)moveStick(p);
+      this.stickX = dx/r;
+      this.stickY = dy/r;
     });
 
     this.input.on("pointerup",()=>{
       dragging=false;
       knob.x=baseX;
       knob.y=baseY;
-      this.moveX=0;
-      this.moveY=0;
+      this.stickX=0;
+      this.stickY=0;
     });
-
-    this.makeButton(860,350,"X",()=>this.startAttack("light"));
-    this.makeButton(800,420,"Y",()=>this.startAttack("heavy"));
-    this.makeButton(920,420,"A",()=>this.startAttack("kick"));
-    this.makeButton(860,490,"B",()=>this.startBlock(),()=>this.endBlock());
-
-    this.makeButton(760,500,"E",()=>this.interact());
-    this.makeButton(760,350,"SP",()=>this.playAction("jump"));
-
-    this.add.text(480,505,"MENU",{
-      font:"16px monospace",
-      fill:"#fff",
-      backgroundColor:"rgba(0,0,0,0.25)"
-    }).setOrigin(0.5).setDepth(2001);
   }
 
-  makeButton(x,y,label,onDown,onUp=null){
-    const btn=this.add.circle(x,y,32,0xffffff,0.22)
-      .setInteractive()
-      .setDepth(2000);
+  update(){
 
-    this.add.text(x,y,label,{
-      font:"18px monospace",
-      fill:"#fff"
-    }).setOrigin(0.5).setDepth(2001);
+    // RESET KEY INPUT
+    this.keyX=0;
+    this.keyY=0;
 
-    btn.on("pointerdown",()=>{
-      if (onDown) onDown();
-    });
+    if(this.keys){
+      if(this.keys.left.isDown || this.keys.a.isDown) this.keyX=-1;
+      if(this.keys.right.isDown || this.keys.d.isDown) this.keyX=1;
+      if(this.keys.up.isDown || this.keys.w.isDown) this.keyY=-1;
+      if(this.keys.down.isDown || this.keys.s.isDown) this.keyY=1;
+    }
 
-    btn.on("pointerup",()=>{
-      if (onUp) onUp();
-    });
+    // MERGE INPUT (FIXED)
+    const moveX = this.stickX !==0 ? this.stickX : this.keyX;
+    const moveY = this.stickY !==0 ? this.stickY : this.keyY;
 
-    btn.on("pointerout",()=>{
-      if (onUp) onUp();
-    });
+    this.player.setVelocity(moveX*200,0);
+
+    // DIRECTION
+    if(Math.abs(moveX)>0.1){
+      this.lastDir="side";
+      this.player.setFlipX(moveX<0);
+    } else if(moveY< -0.1){
+      this.lastDir="up";
+    } else if(moveY>0.1){
+      this.lastDir="down";
+    }
+
+    // ANIMATION
+    if(!textureExists(this,"jt_movement")) return;
+
+    if(Math.abs(moveX)<0.1 && Math.abs(moveY)<0.1){
+      safePlay(this.player,"jt_idle_"+this.lastDir);
+    }else{
+      safePlay(this.player,"jt_walk_"+this.lastDir);
+    }
+
   }
 }
 
-const config={
+// =======================
+
+new Phaser.Game({
   type:Phaser.AUTO,
   width:960,
   height:540,
-  backgroundColor:"#000",
   pixelArt:true,
-  scale:{
-    mode:Phaser.Scale.FIT,
-    autoCenter:Phaser.Scale.CENTER_BOTH
-  },
-  physics:{
-    default:"arcade",
-    arcade:{
-      gravity:{y:0},
-      debug:false
-    }
-  },
-  scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
-};
-
-new Phaser.Game(config);
+  physics:{ default:"arcade" },
+  scene:[Boot,Game]
+});
 
 </script>
 </body>
