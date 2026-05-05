@@ -112,18 +112,52 @@ function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
 }
 
 function createAllAnims(scene){
-  createAnimsFromJson(scene,"jt_movement","jt_movement_json","jt_");
-  createAnimsFromJson(scene,"jt_actions","jt_actions_json","jt_");
-  createAnimsFromJson(scene,"hit_fx","hit_fx_json","");
 
-  if(hasTex(scene,"jt_attack_light") && !hasAnim(scene,"jt_attack_light")){
-    scene.anims.create({
-      key:"jt_attack_light",
-      frames:scene.anims.generateFrameNumbers("jt_attack_light",{start:0,end:4}),
-      frameRate:16,
-      repeat:0
-    });
-  }
+  // 🔥 FORCE movement animations (NO JSON needed)
+
+  scene.anims.create({
+    key: "jt_idle_down",
+    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 0, end: 4 }),
+    frameRate: 6,
+    repeat: -1
+  });
+
+  scene.anims.create({
+    key: "jt_walk_down",
+    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 5, end: 9 }),
+    frameRate: 10,
+    repeat: -1
+  });
+
+  scene.anims.create({
+    key: "jt_run_down",
+    frames: scene.anims.generateFrameNumbers("jt_movement", { start: 10, end: 14 }),
+    frameRate: 14,
+    repeat: -1
+  });
+
+  // attacks
+  scene.anims.create({
+    key:"jt_attack_light",
+    frames:scene.anims.generateFrameNumbers("jt_attack_light",{start:0,end:4}),
+    frameRate:16,
+    repeat:0
+  });
+
+  scene.anims.create({
+    key:"jt_attack_heavy",
+    frames:scene.anims.generateFrameNumbers("jt_attack_heavy",{start:0,end:4}),
+    frameRate:13,
+    repeat:0
+  });
+
+  scene.anims.create({
+    key:"jt_kick",
+    frames:scene.anims.generateFrameNumbers("jt_kick",{start:0,end:4}),
+    frameRate:14,
+    repeat:0
+  });
+}
 
   if(hasTex(scene,"jt_attack_heavy") && !hasAnim(scene,"jt_attack_heavy")){
     scene.anims.create({
@@ -303,21 +337,22 @@ class Game extends Phaser.Scene{
 
     this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4).setDepth(199);
 
-    const playerTex = hasTex(this,"jt_movement") ? "jt_movement" : "jtSingle";
+    const playerTex = "jt_movement"; // FORCE correct sprite
 
-    this.player=this.physics.add.sprite(470,390,playerTex);
-    this.player.setOrigin(0.5,1);
-    this.player.setDepth(200);
-    this.player.setCollideWorldBounds(true);
-    this.player.body.setAllowGravity(false);
-    this.player.body.setVelocity(0,0);
+this.player = this.physics.add.sprite(470, 390, playerTex);
 
-    if(playerTex==="jt_movement"){
-      this.player.setScale(1.6);
-      safePlay(this.player,"jt_idle_down");
-    } else {
-      this.player.setDisplaySize(96,144);
-    }
+this.player.setOrigin(0.5, 1);
+this.player.setDepth(200);
+this.player.setCollideWorldBounds(true);
+
+this.player.body.setAllowGravity(false);
+this.player.body.setVelocity(0, 0);
+
+// 🔥 FIX: remove scaling
+this.player.setScale(1);
+
+// 🔥 FORCE animation
+this.player.play("jt_idle_down", true);
 
     this.createPlatformZones();
     this.createEnemies();
