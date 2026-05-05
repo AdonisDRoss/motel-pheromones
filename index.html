@@ -27,7 +27,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 520;
+const VERSION = 521;
 const W = 960;
 const H = 540;
 
@@ -38,7 +38,8 @@ const ATTACK_FRAME_W = 204;
 const ATTACK_FRAME_H = 204;
 
 const PLAYER_MOVE_SCALE = 0.55;
-const PLAYER_ATTACK_SCALE = 0.55;
+const PLAYER_ATTACK_W = 96;
+const PLAYER_ATTACK_H = 128;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -277,7 +278,8 @@ class Game extends Phaser.Scene{
     this.createEnemies();
     this.makeKeyboard();
 
-    this.input.addPointer(5);
+    this.input.topOnly=false;
+    this.input.addPointer(6);
     this.makeMobileControls();
 
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
@@ -375,7 +377,6 @@ class Game extends Phaser.Scene{
   }
 
   playMoveAnim(moving,running){
-    
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
@@ -522,42 +523,39 @@ class Game extends Phaser.Scene{
     });
   }
 
-startAttack(type){
-  if(this.playerBusy || this.isClimbing) return;
+  startAttack(type){
+    if(this.playerBusy || this.isClimbing) return;
 
-  const data={
-    light:["jt_attack_light",8],
-    heavy:["jt_attack_heavy",16],
-    kick:["jt_kick",11]
-  }[type];
+    const data={
+      light:["jt_attack_light",8],
+      heavy:["jt_attack_heavy",16],
+      kick:["jt_kick",11]
+    }[type];
 
-  if(!data) return;
+    if(!data) return;
 
-  this.playerBusy=true;
-  this.player.body.setVelocity(0,0);
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
 
-  this.player.setTexture("jt_attacks");
-  this.player.setOrigin(0.5,1);
-  this.player.setDisplaySize(96,128);
-
-  if(hasAnim(this,data[0])){
-    this.player.play(data[0],true);
-  }
-
-  this.time.delayedCall(100,()=>this.createHitbox(data));
-
-  this.time.delayedCall(430,()=>{
-    this.player.stop();
-    this.player.setTexture("jt_movement");
+    this.player.setTexture("jt_attacks");
     this.player.setOrigin(0.5,1);
-    this.player.setScale(PLAYER_MOVE_SCALE);
-    this.playerBusy=false;
-    safePlay(this.player,"jt_idle_down");
-  });
+    this.player.setDisplaySize(PLAYER_ATTACK_W,PLAYER_ATTACK_H);
 
-    
-      
-  
+    if(hasAnim(this,data[0])){
+      this.player.play(data[0],true);
+    }
+
+    this.time.delayedCall(100,()=>this.createHitbox(data));
+
+    this.time.delayedCall(430,()=>{
+      this.player.stop();
+      this.player.setTexture("jt_movement");
+      this.player.setOrigin(0.5,1);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+      this.playerBusy=false;
+      safePlay(this.player,"jt_idle_down");
+    });
+  }
 
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
@@ -606,7 +604,8 @@ startAttack(type){
     this.isBlocking=true;
     this.player.body.setVelocity(0,0);
     this.player.setTexture("jt_attacks");
-    this.player.setScale(PLAYER_ATTACK_SCALE);
+    this.player.setOrigin(0.5,1);
+    this.player.setDisplaySize(PLAYER_ATTACK_W,PLAYER_ATTACK_H);
     safePlay(this.player,"jt_block");
   }
 
@@ -616,12 +615,13 @@ startAttack(type){
     this.isBlocking=false;
     this.playerBusy=false;
     this.player.setTexture("jt_movement");
+    this.player.setOrigin(0.5,1);
     this.player.setScale(PLAYER_MOVE_SCALE);
     safePlay(this.player,"jt_idle_down");
   }
 
   playAction(key){
-    this.startAttack("light");
+    this.startAttack("heavy");
   }
 
   addRain(){
@@ -671,12 +671,12 @@ startAttack(type){
   }
 
   makeMobileControls(){
-    const bx=120;
+    const bx=115;
     const by=420;
-    const r=60;
+    const r=58;
 
-    this.add.circle(bx,by,r,0xffffff,0.14).setDepth(3000);
-    const knob=this.add.circle(bx,by,26,0xffffff,0.38).setDepth(3001);
+    this.add.circle(bx,by,r,0xffffff,0.16).setDepth(9000);
+    const knob=this.add.circle(bx,by,25,0xffffff,0.38).setDepth(9001);
 
     let dragging=false;
 
@@ -716,33 +716,30 @@ startAttack(type){
       this.stickY=0;
     });
 
-    this.mobileButton(860,350,"X",()=>this.startAttack("light"));
-    this.mobileButton(800,420,"Y",()=>this.startAttack("heavy"));
-    this.mobileButton(920,420,"A",()=>this.startAttack("kick"));
-    this.mobileButton(860,490,"B",()=>this.startBlock(),()=>this.endBlock());
-    this.mobileButton(760,350,"SP",()=>this.playAction("special"));
-    this.mobileButton(760,500,"E",()=>this.playAction("interact"));
-    this.mobileButton(700,420,"RUN",
-      ()=>{ this.mobileRun=true; },
-      ()=>{ this.mobileRun=false; }
-    );
+    this.mobileButton(820,340,"X",()=>this.startAttack("light"));
+    this.mobileButton(760,410,"Y",()=>this.startAttack("heavy"));
+    this.mobileButton(880,410,"A",()=>this.startAttack("kick"));
+    this.mobileButton(820,480,"B",()=>this.startBlock(),()=>this.endBlock());
+    this.mobileButton(700,405,"RUN",()=>{this.mobileRun=true;},()=>{this.mobileRun=false;});
+    this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
 
     this.add.text(480,505,"MENU",{font:"16px monospace",fill:"#fff"})
       .setOrigin(0.5)
-      .setDepth(3002);
+      .setDepth(9502);
   }
 
   mobileButton(x,y,label,down,up=null){
-    const hit=this.add.rectangle(x,y,90,90,0x00ff00,0)
+    const hit=this.add.circle(x,y,42,0x00ff00,0.18)
       .setInteractive()
-      .setDepth(4000);
+      .setDepth(9500);
 
-    this.add.circle(x,y,34,0xffffff,0.24).setDepth(4001);
+    this.add.circle(x,y,34,0xffffff,0.28)
+      .setDepth(9501);
 
     this.add.text(x,y,label,{
       font:"18px monospace",
       fill:"#fff"
-    }).setOrigin(0.5).setDepth(4002);
+    }).setOrigin(0.5).setDepth(9502);
 
     hit.on("pointerdown",()=>{
       if(down) down();
