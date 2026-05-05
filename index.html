@@ -13,13 +13,12 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 513;
+const VERSION = 514;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-
 const ATTACK_FRAME_W = 128;
 const ATTACK_FRAME_H = 128;
 const FRAME = 128;
@@ -46,21 +45,18 @@ function loadJT(scene){
     frameHeight: MOVE_FRAME_H
   });
 
- scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION, {
-  frameWidth: 128,
-  frameHeight: 128
-}); 
-
   scene.load.spritesheet("jt_actions", JT_BASE + "/actions.png?v=" + VERSION, {
     frameWidth: FRAME,
     frameHeight: FRAME
   });
+
   scene.load.json("jt_actions_json", JT_BASE + "/data/actions.json?v=" + VERSION);
 
   scene.load.spritesheet("hit_fx", JT_BASE + "/fx/hit_fx.png?v=" + VERSION, {
     frameWidth: FRAME,
     frameHeight: FRAME
   });
+
   scene.load.json("hit_fx_json", JT_BASE + "/data/hit_fx.json?v=" + VERSION);
 
   scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION, {
@@ -82,6 +78,7 @@ function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
   anims.forEach(a=>{
     const key = prefix + a.key;
     if(hasAnim(scene,key)) return;
+
     scene.anims.create({
       key,
       frames: scene.anims.generateFrameNumbers(spriteKey,{start:a.start,end:a.end}),
@@ -94,6 +91,7 @@ function createAnimsFromJson(scene, spriteKey, jsonKey, prefix){
 function makeAnim(scene, key, sheet, start, end, rate, repeat){
   if(!hasTex(scene, sheet)) return;
   if(hasAnim(scene, key)) return;
+
   scene.anims.create({
     key,
     frames: scene.anims.generateFrameNumbers(sheet, { start, end }),
@@ -115,10 +113,10 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
-  makeAnim(scene,"jt_attack_light","jt_attacks",0,3,16,0);
-  makeAnim(scene,"jt_attack_heavy","jt_attacks",5,9,13,0);
-  makeAnim(scene,"jt_kick","jt_attacks",10,13,14,0);
-  makeAnim(scene,"jt_back_kick","jt_attacks",15,19,14,0);
+  makeAnim(scene,"jt_attack_light","jt_attacks",1,3,16,0);
+  makeAnim(scene,"jt_attack_heavy","jt_attacks",5,8,13,0);
+  makeAnim(scene,"jt_kick","jt_attacks",10,12,14,0);
+  makeAnim(scene,"jt_back_kick","jt_attacks",15,18,12,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
 
   createAnimsFromJson(scene,"jt_actions","jt_actions_json","jt_");
@@ -153,10 +151,7 @@ class Title extends Phaser.Scene{
 
   create(){
     this.add.image(480,270,"title").setDisplaySize(960,540);
-    this.add.text(480,480,"TAP TO START",{
-      font:"22px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(10);
+    this.add.text(480,480,"TAP TO START",{font:"22px monospace",fill:"#ff4fc3"}).setOrigin(0.5).setDepth(10);
 
     this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
     this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
@@ -210,10 +205,9 @@ class LevelSelect extends Phaser.Scene{
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
 
-    this.status=this.add.text(480,505,"TAP A LEVEL",{
-      font:"20px monospace",
-      fill:"#ff4fc3"
-    }).setOrigin(0.5).setDepth(60);
+    this.status=this.add.text(480,505,"TAP A LEVEL",{font:"20px monospace",fill:"#ff4fc3"})
+      .setOrigin(0.5)
+      .setDepth(60);
 
     levels.forEach(l=>{
       this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
@@ -263,15 +257,11 @@ class Game extends Phaser.Scene{
     this.add.text(20,20,"CHAR: "+selectedFighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
     this.add.text(20,45,"LEVEL: "+selectedLevelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
 
-    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
-      font:"16px monospace",
-      fill:"#ffff00"
-    }).setOrigin(0.5).setDepth(1000);
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{font:"16px monospace",fill:"#ffff00"})
+      .setOrigin(0.5)
+      .setDepth(1000);
 
-    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
-      font:"16px monospace",
-      fill:"#00eaff"
-    }).setDepth(1000);
+    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{font:"16px monospace",fill:"#00eaff"}).setDepth(1000);
 
     this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4).setDepth(199);
 
@@ -281,7 +271,7 @@ class Game extends Phaser.Scene{
     this.player.setCollideWorldBounds(true);
     this.player.body.setAllowGravity(false);
     this.player.body.setVelocity(0,0);
-    this.player.setDisplaySize(96,128);
+    this.player.setScale(1);
     this.player.play("jt_idle_down",true);
 
     this.createPlatformZones();
@@ -314,6 +304,7 @@ class Game extends Phaser.Scene{
     else this.updateMovement();
 
     this.updateEnemies();
+
     this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
     this.shadow.x=this.player.x;
     this.shadow.y=this.player.y+5;
@@ -385,8 +376,7 @@ class Game extends Phaser.Scene{
   }
 
   createPlatformZones(){
-    const alpha=0.08;
-    const depth=10;
+    const alpha=0;
 
     this.ladders=[
       {name:"left",x:250,y:360,w:70,h:230,topY:250,middleY:390},
@@ -394,11 +384,11 @@ class Game extends Phaser.Scene{
     ];
 
     this.ladders.forEach(l=>{
-      l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(depth);
+      l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
     });
 
-    this.downStairs=this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(depth);
-    this.upStairs=this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(depth);
+    this.downStairs=this.add.rectangle(500,420,260,80,0xff00ff,alpha).setDepth(10);
+    this.upStairs=this.add.rectangle(500,505,300,90,0x00ffff,alpha).setDepth(10);
   }
 
   handlePlatformTransitions(){
@@ -498,6 +488,7 @@ class Game extends Phaser.Scene{
       const e=this.add.rectangle(x,y-40,48,80,0x33ff66,0.85).setDepth(y);
       e.health=30;
       e.dead=false;
+
       this.physics.add.existing(e);
       e.body.setAllowGravity(false);
       this.enemies.add(e);
@@ -725,15 +716,13 @@ class Game extends Phaser.Scene{
       ()=>{ this.mobileRun=false; }
     );
 
-    this.add.text(480,505,"MENU",{
-      font:"16px monospace",
-      fill:"#fff",
-      backgroundColor:"rgba(0,0,0,0.25)"
-    }).setOrigin(0.5).setDepth(2001);
+    this.add.text(480,505,"MENU",{font:"16px monospace",fill:"#fff"})
+      .setOrigin(0.5)
+      .setDepth(2001);
   }
 
   button(x,y,label,down,up=null){
-    const hit=this.add.rectangle(x,y,90,90,0x00ff00,0.12)
+    const hit=this.add.rectangle(x,y,90,90,0x00ff00,0)
       .setInteractive()
       .setDepth(3000);
 
