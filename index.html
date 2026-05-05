@@ -13,18 +13,14 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 541;
+const VERSION = 542;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-
 const ATTACK_FRAME_W = 128;
 const ATTACK_FRAME_H = 128;
-
-const ENEMY_FRAME_W = 128;
-const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.44;
@@ -52,10 +48,10 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(hasAnim(scene,key)) return;
 
   scene.anims.create({
-    key:key,
-    frames:scene.anims.generateFrameNumbers(sheet,{start:start,end:end}),
+    key,
+    frames:scene.anims.generateFrameNumbers(sheet,{start,end}),
     frameRate:rate,
-    repeat:repeat
+    repeat
   });
 }
 
@@ -79,16 +75,54 @@ function loadAssets(scene){
     frameWidth:ATTACK_FRAME_W,
     frameHeight:ATTACK_FRAME_H
   });
-scene.load.spritesheet("corpo_sellout",
-  ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,
-  {
-    frameWidth: 128,
-    frameHeight: 128,
-    margin: 0,
-    spacing: 0
+
+  // USE YOUR GRID IMAGE SHEET HERE.
+  // Save file as: assets/sprites/enemies/corpo_sellout_grid.png
+  scene.load.image("corpo_raw", ENEMY_BASE + "/corpo_sellout_grid.png?v=" + VERSION);
+}
+
+function cutGridSheet(scene, rawKey, cleanKey){
+  if(!hasTex(scene,rawKey)) return;
+
+  const raw = scene.textures.get(rawKey).getSourceImage();
+
+  const COLS = 16;
+  const ROWS = 6;
+  const FRAME = 128;
+
+  // These numbers match the grid image you showed.
+  // If it cuts slightly wrong, adjust only these four.
+  const GRID_X = 50;
+  const GRID_Y = 125;
+  const CELL_W = 91;
+  const CELL_H = 91;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = COLS * FRAME;
+  canvas.height = ROWS * FRAME;
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let row=0; row<ROWS; row++){
+    for(let col=0; col<COLS; col++){
+      const sx = GRID_X + col * CELL_W;
+      const sy = GRID_Y + row * CELL_H;
+      const dx = col * FRAME;
+      const dy = row * FRAME;
+
+      ctx.drawImage(raw, sx, sy, CELL_W, CELL_H, dx, dy, FRAME, FRAME);
+    }
   }
-);
-  
+
+  if(hasTex(scene,cleanKey)) scene.textures.remove(cleanKey);
+
+  scene.textures.addSpriteSheet(cleanKey, canvas, {
+    frameWidth:FRAME,
+    frameHeight:FRAME,
+    margin:0,
+    spacing:0
+  });
 }
 
 function createAllAnims(scene){
@@ -109,18 +143,19 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
 
-  makeAnim(scene,"enemy_idle","corpo_sellout",0,9,8,-1);
-  makeAnim(scene,"enemy_walk","corpo_sellout",10,19,10,-1);
-  makeAnim(scene,"enemy_punch","corpo_sellout",20,29,14,0);
-  makeAnim(scene,"enemy_kick","corpo_sellout",30,34,12,0);
-  makeAnim(scene,"enemy_hurt","corpo_sellout",35,39,10,0);
-  makeAnim(scene,"enemy_ko","corpo_sellout",44,47,8,0);
+  makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
+  makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
+  makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
+  makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
+  makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
+  makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
 }
 
 class Boot extends Phaser.Scene{
   constructor(){ super("Boot"); }
   preload(){ loadAssets(this); }
   create(){
+    cutGridSheet(this,"corpo_raw","corpo_sellout");
     createAllAnims(this);
     this.scene.start("Title");
   }
@@ -466,33 +501,33 @@ class Game extends Phaser.Scene{
   }
 
   createEnemies(){
-  this.enemies=this.physics.add.group();
+    this.enemies=this.physics.add.group();
+    this.spawnEnemy(720,390);
+    this.spawnEnemy(830,390);
+  }
 
-  this.spawnEnemy(720,390);
-  this.spawnEnemy(830,390);
-}
+  spawnEnemy(x,y){
+    const e=this.physics.add.sprite(x,y,"corpo_sellout",0);
 
-spawnEnemy(x,y){
-  const e = this.physics.add.sprite(x, y, "corpo_sellout", 0);
+    e.setOrigin(0.5,1);
+    e.setScale(ENEMY_SCALE);
+    e.setDepth(210);
+    e.body.setAllowGravity(false);
+    e.body.setVelocity(0,0);
+    e.health=30;
+    e.dead=false;
+    e.busy=false;
 
-  e.setOrigin(0.5,1);
-  e.setScale(ENEMY_SCALE);
-  e.setDepth(210);
-  e.body.setAllowGravity(false);
-  e.body.setVelocity(0,0);
-  e.health=30;
-  e.dead=false;
-  e.busy=false;
+    safePlay(e,"enemy_idle");
 
-  safePlay(e,"enemy_idle");
+    e.hpText=this.add.text(x,y-110,"HP 30",{
+      font:"12px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(1000);
 
-  e.hpText=this.add.text(x,y-110,"HP 30",{
-    font:"12px monospace",
-    fill:"#fff"
-  }).setOrigin(0.5).setDepth(1000);
+    this.enemies.add(e);
+  }
 
-  this.enemies.add(e);
-}
   updateEnemyAI(){
     if(!this.enemies) return;
 
