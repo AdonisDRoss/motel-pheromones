@@ -1,3 +1,5 @@
+Paste this over your full index.html:
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -12,48 +14,38 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 </head>
 <body>
 <script>
-
-const VERSION = 562;
+const VERSION = 563;
 const W = 960;
 const H = 540;
-
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 const ATTACK_FRAME_W = 128;
 const ATTACK_FRAME_H = 128;
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
-
 const PLAYER_MOVE_SCALE = 0.44;
-const PLAYER_ATTACK_SCALE = 0.44;
+const PLAYER_ATTACK_SCALE = 0.58;
 const ENEMY_SCALE = 0.55;
-
 /* JT attack alignment fix */
 const PLAYER_FOOT_Y_OFFSET = 0;
-const ATTACK_OFFSET_X = 0;
-const ATTACK_OFFSET_Y = 10;
-
+const ATTACK_OFFSET_X = 24;
+const ATTACK_OFFSET_Y = 0;
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
-
 const JT_BASE = "assets/sprites/player/jt";
 const ENEMY_BASE = "assets/sprites/enemies";
-
 function hasTex(scene,key){ return scene.textures.exists(key); }
 function hasAnim(scene,key){ return scene.anims.exists(key); }
-
 function safePlay(sprite,key){
   if(!sprite || !sprite.scene) return;
   if(!hasAnim(sprite.scene,key)) return;
   if(sprite.anims.currentAnim && sprite.anims.currentAnim.key === key) return;
   sprite.play(key,true);
 }
-
 function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
-
   scene.anims.create({
     key,
     frames:scene.anims.generateFrameNumbers(sheet,{start,end}),
@@ -61,28 +53,23 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
     repeat
   });
 }
-
 function loadAssets(scene){
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
   scene.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
-
   scene.load.image("house","assets/levels/house-party.png?v="+VERSION);
   scene.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
   scene.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-
   scene.load.spritesheet("jt_movement", JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
     frameHeight:MOVE_FRAME_H
   });
-
   scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
     frameWidth:ATTACK_FRAME_W,
     frameHeight:ATTACK_FRAME_H
   });
-
   scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
     frameHeight:ENEMY_FRAME_H,
@@ -90,25 +77,20 @@ function loadAssets(scene){
     spacing:0
   });
 }
-
 function createAllAnims(scene){
   makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
   makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
   makeAnim(scene,"jt_idle_side","jt_movement",10,14,6,-1);
-
   makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
   makeAnim(scene,"jt_walk_up","jt_movement",15,19,8,-1);
   makeAnim(scene,"jt_walk_side","jt_movement",15,19,8,-1);
-
   makeAnim(scene,"jt_run_down","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
-
   makeAnim(scene,"jt_attack_light","jt_attacks",1,3,14,0);
   makeAnim(scene,"jt_attack_heavy","jt_attacks",5,8,12,0);
   makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
   makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
-
   makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
   makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
   makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
@@ -116,23 +98,18 @@ function createAllAnims(scene){
   makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
   makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
 }
-
 class Boot extends Phaser.Scene{
   constructor(){ super("Boot"); }
-
   preload(){
     loadAssets(this);
   }
-
   create(){
     createAllAnims(this);
     this.scene.start("Title");
   }
 }
-
 class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
-
   create(){
     if(hasTex(this,"title")){
       this.add.image(480,270,"title").setDisplaySize(960,540);
@@ -143,23 +120,19 @@ class Title extends Phaser.Scene{
         fill:"#ff4fc3"
       }).setOrigin(0.5);
     }
-
     this.add.text(480,485,"TAP TO START",{
       font:"24px monospace",
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(9999);
-
     this.time.delayedCall(500,()=>{
       this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
       this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
     });
   }
 }
-
 class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
-
   create(){
     if(hasTex(this,"charSelect")){
       this.add.image(480,270,"charSelect").setDisplaySize(960,540);
@@ -170,17 +143,14 @@ class CharacterSelect extends Phaser.Scene{
         fill:"#ff4fc3"
       }).setOrigin(0.5);
     }
-
     const fighters=[
       {name:"DOTTIE",x:260,y:300,w:170,h:260},
       {name:"GIGI",x:480,y:300,w:170,h:260},
       {name:"JT",x:700,y:300,w:170,h:260}
     ];
-
     const outline=this.add.rectangle(700,300,170,260,0xff4fc3,0)
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
-
     this.time.delayedCall(250,()=>{
       fighters.forEach(f=>{
         this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
@@ -195,10 +165,8 @@ class CharacterSelect extends Phaser.Scene{
     });
   }
 }
-
 class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
-
   create(){
     if(hasTex(this,"levelSelect")){
       this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
@@ -209,7 +177,6 @@ class LevelSelect extends Phaser.Scene{
         fill:"#00eaff"
       }).setOrigin(0.5);
     }
-
     const levels=[
       {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
       {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
@@ -217,16 +184,13 @@ class LevelSelect extends Phaser.Scene{
       {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
       {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
     ];
-
     const outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
-
     const status=this.add.text(480,505,"TAP A LEVEL",{
       font:"20px monospace",
       fill:"#ff4fc3"
     }).setOrigin(0.5).setDepth(60);
-
     this.time.delayedCall(250,()=>{
       levels.forEach(l=>{
         this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
@@ -244,59 +208,46 @@ class LevelSelect extends Phaser.Scene{
     });
   }
 }
-
 class Game extends Phaser.Scene{
   constructor(){ super("Game"); }
-
   create(){
     this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
       .setDisplaySize(960,540)
       .setDepth(0);
-
     this.platform="middle";
     this.isClimbing=false;
     this.currentLadder=null;
     this.climbSpeed=120;
-
     this.stickX=0;
     this.stickY=0;
     this.moveX=0;
     this.moveY=0;
     this.lastDir="down";
-
     this.playerBusy=false;
     this.isBlocking=false;
     this.mobileRun=false;
-
     this.combo=0;
     this.rhythm=0;
-
     this.addRain();
     this.addFog();
-
     this.add.text(20,20,"CHAR: "+selectedFighter,{
       font:"16px monospace",
       fill:"#fff"
     }).setDepth(1000);
-
     this.add.text(20,45,"LEVEL: "+selectedLevelName,{
       font:"16px monospace",
       fill:"#ff4fc3"
     }).setDepth(1000);
-
     this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
       font:"16px monospace",
       fill:"#ffff00"
     }).setOrigin(0.5).setDepth(1000);
-
     this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
       font:"16px monospace",
       fill:"#00eaff"
     }).setDepth(1000);
-
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
-
     this.player=this.physics.add.sprite(470,390,"jt_movement");
     this.player.setOrigin(0.5,1);
     this.player.setScale(PLAYER_MOVE_SCALE);
@@ -305,21 +256,17 @@ class Game extends Phaser.Scene{
     this.player.body.setAllowGravity(false);
     this.player.body.setVelocity(0,0);
     safePlay(this.player,"jt_idle_down");
-
     this.attackSprite=this.add.sprite(470,390,"jt_attacks");
     this.attackSprite.setOrigin(0.5,1);
     this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
     this.attackSprite.setDepth(201);
     this.attackSprite.setVisible(false);
-
     this.createPlatformZones();
     this.createEnemies();
     this.makeKeyboard();
-
     this.input.topOnly=false;
     this.input.addPointer(6);
     this.makeMobileControls();
-
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
     this.input.keyboard.on("keydown-K",()=>this.startAttack("heavy"));
     this.input.keyboard.on("keydown-U",()=>this.startAttack("kick"));
@@ -327,7 +274,6 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keyup-L",()=>this.endBlock());
     this.input.keyboard.on("keydown-SPACE",()=>this.startAttack("heavy"));
   }
-
   makeKeyboard(){
     this.keys=this.input.keyboard.addKeys({
       up:"UP",
@@ -341,61 +287,47 @@ class Game extends Phaser.Scene{
       shift:"SHIFT"
     });
   }
-
   update(){
     this.updateRain();
     this.readInput();
-
     if(this.isClimbing){
       this.updateClimbing();
     }else{
       this.updateMovement();
     }
-
     this.updateEnemyAI();
-
     this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
-
     this.shadow.x=this.player.x;
     this.shadow.y=this.player.y+5;
   }
-
   readInput(){
     let keyX=0;
     let keyY=0;
-
     if(this.keys){
       if(this.keys.left.isDown || this.keys.a.isDown) keyX=-1;
       if(this.keys.right.isDown || this.keys.d.isDown) keyX=1;
       if(this.keys.up.isDown || this.keys.w.isDown) keyY=-1;
       if(this.keys.down.isDown || this.keys.s.isDown) keyY=1;
     }
-
     this.moveX=Math.abs(this.stickX)>0.05 ? this.stickX : keyX;
     this.moveY=Math.abs(this.stickY)>0.05 ? this.stickY : keyY;
   }
-
   updateMovement(){
     if(this.playerBusy){
       this.player.body.setVelocity(0,0);
       return;
     }
-
     const stickPower=Math.hypot(this.stickX,this.stickY);
     const running=(this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower>0.75;
     const speed=running ? 260 : 200;
-
     let vx=this.moveX;
     let vy=this.moveY;
-
     if(vx!==0 && vy!==0){
       vx*=0.707;
       vy*=0.707;
     }
-
     this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
     this.player.body.velocity.y=0;
-
     if(Math.abs(vx)>0.1){
       this.lastDir="side";
       this.player.setFlipX(vx<0);
@@ -404,66 +336,52 @@ class Game extends Phaser.Scene{
     }else if(vy>0.1){
       this.lastDir="down";
     }
-
     this.handlePlatformTransitions();
     this.applyPlatformBounds();
-
     const moving=Math.abs(vx)>0.05 || Math.abs(vy)>0.05;
     this.playMoveAnim(moving,running);
   }
-
   playMoveAnim(moving,running){
     if(this.playerBusy) return;
-
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
       else safePlay(this.player,"jt_idle_down");
       return;
     }
-
     if(this.lastDir==="up") safePlay(this.player,running ? "jt_run_up" : "jt_walk_up");
     else if(this.lastDir==="side") safePlay(this.player,running ? "jt_run_side" : "jt_walk_side");
     else safePlay(this.player,running ? "jt_run_down" : "jt_walk_down");
   }
-
   createPlatformZones(){
     const alpha=0;
-
     this.ladders=[
       {name:"left",x:250,y:360,w:70,h:230,topY:250,middleY:390},
       {name:"right",x:775,y:360,w:70,h:230,topY:250,middleY:390}
     ];
-
     this.ladders.forEach(l=>{
       l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
     });
   }
-
   handlePlatformTransitions(){
     const nearLadder=this.ladders.find(l=>{
       return Phaser.Geom.Rectangle.Contains(l.zone.getBounds(),this.player.x,this.player.y-60);
     });
-
     const nearStairs=Math.abs(this.player.x-500)<150;
-
     if(!this.isClimbing && nearLadder && Math.abs(this.moveY)>0.45){
       this.startClimbing(nearLadder);
     }
-
     if(!this.isClimbing && this.platform==="middle" && this.moveY>0.45 && nearStairs){
       this.platform="bottom";
       this.player.y=505;
       this.zoneText.setText("BOTTOM LEVEL");
     }
-
     if(!this.isClimbing && this.platform==="bottom" && this.moveY<-0.45 && nearStairs){
       this.platform="middle";
       this.player.y=390;
       this.zoneText.setText("MIDDLE PLATFORM");
     }
   }
-
   startClimbing(ladder){
     this.isClimbing=true;
     this.currentLadder=ladder;
@@ -473,15 +391,12 @@ class Game extends Phaser.Scene{
     safePlay(this.player,"jt_idle_up");
     this.zoneText.setText("CLIMBING LADDER");
   }
-
   updateClimbing(){
     const l=this.currentLadder;
     if(!l) return;
-
     this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.35);
     this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
     this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
-
     if(this.player.y<=l.topY+2 && this.moveY<-0.45){
       this.isClimbing=false;
       this.platform="top";
@@ -489,7 +404,6 @@ class Game extends Phaser.Scene{
       this.zoneText.setText("TOP PLATFORM");
       this.currentLadder=null;
     }
-
     if(this.player.y>=l.middleY-2 && this.moveY>0.45){
       this.isClimbing=false;
       this.platform="middle";
@@ -497,7 +411,6 @@ class Game extends Phaser.Scene{
       this.zoneText.setText("MIDDLE PLATFORM");
       this.currentLadder=null;
     }
-
     if(Math.abs(this.moveX)>0.65){
       this.isClimbing=false;
       this.platform="middle";
@@ -506,34 +419,27 @@ class Game extends Phaser.Scene{
       this.currentLadder=null;
     }
   }
-
   applyPlatformBounds(){
     if(this.platform==="bottom"){
       this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
       this.player.y=505;
     }
-
     if(this.platform==="middle"){
       this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
       this.player.y=390;
     }
-
     if(this.platform==="top"){
       this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
       this.player.y=250;
     }
   }
-
   createEnemies(){
     this.enemies=this.physics.add.group();
-
     this.spawnEnemy(640,390);
     this.spawnEnemy(830,390);
   }
-
   spawnEnemy(x,y){
     const e=this.physics.add.sprite(x,y,"corpo_sellout",0);
-
     e.setOrigin(0.5,1);
     e.setScale(ENEMY_SCALE);
     e.setTint(0xffffff);
@@ -543,72 +449,53 @@ class Game extends Phaser.Scene{
     e.health=30;
     e.dead=false;
     e.busy=false;
-
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
-
     safePlay(e,"enemy_idle");
-
     e.hpText=this.add.text(x,y-85,"HP 30",{
       font:"11px monospace",
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(1000);
-
     this.enemies.add(e);
   }
-
   updateEnemyAI(){
     if(!this.enemies) return;
-
     this.enemies.children.each(e=>{
       if(!e) return;
-
       if(e.dead){
         e.setVelocityX(0);
-
         if(e.hpText){
           e.hpText.x=e.x;
           e.hpText.y=e.y-85;
         }
-
         if(e.shadow){
           e.shadow.x=e.x;
           e.shadow.y=e.y+3;
         }
-
         return;
       }
-
       if(this.platform==="bottom") e.y=505;
       else if(this.platform==="top") e.y=250;
       else e.y=390;
-
       e.setDepth(e.y);
-
       if(e.hpText){
         e.hpText.x=e.x;
         e.hpText.y=e.y-85;
       }
-
       if(e.shadow){
         e.shadow.x=e.x;
         e.shadow.y=e.y+3;
       }
-
       if(e.busy) return;
-
       const dx=this.player.x-e.x;
       const dy=this.player.y-e.y;
       const dist=Math.abs(dx);
-
       e.setFlipX(dx<0);
-
       if(Math.abs(dy)>45){
         e.setVelocityX(0);
         safePlay(e,"enemy_idle");
         return;
       }
-
       if(dist>70){
         e.setVelocityX(dx>0 ? 55 : -55);
         safePlay(e,"enemy_walk");
@@ -616,7 +503,6 @@ class Game extends Phaser.Scene{
         e.setVelocityX(0);
         e.busy=true;
         safePlay(e,"enemy_punch");
-
         this.time.delayedCall(550,()=>{
           if(!e.dead){
             e.busy=false;
@@ -626,110 +512,80 @@ class Game extends Phaser.Scene{
       }
     });
   }
-
   positionAttackSprite(){
     if(!this.player || !this.attackSprite) return;
-
     const dir=this.player.flipX ? -1 : 1;
-
     this.attackSprite.x=this.player.x + (ATTACK_OFFSET_X * dir);
     this.attackSprite.y=this.player.y + ATTACK_OFFSET_Y + PLAYER_FOOT_Y_OFFSET;
     this.attackSprite.flipX=this.player.flipX;
+    this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
   }
-
   forcePlayerReady(){
     this.playerBusy=false;
     this.isBlocking=false;
-
     if(this.attackSprite){
       this.attackSprite.stop();
       this.attackSprite.setVisible(false);
     }
-
     if(this.player){
       this.player.setVisible(true);
       this.player.body.setVelocity(0,0);
-
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
       else safePlay(this.player,"jt_idle_down");
     }
   }
-
   startAttack(type){
     if(this.playerBusy || this.isClimbing) return;
-
     const data={
       light:["jt_attack_light",8],
       heavy:["jt_attack_heavy",16],
       kick:["jt_kick",11]
     }[type];
-
     if(!data) return;
-
     this.playerBusy=true;
     this.player.body.setVelocity(0,0);
-
     this.positionAttackSprite();
-    this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
     this.attackSprite.setVisible(true);
-
     this.player.setVisible(false);
-
     safePlay(this.attackSprite,data[0]);
-
     this.time.delayedCall(100,()=>this.createHitbox(data));
-
     this.time.delayedCall(420,()=>{
       this.forcePlayerReady();
     });
-
     this.time.delayedCall(700,()=>{
       if(this.playerBusy) this.forcePlayerReady();
     });
   }
-
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
     const boxX=this.player.x + dir*50;
     const boxY=this.player.y - 45;
-
     const box=this.add.rectangle(boxX,boxY,80,50,0xff0000,0).setDepth(999);
     this.physics.add.existing(box);
     box.body.setAllowGravity(false);
-
     const hit=new Set();
-
     this.physics.add.overlap(box,this.enemies,(b,e)=>{
       if(hit.has(e) || e.dead) return;
-
       hit.add(e);
-
       e.health-=data[1];
       e.busy=true;
       e.setVelocityX((e.x<this.player.x ? -1 : 1)*120);
-
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
-
       if(e.health<=0){
         e.health=0;
         e.dead=true;
         e.busy=false;
         e.setVelocityX(0);
         safePlay(e,"enemy_ko");
-
         if(e.hpText) e.hpText.setText("KO");
-
         return;
       }
-
       safePlay(e,"enemy_hurt");
-
       if(e.hpText){
         e.hpText.setText("HP "+e.health);
       }
-
       this.time.delayedCall(300,()=>{
         if(!e.dead){
           e.busy=false;
@@ -737,49 +593,36 @@ class Game extends Phaser.Scene{
         }
       });
     });
-
     this.time.delayedCall(120,()=>{
       if(box && box.destroy) box.destroy();
     });
   }
-
   quickBlock(){
     if(this.playerBusy || this.isClimbing) return;
-
     this.startBlock();
-
     this.time.delayedCall(450,()=>{
       this.forcePlayerReady();
     });
   }
-
   startBlock(){
     if(this.playerBusy || this.isClimbing) return;
-
     this.playerBusy=true;
     this.isBlocking=true;
     this.player.body.setVelocity(0,0);
-
     this.positionAttackSprite();
-    this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
     this.attackSprite.setVisible(true);
-
     this.player.setVisible(false);
     safePlay(this.attackSprite,"jt_block");
-
     this.time.delayedCall(600,()=>{
       if(this.isBlocking) this.forcePlayerReady();
     });
   }
-
   endBlock(){
     if(!this.isBlocking) return;
     this.forcePlayerReady();
   }
-
   addRain(){
     this.rain=this.add.group();
-
     for(let i=0;i<80;i++){
       const r=this.add.rectangle(
         Phaser.Math.Between(0,960),
@@ -789,31 +632,24 @@ class Game extends Phaser.Scene{
         0x77aaff,
         0.32
       ).setDepth(90);
-
       r.speed=Phaser.Math.Between(5,10);
       this.rain.add(r);
     }
   }
-
   updateRain(){
     if(!this.rain) return;
-
     this.rain.children.iterate(r=>{
       if(!r) return;
-
       r.y+=r.speed;
       r.x-=1;
-
       if(r.y>540){
         r.y=0;
         r.x=Phaser.Math.Between(0,960);
       }
     });
   }
-
   addFog(){
     this.fog=this.add.rectangle(480,500,960,200,0x000000,0.16).setDepth(95);
-
     this.tweens.add({
       targets:this.fog,
       alpha:{from:0.12,to:0.22},
@@ -822,45 +658,35 @@ class Game extends Phaser.Scene{
       repeat:-1
     });
   }
-
   makeMobileControls(){
     const bx=115;
     const by=420;
     const r=58;
-
     this.add.circle(bx,by,r,0xffffff,0.16).setDepth(9000);
     const knob=this.add.circle(bx,by,25,0xffffff,0.38).setDepth(9001);
-
     let dragging=false;
-
     const move=p=>{
       let dx=p.x-bx;
       let dy=p.y-by;
       const d=Math.sqrt(dx*dx+dy*dy);
-
       if(d>r){
         dx=dx/d*r;
         dy=dy/d*r;
       }
-
       knob.x=bx+dx;
       knob.y=by+dy;
-
       this.stickX=dx/r;
       this.stickY=dy/r;
     };
-
     this.input.on("pointerdown",p=>{
       if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<95){
         dragging=true;
         move(p);
       }
     });
-
     this.input.on("pointermove",p=>{
       if(dragging) move(p);
     });
-
     this.input.on("pointerup",()=>{
       dragging=false;
       knob.x=bx;
@@ -868,40 +694,31 @@ class Game extends Phaser.Scene{
       this.stickX=0;
       this.stickY=0;
     });
-
     this.mobileButton(820,340,"X",()=>this.startAttack("light"));
     this.mobileButton(760,410,"Y",()=>this.startAttack("heavy"));
     this.mobileButton(880,410,"A",()=>this.startAttack("kick"));
-
     this.mobileButton(820,480,"B",()=>this.quickBlock());
-
     this.mobileButton(700,405,"RUN",()=>{this.mobileRun=true;},()=>{this.mobileRun=false;});
     this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
-
     this.add.text(480,505,"MENU",{
       font:"16px monospace",
       fill:"#fff"
     }).setOrigin(0.5).setDepth(9502);
   }
-
   mobileButton(x,y,label,down,up=null){
     const hit=this.add.circle(x,y,42,0x00ff00,0.01)
       .setInteractive()
       .setDepth(9500);
-
     this.add.circle(x,y,34,0xffffff,0.24).setDepth(9501);
-
     this.add.text(x,y,label,{
       font:"18px monospace",
       fill:"#fff"
     }).setOrigin(0.5).setDepth(9502);
-
     hit.on("pointerdown",()=>{ if(down) down(); });
     hit.on("pointerup",()=>{ if(up) up(); });
     hit.on("pointerout",()=>{ if(up) up(); });
   }
 }
-
 const config={
   type:Phaser.AUTO,
   width:W,
@@ -921,9 +738,7 @@ const config={
   },
   scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
-
 new Phaser.Game(config);
-
 </script>
 </body>
 </html>
