@@ -19,8 +19,8 @@ const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-const ATTACK_FRAME_W = 128;
-const ATTACK_FRAME_H = 128;
+const ATTACK_FRAME_W = 204;
+const ATTACK_FRAME_H = 204;
 const FRAME = 128;
 
 let selectedFighter = "JT";
@@ -525,12 +525,10 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,0);
 
     if(hasAnim(this,data[0])){
-      this.player.play(data[0],true);
-    } else {
-      this.player.setTint(0xff3333);
-      this.cameras.main.shake(80,0.004);
-      this.time.delayedCall(120,()=>this.player.clearTint());
-    }
+  this.player.setScale(1);
+  this.player.play(data[0],true);
+}
+}
 
     this.time.delayedCall(120,()=>this.createHitbox(data));
     this.time.delayedCall(430,()=>this.playerBusy=false);
