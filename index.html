@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 511;
+const VERSION = 512;
 const W = 960;
 const H = 540;
 
@@ -518,28 +518,33 @@ const speed = running ? 260 : 200;
     });
   }
 
-  startAttack(type){
-    if(this.playerBusy || this.isClimbing) return;
+startAttack(type){
+  if(this.playerBusy || this.isClimbing) return;
 
-    const data={
-      light:["jt_attack_light",8,"hit_small"],
-      heavy:["jt_attack_heavy",16,"hit_heavy"],
-      kick:["jt_kick",11,"hit_medium"]
-    }[type];
+  const data={
+    light:["jt_attack_light",8,"hit_small"],
+    heavy:["jt_attack_heavy",16,"hit_heavy"],
+    kick:["jt_kick",11,"hit_medium"]
+  }[type];
 
-    if(!data) return;
+  if(!data) return;
 
-    this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
+  this.playerBusy=true;
+  this.player.body.setVelocity(0,0);
 
-    if(hasAnim(this,data[0])){
-      this.player.play(data[0],true);
-    }
+  console.log("ATTACK:", type, "ANIM EXISTS:", hasAnim(this,data[0]));
 
-    this.time.delayedCall(120,()=>this.createHitbox(data));
-    this.time.delayedCall(430,()=>this.playerBusy=false);
+  if(hasAnim(this,data[0])){
+    this.player.play(data[0],true);
+  } else {
+    this.player.setTint(0xff3333);
+    this.cameras.main.shake(80,0.004);
+    this.time.delayedCall(120,()=>this.player.clearTint());
   }
 
+  this.time.delayedCall(120,()=>this.createHitbox(data));
+  this.time.delayedCall(430,()=>this.playerBusy=false);
+}  
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
 
