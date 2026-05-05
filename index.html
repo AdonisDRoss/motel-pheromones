@@ -20,9 +20,8 @@ const H = 540;
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 
-const ATTACK_FRAME_W = 204;
-const ATTACK_FRAME_H = 204;
-
+const ATTACK_FRAME_W = 128;
+const ATTACK_FRAME_H = 128;
 const FRAME = 128;
 
 let selectedFighter = "JT";
@@ -46,6 +45,11 @@ function loadJT(scene){
     frameWidth: MOVE_FRAME_W,
     frameHeight: MOVE_FRAME_H
   });
+
+ scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION, {
+  frameWidth: 128,
+  frameHeight: 128
+}); 
 
   scene.load.spritesheet("jt_actions", JT_BASE + "/actions.png?v=" + VERSION, {
     frameWidth: FRAME,
