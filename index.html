@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 509;
+const VERSION = 510;
 const W = 960;
 const H = 540;
 
@@ -150,9 +150,14 @@ class Boot extends Phaser.Scene{
 
 class Title extends Phaser.Scene{
   constructor(){ super("Title"); }
+
   create(){
     this.add.image(480,270,"title").setDisplaySize(960,540);
-    this.add.text(480,480,"TAP TO START",{font:"22px monospace",fill:"#ff4fc3"}).setOrigin(0.5).setDepth(10);
+    this.add.text(480,480,"TAP TO START",{
+      font:"22px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(10);
+
     this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
     this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
   }
@@ -160,6 +165,7 @@ class Title extends Phaser.Scene{
 
 class CharacterSelect extends Phaser.Scene{
   constructor(){ super("CharacterSelect"); }
+
   create(){
     this.add.image(480,270,"charSelect").setDisplaySize(960,540);
 
@@ -188,6 +194,7 @@ class CharacterSelect extends Phaser.Scene{
 
 class LevelSelect extends Phaser.Scene{
   constructor(){ super("LevelSelect"); }
+
   create(){
     this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
 
@@ -203,9 +210,10 @@ class LevelSelect extends Phaser.Scene{
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
 
-    this.status=this.add.text(480,505,"TAP A LEVEL",{font:"20px monospace",fill:"#ff4fc3"})
-      .setOrigin(0.5)
-      .setDepth(60);
+    this.status=this.add.text(480,505,"TAP A LEVEL",{
+      font:"20px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(60);
 
     levels.forEach(l=>{
       this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
@@ -254,11 +262,15 @@ class Game extends Phaser.Scene{
     this.add.text(20,20,"CHAR: "+selectedFighter,{font:"16px monospace",fill:"#fff"}).setDepth(1000);
     this.add.text(20,45,"LEVEL: "+selectedLevelName,{font:"16px monospace",fill:"#ff4fc3"}).setDepth(1000);
 
-    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{font:"16px monospace",fill:"#ffff00"})
-      .setOrigin(0.5)
-      .setDepth(1000);
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
+      font:"16px monospace",
+      fill:"#ffff00"
+    }).setOrigin(0.5).setDepth(1000);
 
-    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{font:"16px monospace",fill:"#00eaff"}).setDepth(1000);
+    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
+      font:"16px monospace",
+      fill:"#00eaff"
+    }).setDepth(1000);
 
     this.shadow=this.add.ellipse(470,395,50,14,0x000000,0.4).setDepth(199);
 
@@ -675,21 +687,7 @@ class Game extends Phaser.Scene{
       this.stickX=dx/r;
       this.stickY=dy/r;
     };
-    
-this.button(860,350,"X",()=>this.startAttack("light"));
-this.button(800,420,"Y",()=>this.startAttack("heavy"));
-this.button(920,420,"A",()=>this.startAttack("kick"));
 
-this.button(
-  860,
-  490,
-  "B",
-  ()=>this.startBlock(),
-  ()=>this.endBlock()
-);
-
-this.button(760,350,"SP",()=>this.playAction("jump"));
-this.button(760,500,"E",()=>this.interact());
     this.input.on("pointerdown",p=>{
       if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<85){
         dragging=true;
@@ -709,31 +707,12 @@ this.button(760,500,"E",()=>this.interact());
       this.stickY=0;
     });
 
-    button(x,y,label,down,up=null){
-  const hit = this.add.rectangle(x,y,90,90,0x00ff00,0.12)
-    .setInteractive()
-    .setDepth(3000);
-
-  this.add.circle(x,y,32,0xffffff,0.22)
-    .setDepth(3001);
-
-  this.add.text(x,y,label,{
-    font:"18px monospace",
-    fill:"#fff"
-  }).setOrigin(0.5).setDepth(3002);
-
-  hit.on("pointerdown",()=>{
-    if(down) down();
-  });
-
-  hit.on("pointerup",()=>{
-    if(up) up();
-  });
-
-  hit.on("pointerout",()=>{
-    if(up) up();
-  });
-}
+    this.button(860,350,"X",()=>this.startAttack("light"));
+    this.button(800,420,"Y",()=>this.startAttack("heavy"));
+    this.button(920,420,"A",()=>this.startAttack("kick"));
+    this.button(860,490,"B",()=>this.startBlock(),()=>this.endBlock());
+    this.button(760,350,"SP",()=>this.playAction("jump"));
+    this.button(760,500,"E",()=>this.interact());
 
     this.add.text(480,505,"MENU",{
       font:"16px monospace",
@@ -743,18 +722,28 @@ this.button(760,500,"E",()=>this.interact());
   }
 
   button(x,y,label,down,up=null){
-    const b=this.add.circle(x,y,32,0xffffff,0.22)
+    const hit=this.add.rectangle(x,y,90,90,0x00ff00,0.12)
       .setInteractive()
-      .setDepth(2000);
+      .setDepth(3000);
+
+    this.add.circle(x,y,32,0xffffff,0.22).setDepth(3001);
 
     this.add.text(x,y,label,{
       font:"18px monospace",
       fill:"#fff"
-    }).setOrigin(0.5).setDepth(2001);
+    }).setOrigin(0.5).setDepth(3002);
 
-    b.on("pointerdown",()=>down && down());
-    b.on("pointerup",()=>up && up());
-    b.on("pointerout",()=>up && up());
+    hit.on("pointerdown",()=>{
+      if(down) down();
+    });
+
+    hit.on("pointerup",()=>{
+      if(up) up();
+    });
+
+    hit.on("pointerout",()=>{
+      if(up) up();
+    });
   }
 }
 
