@@ -80,7 +80,7 @@ function loadAssets(scene){
     frameHeight:ATTACK_FRAME_H
   });
 
-  scene.load.spritesheet("corpo_sellout",
+  const e = this.physics.add.image(x, y, "corpo_sellout");
   ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:128,
     frameHeight:128,
