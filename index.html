@@ -34,8 +34,8 @@ const H = 540;
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 
-const ATTACK_FRAME_W = 170;
-const ATTACK_FRAME_H = 170;
+const ATTACK_FRAME_W = 204;
+const ATTACK_FRAME_H = 204;
 
 const PLAYER_MOVE_SCALE = 0.55;
 const PLAYER_ATTACK_SCALE = 0.55;
@@ -375,9 +375,7 @@ class Game extends Phaser.Scene{
   }
 
   playMoveAnim(moving,running){
-    this.player.setTexture("jt_movement");
-    this.player.setScale(PLAYER_MOVE_SCALE);
-
+    
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
@@ -524,36 +522,42 @@ class Game extends Phaser.Scene{
     });
   }
 
-  startAttack(type){
-    if(this.playerBusy || this.isClimbing) return;
+startAttack(type){
+  if(this.playerBusy || this.isClimbing) return;
 
-    const data={
-      light:["jt_attack_light",8],
-      heavy:["jt_attack_heavy",16],
-      kick:["jt_kick",11]
-    }[type];
+  const data={
+    light:["jt_attack_light",8],
+    heavy:["jt_attack_heavy",16],
+    kick:["jt_kick",11]
+  }[type];
 
-    if(!data) return;
+  if(!data) return;
 
-    this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
+  this.playerBusy=true;
+  this.player.body.setVelocity(0,0);
 
-    this.player.setTexture("jt_attacks");
-    this.player.setScale(PLAYER_ATTACK_SCALE);
+  this.player.setTexture("jt_attacks");
+  this.player.setOrigin(0.5,1);
+  this.player.setDisplaySize(96,128);
 
-    if(hasAnim(this,data[0])){
-      this.player.play(data[0],true);
-    }
-
-    this.time.delayedCall(100,()=>this.createHitbox(data));
-
-    this.time.delayedCall(430,()=>{
-      this.player.setTexture("jt_movement");
-      this.player.setScale(PLAYER_MOVE_SCALE);
-      this.playerBusy=false;
-      safePlay(this.player,"jt_idle_down");
-    });
+  if(hasAnim(this,data[0])){
+    this.player.play(data[0],true);
   }
+
+  this.time.delayedCall(100,()=>this.createHitbox(data));
+
+  this.time.delayedCall(430,()=>{
+    this.player.stop();
+    this.player.setTexture("jt_movement");
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(PLAYER_MOVE_SCALE);
+    this.playerBusy=false;
+    safePlay(this.player,"jt_idle_down");
+  });
+
+    
+      
+  
 
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
