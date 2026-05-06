@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 579;
+const VERSION = 580;
 const W = 960;
 const H = 540;
 
@@ -40,15 +40,15 @@ const PLAYER_REACTION_SCALE = 0.44;
 const ENEMY_SCALE = 0.55;
 
 /*
-BUILD 579 TEST:
-These values are intentionally extreme.
-If attacks do NOT move big/up/large, your browser is still loading old code.
+Normal attack alignment.
+originY: 1 keeps attack frames bottom-anchored.
+x/y nudge keeps JT's attack body lined up with movement sprite.
 */
 const ATTACK_NUDGE = {
-  light: {x: -80, y: -40, scale: 0.60, originY: 1},
-  heavy: {x: -80, y: -40, scale: 0.60, originY: 1},
-  kick:  {x: -80, y: -40, scale: 0.60, originY: 1},
-  block: {x: -80, y: -40, scale: 0.60, originY: 1}
+  light: {x: -8,  y: -2, scale: 0.44, originY: 1},
+  heavy: {x: -10, y: -2, scale: 0.44, originY: 1},
+  kick:  {x: -6,  y: 0,  scale: 0.44, originY: 1},
+  block: {x: 0,   y: 0,  scale: 0.44, originY: 1}
 };
 
 let selectedFighter = "JT";
@@ -348,12 +348,6 @@ class Game extends Phaser.Scene{
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setDepth(1000);
-
-    this.add.text(20,120,"BUILD 579 - ATTACK OFFSET TEST",{
-      font:"14px monospace",
-      fill:"#00ff00",
-      backgroundColor:"#000000"
-    }).setDepth(10000);
 
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
