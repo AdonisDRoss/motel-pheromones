@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 576;
+const VERSION = 578;
 const W = 960;
 const H = 540;
 
@@ -889,15 +889,12 @@ class Game extends Phaser.Scene{
   positionAttackSprite(type="light"){
   if(!this.player || !this.poseSprite) return;
 
-  const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
-  const dir=this.player.flipX ? -1 : 1;
-
-  this.poseSprite.x=this.player.x + (nudge.x * dir);
-  this.poseSprite.y=this.player.y + nudge.y;
-  this.poseSprite.flipX=this.player.flipX;
-  this.poseSprite.setOrigin(0.5,nudge.originY);
-  this.poseSprite.setScale(nudge.scale);
-}
+    const ATTACK_NUDGE = {
+  light: {x: -8, y: -2, scale: 0.44, originY: 1},
+  heavy: {x: -10, y: -2, scale: 0.44, originY: 1},
+  kick:  {x: -6, y: 0, scale: 0.44, originY: 1},
+  block: {x: 0, y: 0, scale: 0.44, originY: 1}
+};
 
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
