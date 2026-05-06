@@ -13,34 +13,9 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 578;
+const VERSION = 579;
 const W = 960;
 const H = 540;
-
-/*
-FILE SETUP:
-
-assets/sprites/player/jt/movement.png
-- 204x170 frames
-
-assets/sprites/player/jt/attacks/jt_attacks.png
-- 204x170 frames
-- 4 columns x 4 rows
-- 816x680 total
-
-assets/sprites/player/jt/actions/jt_actions.png
-- 284x236 frames
-- 4 columns x 4 rows
-- 1136x944 total
-
-assets/sprites/player/jt/reactions/jt_reactions.png
-- 284x236 frames
-- 4 columns x 4 rows
-- 1136x944 total
-
-assets/sprites/enemies/corpo_sellout.png
-- 128x128 frames
-*/
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
@@ -65,15 +40,15 @@ const PLAYER_REACTION_SCALE = 0.44;
 const ENEMY_SCALE = 0.55;
 
 /*
-Attack alignment fix.
-Positive Y moves the attack sprite DOWN.
-Negative X pulls JT's attack body slightly back toward his standing position.
+BUILD 579 TEST:
+These values are intentionally extreme.
+If attacks do NOT move big/up/large, your browser is still loading old code.
 */
 const ATTACK_NUDGE = {
-  light: {x: -10, y: 8, scale: 0.44, originY: 0.86},
-  heavy: {x: -12, y: 8, scale: 0.44, originY: 0.86},
-  kick:  {x: -8,  y: 10, scale: 0.44, originY: 0.86},
-  block: {x: -2,  y: 8, scale: 0.44, originY: 0.86}
+  light: {x: -80, y: -40, scale: 0.60, originY: 1},
+  heavy: {x: -80, y: -40, scale: 0.60, originY: 1},
+  kick:  {x: -80, y: -40, scale: 0.60, originY: 1},
+  block: {x: -80, y: -40, scale: 0.60, originY: 1}
 };
 
 let selectedFighter = "JT";
@@ -373,6 +348,12 @@ class Game extends Phaser.Scene{
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setDepth(1000);
+
+    this.add.text(20,120,"BUILD 579 - ATTACK OFFSET TEST",{
+      font:"14px monospace",
+      fill:"#00ff00",
+      backgroundColor:"#000000"
+    }).setDepth(10000);
 
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
@@ -887,14 +868,17 @@ class Game extends Phaser.Scene{
   }
 
   positionAttackSprite(type="light"){
-  if(!this.player || !this.poseSprite) return;
+    if(!this.player || !this.poseSprite) return;
 
-    const ATTACK_NUDGE = {
-  light: {x: -8, y: -2, scale: 0.44, originY: 1},
-  heavy: {x: -10, y: -2, scale: 0.44, originY: 1},
-  kick:  {x: -6, y: 0, scale: 0.44, originY: 1},
-  block: {x: 0, y: 0, scale: 0.44, originY: 1}
-};
+    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
+    const dir=this.player.flipX ? -1 : 1;
+
+    this.poseSprite.x=this.player.x + (nudge.x * dir);
+    this.poseSprite.y=this.player.y + nudge.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,nudge.originY);
+    this.poseSprite.setScale(nudge.scale);
+  }
 
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
