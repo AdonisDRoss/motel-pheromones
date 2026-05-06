@@ -13,9 +13,34 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 573;
+const VERSION = 574;
 const W = 960;
 const H = 540;
+
+/*
+FILE SETUP:
+
+assets/sprites/player/jt/movement.png
+- 204x170 frames
+
+assets/sprites/player/jt/attacks/jt_attacks.png
+- 204x170 frames
+- 4 columns x 4 rows
+- 816x680 total
+
+assets/sprites/player/jt/actions/jt_actions.png
+- 284x236 frames
+- 4 columns x 4 rows
+- 1136x944 total
+
+assets/sprites/player/jt/reactions/jt_reactions.png
+- 284x236 frames
+- 4 columns x 4 rows
+- 1136x944 total
+
+assets/sprites/enemies/corpo_sellout.png
+- 128x128 frames
+*/
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
@@ -23,11 +48,11 @@ const MOVE_FRAME_H = 170;
 const ATTACK_FRAME_W = 204;
 const ATTACK_FRAME_H = 170;
 
-const ACTION_FRAME_W = 204;
-const ACTION_FRAME_H = 170;
+const ACTION_FRAME_W = 284;
+const ACTION_FRAME_H = 236;
 
-const REACTION_FRAME_W = 204;
-const REACTION_FRAME_H = 170;
+const REACTION_FRAME_W = 284;
+const REACTION_FRAME_H = 236;
 
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
@@ -131,16 +156,40 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
+  /*
+  JT attacks:
+  204x170 frames
+  Row 1: 0-3 light
+  Row 2: 4-7 heavy
+  Row 3: 8-11 kick
+  Row 4: 12-15 block
+  */
   makeAnim(scene,"jt_attack_light","jt_attacks",0,3,14,0);
   makeAnim(scene,"jt_attack_heavy","jt_attacks",4,7,12,0);
   makeAnim(scene,"jt_kick","jt_attacks",8,11,13,0);
   makeAnim(scene,"jt_block","jt_attacks",12,15,8,-1);
 
+  /*
+  JT actions:
+  284x236 frames
+  Row 1: 0-3 climb
+  Row 2: 4-7 crouch / ready
+  Row 3: 8-11 taunt / point
+  Row 4: 12-15 special / guard
+  */
   makeAnim(scene,"jt_climb","jt_actions",0,3,8,-1);
   makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
   makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
   makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
 
+  /*
+  JT reactions:
+  284x236 frames
+  Row 1: 0-3 hurt
+  Row 2: 4-7 knockback
+  Row 3: 8-11 KO
+  Row 4: 12-15 get up
+  */
   makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
   makeAnim(scene,"jt_knockback","jt_reactions",4,7,8,0);
   makeAnim(scene,"jt_ko","jt_reactions",8,11,6,0);
@@ -377,7 +426,7 @@ class Game extends Phaser.Scene{
 
     this.input.keyboard.on("keydown-C",()=>this.playPlayerPose("jt_crouch",450,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-T",()=>this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE));
-    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose("jt_victory",900,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-I",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
   }
 
@@ -534,13 +583,7 @@ class Game extends Phaser.Scene{
     this.playerBusy=false;
     this.player.body.setVelocity(0,0);
     this.player.x=ladder.x;
-
-    if(hasAnim(this,"jt_climb")){
-      safePlay(this.player,"jt_idle_up");
-    }else{
-      safePlay(this.player,"jt_idle_up");
-    }
-
+    safePlay(this.player,"jt_idle_up");
     this.zoneText.setText("CLIMBING LADDER");
   }
 
@@ -621,7 +664,6 @@ class Game extends Phaser.Scene{
     e.stopRange=58;
     e.chaseSpeed=65;
     e.knockbackTime=0;
-    e.preferredOffset=Phaser.Math.Between(-28,28);
 
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
 
@@ -777,13 +819,14 @@ class Game extends Phaser.Scene{
     });
   }
 
-  showPose(animKey,scale){
+  showPose(animKey,scale=PLAYER_ACTION_SCALE,yOffset=0){
     if(!this.player || !this.poseSprite) return false;
     if(!hasAnim(this,animKey)) return false;
 
     this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
+    this.poseSprite.y=this.player.y + yOffset;
     this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(scale);
     this.poseSprite.setVisible(true);
 
@@ -866,6 +909,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.x=this.player.x + (ATTACK_OFFSET_X * dir);
     this.poseSprite.y=this.player.y + ATTACK_OFFSET_Y;
     this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
   }
 
