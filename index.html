@@ -13,20 +13,32 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 570;
+const VERSION = 573;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 
+const ATTACK_FRAME_W = 204;
+const ATTACK_FRAME_H = 170;
+
+const ACTION_FRAME_W = 204;
+const ACTION_FRAME_H = 170;
+
+const REACTION_FRAME_W = 204;
+const REACTION_FRAME_H = 170;
+
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
-let ACTIVE_ATTACK_SCALE = 0.44;
-let ACTIVE_ATTACK_OFFSET_X = 0;
-let ACTIVE_ATTACK_OFFSET_Y = 0;
+const PLAYER_ATTACK_SCALE = 0.44;
+const PLAYER_ACTION_SCALE = 0.44;
+const PLAYER_REACTION_SCALE = 0.44;
+
+const ATTACK_OFFSET_X = 0;
+const ATTACK_OFFSET_Y = 0;
 
 const ENEMY_SCALE = 0.55;
 
@@ -34,10 +46,6 @@ let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 
-/* Correct GitHub path:
-   assets/sprites/player/jt/movement.png
-   assets/sprites/player/jt/attacks/jt_attacks.png
-*/
 const JT_BASE = "assets/sprites/player/jt";
 const ENEMY_BASE = "assets/sprites/enemies";
 
@@ -56,10 +64,10 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(hasAnim(scene,key)) return;
 
   scene.anims.create({
-    key,
-    frames:scene.anims.generateFrameNumbers(sheet,{start,end}),
+    key:key,
+    frames:scene.anims.generateFrameNumbers(sheet,{start:start,end:end}),
     frameRate:rate,
-    repeat
+    repeat:repeat
   });
 }
 
@@ -81,7 +89,26 @@ function loadAssets(scene){
     spacing:0
   });
 
-  scene.load.image("jt_attacks_raw", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION);
+  scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
+    frameWidth:ATTACK_FRAME_W,
+    frameHeight:ATTACK_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_actions", JT_BASE + "/actions/jt_actions.png?v=" + VERSION,{
+    frameWidth:ACTION_FRAME_W,
+    frameHeight:ACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_reactions", JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
+    frameWidth:REACTION_FRAME_W,
+    frameHeight:REACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
 
   scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
@@ -89,49 +116,6 @@ function loadAssets(scene){
     margin:0,
     spacing:0
   });
-}
-
-function registerAttackSheet(scene){
-  if(!hasTex(scene,"jt_attacks_raw")) return;
-
-  const raw = scene.textures.get("jt_attacks_raw").getSourceImage();
-  let frameW = 204;
-  let frameH = 170;
-
-  if(raw.width % 204 === 0 && raw.height % 170 === 0){
-    frameW = 204;
-    frameH = 170;
-    ACTIVE_ATTACK_SCALE = 0.44;
-    ACTIVE_ATTACK_OFFSET_X = 0;
-    ACTIVE_ATTACK_OFFSET_Y = 0;
-  }
-  else if(raw.width % 128 === 0 && raw.height % 128 === 0){
-    frameW = 128;
-    frameH = 128;
-    ACTIVE_ATTACK_SCALE = 0.58;
-    ACTIVE_ATTACK_OFFSET_X = 24;
-    ACTIVE_ATTACK_OFFSET_Y = 0;
-  }
-  else{
-    frameW = 204;
-    frameH = 170;
-    ACTIVE_ATTACK_SCALE = 0.44;
-    ACTIVE_ATTACK_OFFSET_X = 0;
-    ACTIVE_ATTACK_OFFSET_Y = 0;
-  }
-
-  if(hasTex(scene,"jt_attacks")){
-    scene.textures.remove("jt_attacks");
-  }
-
-  scene.textures.addSpriteSheet("jt_attacks", raw, {
-    frameWidth:frameW,
-    frameHeight:frameH,
-    margin:0,
-    spacing:0
-  });
-
-  console.log("JT attack sheet:", raw.width+"x"+raw.height, "frames:", frameW+"x"+frameH);
 }
 
 function createAllAnims(scene){
@@ -147,10 +131,20 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
-  makeAnim(scene,"jt_attack_light","jt_attacks",1,3,14,0);
-  makeAnim(scene,"jt_attack_heavy","jt_attacks",5,8,12,0);
-  makeAnim(scene,"jt_kick","jt_attacks",10,12,13,0);
-  makeAnim(scene,"jt_block","jt_attacks",20,22,8,-1);
+  makeAnim(scene,"jt_attack_light","jt_attacks",0,3,14,0);
+  makeAnim(scene,"jt_attack_heavy","jt_attacks",4,7,12,0);
+  makeAnim(scene,"jt_kick","jt_attacks",8,11,13,0);
+  makeAnim(scene,"jt_block","jt_attacks",12,15,8,-1);
+
+  makeAnim(scene,"jt_climb","jt_actions",0,3,8,-1);
+  makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
+  makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
+  makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
+
+  makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
+  makeAnim(scene,"jt_knockback","jt_reactions",4,7,8,0);
+  makeAnim(scene,"jt_ko","jt_reactions",8,11,6,0);
+  makeAnim(scene,"jt_getup","jt_reactions",12,15,8,0);
 
   makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
   makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
@@ -168,7 +162,6 @@ class Boot extends Phaser.Scene{
   }
 
   create(){
-    registerAttackSheet(this);
     createAllAnims(this);
     this.scene.start("Title");
   }
@@ -359,11 +352,13 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,0);
     safePlay(this.player,"jt_idle_down");
 
-    this.attackSprite=this.add.sprite(470,390,"jt_attacks");
-    this.attackSprite.setOrigin(0.5,1);
-    this.attackSprite.setScale(ACTIVE_ATTACK_SCALE);
-    this.attackSprite.setDepth(201);
-    this.attackSprite.setVisible(false);
+    this.poseSprite=this.add.sprite(470,390,"jt_attacks");
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.poseSprite.setDepth(201);
+    this.poseSprite.setVisible(false);
+
+    this.attackSprite=this.poseSprite;
 
     this.createPlatformZones();
     this.createEnemies();
@@ -379,6 +374,11 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-L",()=>this.startBlock());
     this.input.keyboard.on("keyup-L",()=>this.endBlock());
     this.input.keyboard.on("keydown-SPACE",()=>this.startAttack("heavy"));
+
+    this.input.keyboard.on("keydown-C",()=>this.playPlayerPose("jt_crouch",450,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose("jt_victory",900,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-I",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
   }
 
   makeKeyboard(){
@@ -534,7 +534,13 @@ class Game extends Phaser.Scene{
     this.playerBusy=false;
     this.player.body.setVelocity(0,0);
     this.player.x=ladder.x;
-    safePlay(this.player,"jt_idle_up");
+
+    if(hasAnim(this,"jt_climb")){
+      safePlay(this.player,"jt_idle_up");
+    }else{
+      safePlay(this.player,"jt_idle_up");
+    }
+
     this.zoneText.setText("CLIMBING LADDER");
   }
 
@@ -771,6 +777,40 @@ class Game extends Phaser.Scene{
     });
   }
 
+  showPose(animKey,scale){
+    if(!this.player || !this.poseSprite) return false;
+    if(!hasAnim(this,animKey)) return false;
+
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setScale(scale);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+    safePlay(this.poseSprite,animKey);
+
+    return true;
+  }
+
+  playPlayerPose(animKey,duration=420,scale=PLAYER_ACTION_SCALE){
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    const played=this.showPose(animKey,scale);
+
+    if(!played){
+      this.forcePlayerReady();
+      return;
+    }
+
+    this.time.delayedCall(duration,()=>{
+      this.forcePlayerReady();
+    });
+  }
+
   damagePlayer(amount,dir){
     if(this.playerHealth<=0) return;
     if(this.playerInvuln>0) return;
@@ -784,31 +824,49 @@ class Game extends Phaser.Scene{
     this.playerHealth=Math.max(0,this.playerHealth-finalDamage);
     this.playerInvuln=650;
 
-    if(this.player){
-      this.player.setTint(0xff4444);
-      this.player.body.setVelocityX(dir*90);
-
-      this.time.delayedCall(120,()=>{
-        if(this.player) this.player.clearTint();
-      });
-    }
-
     if(this.playerHealth<=0){
       this.playerHealth=0;
       this.playerBusy=true;
       this.player.body.setVelocity(0,0);
+
+      if(hasAnim(this,"jt_ko")){
+        this.showPose("jt_ko",PLAYER_REACTION_SCALE);
+      }else{
+        this.player.setTint(0xff4444);
+      }
+
+      return;
+    }
+
+    if(this.player){
+      this.player.body.setVelocityX(dir*90);
+
+      if(hasAnim(this,"jt_hurt")){
+        this.playerBusy=true;
+        this.showPose("jt_hurt",PLAYER_REACTION_SCALE);
+
+        this.time.delayedCall(300,()=>{
+          this.forcePlayerReady();
+        });
+      }else{
+        this.player.setTint(0xff4444);
+
+        this.time.delayedCall(120,()=>{
+          if(this.player) this.player.clearTint();
+        });
+      }
     }
   }
 
   positionAttackSprite(){
-    if(!this.player || !this.attackSprite) return;
+    if(!this.player || !this.poseSprite) return;
 
     const dir=this.player.flipX ? -1 : 1;
 
-    this.attackSprite.x=this.player.x + (ACTIVE_ATTACK_OFFSET_X * dir);
-    this.attackSprite.y=this.player.y + ACTIVE_ATTACK_OFFSET_Y;
-    this.attackSprite.flipX=this.player.flipX;
-    this.attackSprite.setScale(ACTIVE_ATTACK_SCALE);
+    this.poseSprite.x=this.player.x + (ATTACK_OFFSET_X * dir);
+    this.poseSprite.y=this.player.y + ATTACK_OFFSET_Y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
   }
 
   forcePlayerReady(){
@@ -817,9 +875,9 @@ class Game extends Phaser.Scene{
     this.playerBusy=false;
     this.isBlocking=false;
 
-    if(this.attackSprite){
-      this.attackSprite.stop();
-      this.attackSprite.setVisible(false);
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
     }
 
     if(this.player){
@@ -848,10 +906,10 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,0);
 
     this.positionAttackSprite();
-    this.attackSprite.setVisible(true);
+    this.poseSprite.setVisible(true);
     this.player.setVisible(false);
 
-    safePlay(this.attackSprite,data[0]);
+    safePlay(this.poseSprite,data[0]);
 
     this.time.delayedCall(100,()=>this.createHitbox(data));
 
@@ -941,10 +999,10 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,0);
 
     this.positionAttackSprite();
-    this.attackSprite.setVisible(true);
+    this.poseSprite.setVisible(true);
 
     this.player.setVisible(false);
-    safePlay(this.attackSprite,"jt_block");
+    safePlay(this.poseSprite,"jt_block");
 
     this.time.delayedCall(600,()=>{
       if(this.isBlocking) this.forcePlayerReady();
