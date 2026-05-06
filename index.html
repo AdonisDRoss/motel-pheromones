@@ -70,10 +70,10 @@ Positive Y moves the attack sprite DOWN.
 Negative X pulls JT's attack body slightly back toward his standing position.
 */
 const ATTACK_NUDGE = {
-  light: {x: -6, y: 2, scale: 0.44},
-  heavy: {x: -8, y: 2, scale: 0.44},
-  kick:  {x: -4, y: 4, scale: 0.44},
-  block: {x: 0,  y: 2, scale: 0.44}
+  light: {x: -10, y: 8, scale: 0.44, originY: 0.86},
+  heavy: {x: -12, y: 8, scale: 0.44, originY: 0.86},
+  kick:  {x: -8,  y: 10, scale: 0.44, originY: 0.86},
+  block: {x: -2,  y: 8, scale: 0.44, originY: 0.86}
 };
 
 let selectedFighter = "JT";
@@ -887,17 +887,17 @@ class Game extends Phaser.Scene{
   }
 
   positionAttackSprite(type="light"){
-    if(!this.player || !this.poseSprite) return;
+  if(!this.player || !this.poseSprite) return;
 
-    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
-    const dir=this.player.flipX ? -1 : 1;
+  const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
+  const dir=this.player.flipX ? -1 : 1;
 
-    this.poseSprite.x=this.player.x + (nudge.x * dir);
-    this.poseSprite.y=this.player.y + nudge.y;
-    this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(nudge.scale);
-  }
+  this.poseSprite.x=this.player.x + (nudge.x * dir);
+  this.poseSprite.y=this.player.y + nudge.y;
+  this.poseSprite.flipX=this.player.flipX;
+  this.poseSprite.setOrigin(0.5,nudge.originY);
+  this.poseSprite.setScale(nudge.scale);
+}
 
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
