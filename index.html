@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 569;
+const VERSION = 570;
 const W = 960;
 const H = 540;
 
@@ -34,9 +34,11 @@ let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 
-/* Updated to match your GitHub path:
-   assets/sprites/jt/attacks/attacks.png */
-const JT_BASE = "assets/sprites/jt";
+/* Correct GitHub path:
+   assets/sprites/player/jt/movement.png
+   assets/sprites/player/jt/attacks/jt_attacks.png
+*/
+const JT_BASE = "assets/sprites/player/jt";
 const ENEMY_BASE = "assets/sprites/enemies";
 
 function hasTex(scene,key){ return scene.textures.exists(key); }
@@ -79,8 +81,7 @@ function loadAssets(scene){
     spacing:0
   });
 
-  /* Load attack image raw first so we can detect 204x170 vs 128x128 */
-  scene.load.image("jt_attacks_raw", JT_BASE + "/attacks/attacks.png?v=" + VERSION);
+  scene.load.image("jt_attacks_raw", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION);
 
   scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
@@ -97,7 +98,6 @@ function registerAttackSheet(scene){
   let frameW = 204;
   let frameH = 170;
 
-  /* Best case: new corrected sheet */
   if(raw.width % 204 === 0 && raw.height % 170 === 0){
     frameW = 204;
     frameH = 170;
@@ -105,7 +105,6 @@ function registerAttackSheet(scene){
     ACTIVE_ATTACK_OFFSET_X = 0;
     ACTIVE_ATTACK_OFFSET_Y = 0;
   }
-  /* Backup: old 128x128 sheet */
   else if(raw.width % 128 === 0 && raw.height % 128 === 0){
     frameW = 128;
     frameH = 128;
@@ -113,7 +112,6 @@ function registerAttackSheet(scene){
     ACTIVE_ATTACK_OFFSET_X = 24;
     ACTIVE_ATTACK_OFFSET_Y = 0;
   }
-  /* Fallback: try 204x170 because that is the intended final system */
   else{
     frameW = 204;
     frameH = 170;
