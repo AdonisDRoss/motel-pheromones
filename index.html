@@ -13,31 +13,30 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 566;
+const VERSION = 569;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-const ATTACK_FRAME_W = 128;
-const ATTACK_FRAME_H = 128;
+
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
-const PLAYER_ATTACK_SCALE = 0.58;
-const ENEMY_SCALE = 0.55;
+let ACTIVE_ATTACK_SCALE = 0.44;
+let ACTIVE_ATTACK_OFFSET_X = 0;
+let ACTIVE_ATTACK_OFFSET_Y = 0;
 
-/* Current 128x128 JT attack alignment */
-const PLAYER_FOOT_Y_OFFSET = 0;
-const ATTACK_OFFSET_X = 24;
-const ATTACK_OFFSET_Y = 0;
+const ENEMY_SCALE = 0.55;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 
-const JT_BASE = "assets/sprites/player/jt";
+/* Updated to match your GitHub path:
+   assets/sprites/jt/attacks/attacks.png */
+const JT_BASE = "assets/sprites/jt";
 const ENEMY_BASE = "assets/sprites/enemies";
 
 function hasTex(scene,key){ return scene.textures.exists(key); }
@@ -75,13 +74,13 @@ function loadAssets(scene){
 
   scene.load.spritesheet("jt_movement", JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
-    frameHeight:MOVE_FRAME_H
+    frameHeight:MOVE_FRAME_H,
+    margin:0,
+    spacing:0
   });
 
-  scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
-    frameWidth:ATTACK_FRAME_W,
-    frameHeight:ATTACK_FRAME_H
-  });
+  /* Load attack image raw first so we can detect 204x170 vs 128x128 */
+  scene.load.image("jt_attacks_raw", JT_BASE + "/attacks/attacks.png?v=" + VERSION);
 
   scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
@@ -89,6 +88,52 @@ function loadAssets(scene){
     margin:0,
     spacing:0
   });
+}
+
+function registerAttackSheet(scene){
+  if(!hasTex(scene,"jt_attacks_raw")) return;
+
+  const raw = scene.textures.get("jt_attacks_raw").getSourceImage();
+  let frameW = 204;
+  let frameH = 170;
+
+  /* Best case: new corrected sheet */
+  if(raw.width % 204 === 0 && raw.height % 170 === 0){
+    frameW = 204;
+    frameH = 170;
+    ACTIVE_ATTACK_SCALE = 0.44;
+    ACTIVE_ATTACK_OFFSET_X = 0;
+    ACTIVE_ATTACK_OFFSET_Y = 0;
+  }
+  /* Backup: old 128x128 sheet */
+  else if(raw.width % 128 === 0 && raw.height % 128 === 0){
+    frameW = 128;
+    frameH = 128;
+    ACTIVE_ATTACK_SCALE = 0.58;
+    ACTIVE_ATTACK_OFFSET_X = 24;
+    ACTIVE_ATTACK_OFFSET_Y = 0;
+  }
+  /* Fallback: try 204x170 because that is the intended final system */
+  else{
+    frameW = 204;
+    frameH = 170;
+    ACTIVE_ATTACK_SCALE = 0.44;
+    ACTIVE_ATTACK_OFFSET_X = 0;
+    ACTIVE_ATTACK_OFFSET_Y = 0;
+  }
+
+  if(hasTex(scene,"jt_attacks")){
+    scene.textures.remove("jt_attacks");
+  }
+
+  scene.textures.addSpriteSheet("jt_attacks", raw, {
+    frameWidth:frameW,
+    frameHeight:frameH,
+    margin:0,
+    spacing:0
+  });
+
+  console.log("JT attack sheet:", raw.width+"x"+raw.height, "frames:", frameW+"x"+frameH);
 }
 
 function createAllAnims(scene){
@@ -125,6 +170,7 @@ class Boot extends Phaser.Scene{
   }
 
   create(){
+    registerAttackSheet(this);
     createAllAnims(this);
     this.scene.start("Title");
   }
@@ -317,7 +363,7 @@ class Game extends Phaser.Scene{
 
     this.attackSprite=this.add.sprite(470,390,"jt_attacks");
     this.attackSprite.setOrigin(0.5,1);
-    this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.attackSprite.setScale(ACTIVE_ATTACK_SCALE);
     this.attackSprite.setDepth(201);
     this.attackSprite.setVisible(false);
 
@@ -546,7 +592,6 @@ class Game extends Phaser.Scene{
 
   createEnemies(){
     this.enemies=this.physics.add.group();
-
     this.spawnEnemy(640,390);
     this.spawnEnemy(830,390);
   }
@@ -560,6 +605,7 @@ class Game extends Phaser.Scene{
     e.setDepth(210);
     e.body.setAllowGravity(false);
     e.body.setVelocity(0,0);
+    e.setCollideWorldBounds(true);
 
     e.health=30;
     e.dead=false;
@@ -663,10 +709,8 @@ class Game extends Phaser.Scene{
 
       if(dist>e.stopRange){
         e.state="chase";
-
         let chaseDir=dx>0 ? 1 : -1;
         e.setVelocityX(chaseDir*e.chaseSpeed);
-
         safePlay(e,"enemy_walk");
       }else{
         e.state="idle";
@@ -763,10 +807,10 @@ class Game extends Phaser.Scene{
 
     const dir=this.player.flipX ? -1 : 1;
 
-    this.attackSprite.x=this.player.x + (ATTACK_OFFSET_X * dir);
-    this.attackSprite.y=this.player.y + ATTACK_OFFSET_Y + PLAYER_FOOT_Y_OFFSET;
+    this.attackSprite.x=this.player.x + (ACTIVE_ATTACK_OFFSET_X * dir);
+    this.attackSprite.y=this.player.y + ACTIVE_ATTACK_OFFSET_Y;
     this.attackSprite.flipX=this.player.flipX;
-    this.attackSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.attackSprite.setScale(ACTIVE_ATTACK_SCALE);
   }
 
   forcePlayerReady(){
@@ -782,6 +826,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
+      this.player.clearTint();
       this.player.body.setVelocity(0,0);
 
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
@@ -806,7 +851,6 @@ class Game extends Phaser.Scene{
 
     this.positionAttackSprite();
     this.attackSprite.setVisible(true);
-
     this.player.setVisible(false);
 
     safePlay(this.attackSprite,data[0]);
