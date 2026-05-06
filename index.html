@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 574;
+const VERSION = 575;
 const W = 960;
 const H = 540;
 
@@ -62,10 +62,20 @@ const PLAYER_ATTACK_SCALE = 0.44;
 const PLAYER_ACTION_SCALE = 0.44;
 const PLAYER_REACTION_SCALE = 0.44;
 
-const ATTACK_OFFSET_X = 0;
-const ATTACK_OFFSET_Y = 0;
-
 const ENEMY_SCALE = 0.55;
+
+/*
+Attack alignment fix.
+Negative Y moves the attack sprite UP.
+Positive Y moves it DOWN.
+Positive X pushes forward in both directions.
+*/
+const ATTACK_NUDGE = {
+  light: {x: 0, y: -6, scale: 0.44},
+  heavy: {x: 0, y: -8, scale: 0.44},
+  kick:  {x: 0, y: -4, scale: 0.44},
+  block: {x: 0, y: -4, scale: 0.44}
+};
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -156,40 +166,16 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
   makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
 
-  /*
-  JT attacks:
-  204x170 frames
-  Row 1: 0-3 light
-  Row 2: 4-7 heavy
-  Row 3: 8-11 kick
-  Row 4: 12-15 block
-  */
   makeAnim(scene,"jt_attack_light","jt_attacks",0,3,14,0);
   makeAnim(scene,"jt_attack_heavy","jt_attacks",4,7,12,0);
   makeAnim(scene,"jt_kick","jt_attacks",8,11,13,0);
   makeAnim(scene,"jt_block","jt_attacks",12,15,8,-1);
 
-  /*
-  JT actions:
-  284x236 frames
-  Row 1: 0-3 climb
-  Row 2: 4-7 crouch / ready
-  Row 3: 8-11 taunt / point
-  Row 4: 12-15 special / guard
-  */
   makeAnim(scene,"jt_climb","jt_actions",0,3,8,-1);
   makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
   makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
   makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
 
-  /*
-  JT reactions:
-  284x236 frames
-  Row 1: 0-3 hurt
-  Row 2: 4-7 knockback
-  Row 3: 8-11 KO
-  Row 4: 12-15 get up
-  */
   makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
   makeAnim(scene,"jt_knockback","jt_reactions",4,7,8,0);
   makeAnim(scene,"jt_ko","jt_reactions",8,11,6,0);
@@ -901,16 +887,17 @@ class Game extends Phaser.Scene{
     }
   }
 
-  positionAttackSprite(){
+  positionAttackSprite(type="light"){
     if(!this.player || !this.poseSprite) return;
 
+    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
     const dir=this.player.flipX ? -1 : 1;
 
-    this.poseSprite.x=this.player.x + (ATTACK_OFFSET_X * dir);
-    this.poseSprite.y=this.player.y + ATTACK_OFFSET_Y;
+    this.poseSprite.x=this.player.x + (nudge.x * dir);
+    this.poseSprite.y=this.player.y + nudge.y;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.poseSprite.setScale(nudge.scale);
   }
 
   forcePlayerReady(){
@@ -949,7 +936,7 @@ class Game extends Phaser.Scene{
     this.playerBusy=true;
     this.player.body.setVelocity(0,0);
 
-    this.positionAttackSprite();
+    this.positionAttackSprite(type);
     this.poseSprite.setVisible(true);
     this.player.setVisible(false);
 
@@ -1042,7 +1029,7 @@ class Game extends Phaser.Scene{
     this.isBlocking=true;
     this.player.body.setVelocity(0,0);
 
-    this.positionAttackSprite();
+    this.positionAttackSprite("block");
     this.poseSprite.setVisible(true);
 
     this.player.setVisible(false);
