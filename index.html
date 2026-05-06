@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 575;
+const VERSION = 576;
 const W = 960;
 const H = 540;
 
@@ -66,15 +66,14 @@ const ENEMY_SCALE = 0.55;
 
 /*
 Attack alignment fix.
-Negative Y moves the attack sprite UP.
-Positive Y moves it DOWN.
-Positive X pushes forward in both directions.
+Positive Y moves the attack sprite DOWN.
+Negative X pulls JT's attack body slightly back toward his standing position.
 */
 const ATTACK_NUDGE = {
-  light: {x: 0, y: -6, scale: 0.44},
-  heavy: {x: 0, y: -8, scale: 0.44},
-  kick:  {x: 0, y: -4, scale: 0.44},
-  block: {x: 0, y: -4, scale: 0.44}
+  light: {x: -6, y: 2, scale: 0.44},
+  heavy: {x: -8, y: 2, scale: 0.44},
+  kick:  {x: -4, y: 4, scale: 0.44},
+  block: {x: 0,  y: 2, scale: 0.44}
 };
 
 let selectedFighter = "JT";
