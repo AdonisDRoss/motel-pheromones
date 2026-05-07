@@ -1,4 +1,8 @@
-Paste this over index.html. This is VERSION 643 with run animation disabled for testing.
+He was attacking before because the hitbox part worked, but now the attack animation layer is locking him.
+
+Your code hides JT and shows poseSprite during attacks. If jt_attacks.png is cut wrong, frame size is off, or the animation key fails, JT can get stuck hidden or stuck in an action state. This update keeps JT visible and lets attacks hit without depending on the attack animation sheet. Once it stops freezing, we’ll know the problem is the attack sheet/pose layer.
+
+Paste this over index.html.
 
 <!DOCTYPE html>
 <html>
@@ -32,7 +36,7 @@ window.addEventListener("error",function(e){
   window.__MP_LAST_ERROR = e.message || String(e);
   console.error("Motel runtime error:",e);
 });
-const VERSION = 643;
+const VERSION = 645;
 const W = 960;
 const H = 540;
 const MOVE_FRAME_W = 204;
@@ -597,6 +601,7 @@ class Game extends Phaser.Scene{
     this.pauseMenuOpen=false;
     this.pauseItems=[];
     this.frameDelta=16.67;
+    this.busyUntil=0;
     this.addRain();
     this.addBottomFog();
     this.add.text(20,20,"CHAR: "+selectedFighter,{
@@ -675,6 +680,7 @@ class Game extends Phaser.Scene{
     this.updateRain();
     this.updateBottomFog();
     this.readInput();
+    this.actionFailsafe();
     if(this.playerInvuln>0){
       this.playerInvuln-=delta;
       if(this.playerInvuln<0) this.playerInvuln=0;
@@ -709,6 +715,8 @@ class Game extends Phaser.Scene{
       this.debugInputText.setText(
         "STARTED: "+this.matchStarted+
         " | BUSY: "+this.playerBusy+
+        " | UNTIL: "+this.busyUntil+
+        " | NOW: "+Math.floor(this.time.now)+
         " | JUMP: "+this.jumpCount+"/"+this.maxJumps+
         " | CROUCH: "+this.isCrouching+
         " | CLIMB: "+this.isClimbing+
@@ -921,6 +929,7 @@ class Game extends Phaser.Scene{
     this.isClimbing=true;
     this.currentLadder=ladder;
     this.playerBusy=false;
+    this.busyUntil=0;
     this.player.x=ladder.x;
     if(direction==="down"){
       this.player.y=PLATFORM_BOUNDS.top.maxY;
@@ -983,6 +992,7 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     this.playerBusy=true;
+    this.busyUntil=this.time.now+STAIR_TRAVEL_DURATION+250;
     const fromX=this.player.x;
     const fromY=this.player.y;
     const toX=direction==="down" ? stair.bottomX : stair.middleX;
@@ -1097,6 +1107,7 @@ class Game extends Phaser.Scene{
       this.crouchEvent=null;
     }
     this.playerBusy=true;
+    this.busyUntil=this.time.now+JUMP_TIME+250;
     this.isJumping=true;
     this.isCrouching=false;
     this.isBlocking=false;
@@ -1161,6 +1172,7 @@ class Game extends Phaser.Scene{
     if(this.pauseMenuOpen) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     this.playerBusy=true;
+    this.busyUntil=this.time.now+800;
     this.isCrouching=true;
     this.isBlocking=false;
     this.poseSprite.loadTexture(this.getPlayerActionSheet());
@@ -1182,20 +1194,29 @@ class Game extends Phaser.Scene{
   startSweep(){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
-    this.playerBusy=true;
+    if(this.isClimbing || this.playerHealth<=0) return;
+    this.playerBusy=false;
+    this.busyUntil=0;
     this.isCrouching=false;
-    this.positionAttackSprite("kick");
-    this.poseSprite.setVisible(true);
-    this.player.setVisible(false);
-    safePlay(this.poseSprite,this.getPlayerAnim("kick"));
-    this.time.delayedCall(90,()=>this.applyPlayerHit({
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+    this.player.setVisible(true);
+    this.player.setScale(PLAYER_MOVE_SCALE);
+    this.player.setTint(0x66ccff);
+    this.applyPlayerHit({
       damage:Number((SWEEP_DAMAGE*this.getPlayerDamageMod()).toFixed(1)),
       stagger:true,
       range:92
-    }));
-    this.time.delayedCall(430,()=>this.forcePlayerReady());
-    this.time.delayedCall(700,()=>{ if(this.playerBusy) this.forcePlayerReady(); });
+    });
+    this.time.delayedCall(90,()=>{
+      if(this.player){
+        this.player.clearTint();
+      }
+      this.playerBusy=false;
+      this.busyUntil=0;
+    });
   }
   startGrab(){
     if(!this.ensureRoundActive()) return;
@@ -1238,6 +1259,7 @@ class Game extends Phaser.Scene{
     this.grabbedEnemy=target;
     this.grabMode="hold";
     this.playerBusy=true;
+    this.busyUntil=this.time.now+GRAB_HOLD_TIME+250;
     this.isBlocking=false;
     this.isCrouching=false;
     this.isJumping=false;
@@ -1307,6 +1329,7 @@ class Game extends Phaser.Scene{
     this.clearGrabTimers();
     this.grabMode="carry";
     this.playerBusy=false;
+    this.busyUntil=0;
     this.showCarryPose();
     this.carryBreakEvent=this.time.delayedCall(CARRY_BREAK_TIME,()=>{
       if(this.grabbedEnemy && this.grabMode==="carry"){
@@ -1324,6 +1347,7 @@ class Game extends Phaser.Scene{
     this.grabbedEnemy=null;
     this.grabMode="none";
     this.playerBusy=false;
+    this.busyUntil=0;
     this.isBlocking=false;
     this.isCrouching=false;
     this.isJumping=false;
@@ -1380,6 +1404,7 @@ class Game extends Phaser.Scene{
     e.vx=dir*90;
     this.safeEnemyPlay(e,"idle");
     this.playerBusy=false;
+    this.busyUntil=0;
     if(this.poseSprite){
       this.poseSprite.stop();
       this.poseSprite.setVisible(false);
@@ -1418,6 +1443,7 @@ class Game extends Phaser.Scene{
       if(e.thrownTime<=0 && !e.dead && e.state==="thrown"){
         e.busy=false;
         e.state="idle";
+        e.thrownTime=0;
         e.vx=0;
         this.safeEnemyPlay(e,"idle");
       }
@@ -2088,6 +2114,7 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     this.playerBusy=true;
+    this.busyUntil=this.time.now+duration+250;
     this.poseSprite.loadTexture(this.getPlayerActionSheet());
     const played=this.showPose(animKey,scale);
     if(!played){
@@ -2109,6 +2136,7 @@ class Game extends Phaser.Scene{
     const animKey=animMap[type];
     if(!animKey || !hasAnim(this,animKey)) return false;
     this.playerBusy=true;
+    this.busyUntil=this.time.now+duration+250;
     this.isBlocking=false;
     this.poseSprite.loadTexture(this.getPlayerReactionSheet());
     this.poseSprite.x=this.player.x;
@@ -2171,12 +2199,14 @@ class Game extends Phaser.Scene{
     if(this.playerHealth<=0){
       this.playerHealth=0;
       this.playerBusy=true;
+      this.busyUntil=0;
       if(!this.showReaction("ko",9999)){
         this.player.setTint(0xff4444);
       }
       return;
     }
     this.playerBusy=false;
+    this.busyUntil=0;
     this.isBlocking=false;
     this.isCrouching=false;
     if(this.poseSprite){
@@ -2207,10 +2237,22 @@ class Game extends Phaser.Scene{
     this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
   }
+  actionFailsafe(){
+    if(!this.playerBusy) return;
+    if(!this.busyUntil) return;
+    if(this.playerHealth<=0) return;
+    if(this.isClimbing) return;
+    if(this.isJumping) return;
+    if(this.grabbedEnemy) return;
+    if(this.time.now > this.busyUntil){
+      this.forcePlayerReady();
+    }
+  }
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
     if(this.grabbedEnemy && this.grabMode==="carry"){
       this.playerBusy=false;
+      this.busyUntil=0;
       this.isBlocking=false;
       this.isJumping=false;
       this.isCrouching=false;
@@ -2220,6 +2262,7 @@ class Game extends Phaser.Scene{
     this.isJumping=false;
     this.isCrouching=false;
     this.playerBusy=false;
+    this.busyUntil=0;
     this.isBlocking=false;
     this.jumpCount=0;
     if(this.poseSprite){
@@ -2240,17 +2283,32 @@ class Game extends Phaser.Scene{
     if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
     const data=this.getAttackData(type);
     if(!data) return;
-    this.playerBusy=true;
-    this.positionAttackSprite(type);
-    this.poseSprite.setVisible(true);
-    this.player.setVisible(false);
-    safePlay(this.poseSprite,data.anim);
-    this.time.delayedCall(100,()=>this.applyPlayerHit(data));
-    this.time.delayedCall(420,()=>this.forcePlayerReady());
-    this.time.delayedCall(700,()=>{ if(this.playerBusy) this.forcePlayerReady(); });
+    this.playerBusy=false;
+    this.busyUntil=0;
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+    this.player.setVisible(true);
+    this.player.setScale(PLAYER_MOVE_SCALE);
+    if(type==="light"){
+      this.player.setTint(0xffff66);
+    }else if(type==="heavy"){
+      this.player.setTint(0xff8844);
+    }else{
+      this.player.setTint(0x66ccff);
+    }
+    this.applyPlayerHit(data);
+    this.time.delayedCall(90,()=>{
+      if(this.player){
+        this.player.clearTint();
+      }
+      this.playerBusy=false;
+      this.busyUntil=0;
+    });
   }
   applyPlayerHit(data){
     const dir=this.getFacingDir();
@@ -2288,6 +2346,7 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     this.playerBusy=true;
+    this.busyUntil=this.time.now+700;
     this.isBlocking=true;
     this.positionAttackSprite("block");
     this.poseSprite.setVisible(true);
@@ -2316,6 +2375,7 @@ class Game extends Phaser.Scene{
     this.matchStarted=true;
     this.matchOver=false;
     this.playerBusy=false;
+    this.busyUntil=0;
     this.isBlocking=false;
     this.isJumping=false;
     this.isCrouching=false;
