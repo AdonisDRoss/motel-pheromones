@@ -33,25 +33,20 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 630;
+const VERSION = 640;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-
 const MOVE2_FRAME_W = 324;
 const MOVE2_FRAME_H = 243;
-
 const ATTACK_FRAME_W = 288;
 const ATTACK_FRAME_H = 232;
-
 const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
-
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
-
 const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 
@@ -73,13 +68,8 @@ const PLATFORM_BOUNDS = {
   bottom:{minX:120,maxX:860,minY:485,maxY:520}
 };
 
-const LADDER_ACTIVATE_X_RANGE = 34;
-const LADDER_ACTIVATE_Y_RANGE = 120;
 const LADDER_VERTICAL_INPUT = 0.65;
-const LADDER_MAX_SIDE_INPUT = 0.35;
-
 const STAIR_VERTICAL_INPUT = 0.65;
-const STAIR_MAX_SIDE_INPUT = 0.45;
 const STAIR_TRAVEL_DURATION = 720;
 
 const JUMP_HEIGHT = 68;
@@ -89,58 +79,28 @@ const MAX_JUMPS = 2;
 const CROUCH_JUMP_BOOST = 1.15;
 const DOUBLE_JUMP_HEIGHT_MULT = 0.85;
 
-const PLAYER_ANTI_STUCK_ENABLED = true;
-const PLAYER_STUCK_FRAME_LIMIT = 14;
-const PLAYER_STUCK_INPUT_MIN = 0.25;
-const PLAYER_UNSTUCK_PUSH_X = 18;
-const PLAYER_UNSTUCK_PUSH_Y = 8;
-const PLAYER_ENEMY_SOFT_PUSH_X = 5;
-const ENEMY_PLAYER_SOFT_PUSH_X = 4;
-const PLAYER_EDGE_BUFFER = 18;
-
 const SWEEP_DAMAGE = 10;
-
-const GRAB_HOLD_TIME = 3000;
-const CARRY_BREAK_TIME = 5000;
 const THROW_DAMAGE = 16;
 const THROW_COLLISION_DAMAGE = 12;
 const THROW_SPEED = 430;
 const GRAB_OFFSET_X = 42;
 const CARRY_OFFSET_X = 58;
+const GRAB_HOLD_TIME = 3000;
+const CARRY_BREAK_TIME = 5000;
 
 const DOORMAN_DOOR_X = 505;
 const DOORMAN_DOOR_Y = 390;
+
+const DEBUG_INPUT = true;
+const DISABLE_DOORMAN_FOR_TEST = false;
 
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
-const ENEMY_AI_ENABLED = true;
-const PLATFORM_TRANSITIONS_ENABLED = true;
-const DISABLE_DOORMAN_FOR_TEST = false;
-const DEBUG_RUNTIME = true;
-const DEBUG_INPUT = true;
-const SKIP_COUNTDOWN_FOR_TEST = false;
-const SIMPLE_DIRECT_MOVEMENT = true;
-const BUSY_WATCHDOG_MS = 1600;
-
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
-
-const ATTACK_NUDGE = {
-  light:{x:-6,y:0,scale:0.32,originY:1},
-  heavy:{x:-8,y:0,scale:0.32,originY:1},
-  kick:{x:-4,y:0,scale:0.32,originY:1},
-  block:{x:0,y:0,scale:0.26,originY:1}
-};
-
-const REACTION_NUDGE = {
-  hurt:{x:0,y:0,scale:0.32,originY:1},
-  knockback:{x:0,y:0,scale:0.32,originY:1},
-  ko:{x:0,y:0,scale:0.32,originY:1},
-  getup:{x:0,y:0,scale:0.32,originY:1}
-};
 
 const ENEMY_NAMES = [
   "VINNY","MOOSE","TANK","DIEGO","RICO","BUZZ","SLIM","ROCCO",
@@ -157,10 +117,10 @@ const ENEMY_TYPES = {
     maxHealth:30,
     scale:0.46,
     chaseSpeed:65,
-    attackRange:72,
-    stopRange:78,
-    attackCooldownMin:200,
-    attackCooldownMax:650,
+    attackRange:74,
+    stopRange:88,
+    attackCooldownMin:350,
+    attackCooldownMax:800,
     attackDamage:8,
     canBeGrabbed:true,
     knockbackResist:1
@@ -172,10 +132,10 @@ const ENEMY_TYPES = {
     maxHealth:24,
     scale:0.46,
     chaseSpeed:78,
-    attackRange:68,
-    stopRange:76,
-    attackCooldownMin:180,
-    attackCooldownMax:500,
+    attackRange:70,
+    stopRange:86,
+    attackCooldownMin:300,
+    attackCooldownMax:700,
     attackDamage:7,
     canBeGrabbed:true,
     knockbackResist:1
@@ -187,10 +147,10 @@ const ENEMY_TYPES = {
     maxHealth:28,
     scale:0.46,
     chaseSpeed:72,
-    attackRange:70,
-    stopRange:78,
-    attackCooldownMin:250,
-    attackCooldownMax:700,
+    attackRange:72,
+    stopRange:88,
+    attackCooldownMin:350,
+    attackCooldownMax:850,
     attackDamage:8,
     canBeGrabbed:true,
     knockbackResist:1
@@ -202,10 +162,10 @@ const ENEMY_TYPES = {
     maxHealth:22,
     scale:0.46,
     chaseSpeed:88,
-    attackRange:64,
-    stopRange:74,
-    attackCooldownMin:160,
-    attackCooldownMax:460,
+    attackRange:68,
+    stopRange:84,
+    attackCooldownMin:280,
+    attackCooldownMax:650,
     attackDamage:7,
     canBeGrabbed:true,
     knockbackResist:1
@@ -219,7 +179,7 @@ const ENEMY_TYPES = {
     scale:0.55,
     chaseSpeed:48,
     attackRange:92,
-    stopRange:72,
+    stopRange:110,
     attackCooldownMin:650,
     attackCooldownMax:1200,
     attackDamage:15,
@@ -253,11 +213,8 @@ function safePlay(sprite,key){
 function textureHasFrame(scene,sheet,frameIndex){
   if(!hasTex(scene,sheet)) return false;
 
-  const tex=scene.textures.get(sheet);
-
-  if(!tex) return false;
-
   try{
+    const tex = scene.textures.get(sheet);
     return !!tex.get(frameIndex);
   }catch(e){
     return false;
@@ -276,10 +233,7 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
     }
   }
 
-  if(frames.length<=0){
-    console.warn("Missing frames for animation:",key,sheet,start,end);
-    return;
-  }
+  if(frames.length<=0) return;
 
   scene.anims.create({
     key:key,
@@ -650,29 +604,23 @@ class Game extends Phaser.Scene{
   }
 
   getPlayerMoveSheet(){
-    const key=this.getPlayerPrefix()+"_movement";
-    return this.getSafeTextureKey(key,"jt_movement");
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_movement","jt_movement");
   }
 
   getPlayerAttackSheet(){
-    const key=this.getPlayerPrefix()+"_attacks";
-    return this.getSafeTextureKey(key,"jt_attacks");
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_attacks","jt_attacks");
   }
 
   getPlayerActionSheet(){
-    const key=this.getPlayerPrefix()+"_actions";
-    return this.getSafeTextureKey(key,"jt_actions");
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_actions","jt_actions");
   }
 
   getPlayerReactionSheet(){
-    const key=this.getPlayerPrefix()+"_reactions";
-    return this.getSafeTextureKey(key,"jt_reactions");
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
   }
 
   getPlayerAnim(action){
-    const key=this.getPlayerPrefix()+"_"+action;
-    const fallback="jt_"+action;
-    return this.getSafeAnimKey(key,fallback);
+    return this.getSafeAnimKey(this.getPlayerPrefix()+"_"+action,"jt_"+action);
   }
 
   getPlayerSpeedMod(){
@@ -685,9 +633,9 @@ class Game extends Phaser.Scene{
 
   getAttackData(type){
     const base={
-      light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false},
-      heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false},
-      kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false}
+      light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false,range:82},
+      heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false,range:96},
+      kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false,range:88}
     }[type];
 
     if(!base) return null;
@@ -695,7 +643,8 @@ class Game extends Phaser.Scene{
     return {
       anim:base.anim,
       damage:Number((base.damage*this.getPlayerDamageMod()).toFixed(1)),
-      stagger:selectedFighter==="HEW" && type==="heavy"
+      stagger:selectedFighter==="HEW" && type==="heavy",
+      range:base.range
     };
   }
 
@@ -752,12 +701,7 @@ class Game extends Phaser.Scene{
 
     this.pauseMenuOpen=false;
     this.pauseItems=[];
-    this.pauseCursor=0;
-    this.pauseOptions=[];
 
-    this.runtimeErrorText=null;
-    this.busyWatchStartedAt=0;
-    this.lastBusyValue=false;
     this.frameDelta=16.67;
 
     this.addRain();
@@ -798,19 +742,12 @@ class Game extends Phaser.Scene{
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
 
-    this.player=this.physics.add.sprite(470,390,this.getPlayerMoveSheet());
+    this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
     this.player.setOrigin(0.5,1);
     this.player.setScale(PLAYER_MOVE_SCALE);
     this.player.setDepth(200);
-    this.player.setCollideWorldBounds(true);
-    this.player.body.setAllowGravity(false);
-    this.player.body.setVelocity(0,0);
 
     safePlay(this.player,this.getPlayerAnim("idle_down"));
-
-    this.lastPlayerX = this.player.x;
-    this.lastPlayerY = this.player.y;
-    this.playerStuckFrames = 0;
 
     this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
     this.poseSprite.setOrigin(0.5,1);
@@ -865,7 +802,11 @@ class Game extends Phaser.Scene{
     this.updateRain();
     this.updateBottomFog();
     this.readInput();
-    this.updateBusyWatchdog();
+
+    if(this.playerInvuln>0){
+      this.playerInvuln-=delta;
+      if(this.playerInvuln<0) this.playerInvuln=0;
+    }
 
     if(!this.pauseMenuOpen && this.matchStarted && !this.matchOver){
       this.updateThrownEnemies(delta);
@@ -873,14 +814,7 @@ class Game extends Phaser.Scene{
       this.checkDirectCrouch();
     }
 
-    if(this.playerInvuln>0){
-      this.playerInvuln-=delta;
-      if(this.playerInvuln<0) this.playerInvuln=0;
-    }
-
-    if(!this.matchStarted || this.matchOver || this.pauseMenuOpen){
-      this.freezeActors();
-    }else{
+    if(this.matchStarted && !this.matchOver && !this.pauseMenuOpen){
       if(this.isClimbing){
         this.updateClimbing();
       }else{
@@ -888,11 +822,7 @@ class Game extends Phaser.Scene{
       }
 
       this.updateGrabbedEnemy();
-
-      if(ENEMY_AI_ENABLED){
-        this.updateEnemyAI();
-      }
-
+      this.updateEnemyAI(delta);
       this.checkVictory();
     }
 
@@ -909,8 +839,6 @@ class Game extends Phaser.Scene{
       this.shadow.y=this.player.y+5;
     }
 
-    this.updatePlayerAntiStuck();
-
     if(DEBUG_INPUT && this.debugInputText && this.player){
       this.debugInputText.setText(
         "STARTED: "+this.matchStarted+
@@ -923,7 +851,7 @@ class Game extends Phaser.Scene{
         " | Y: "+this.moveY.toFixed(2)+
         " | PX: "+Math.floor(this.player.x)+
         " | PY: "+Math.floor(this.player.y)+
-        " | STUCK: "+this.playerStuckFrames+
+        " | ENEMIES: "+this.enemies.filter(e=>!e.dead).length+
         " | ERR: "+window.__MP_LAST_ERROR
       );
     }
@@ -992,11 +920,6 @@ class Game extends Phaser.Scene{
     return this.getLiveInputX()*facing>ACTION_DEADZONE;
   }
 
-  isBackHeld(){
-    const facing=this.getFacingDir();
-    return this.getLiveInputX()*facing<-ACTION_DEADZONE;
-  }
-
   isUpHeld(){
     return this.getLiveInputY()<-ACTION_DEADZONE;
   }
@@ -1046,13 +969,6 @@ class Game extends Phaser.Scene{
 
     if(this.downCrouchHeld) return;
 
-    const activeStairs=this.stairs && this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
-
-    if(activeStairs && this.platform==="middle"){
-      this.downCrouchHeld=true;
-      return;
-    }
-
     this.downCrouchHeld=true;
 
     if(Math.abs(this.moveX) < 0.15 && this.moveY > 0.75){
@@ -1062,7 +978,6 @@ class Game extends Phaser.Scene{
 
   updateMovement(){
     if(this.playerBusy || this.playerHealth<=0){
-      this.player.body.setVelocity(0,0);
       return;
     }
 
@@ -1103,7 +1018,6 @@ class Game extends Phaser.Scene{
 
     const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
 
-    this.player.body.setVelocity(0,0);
     this.player.x += vx * speed * dt;
     this.player.y += vy * speed * 0.55 * dt;
 
@@ -1187,21 +1101,13 @@ class Game extends Phaser.Scene{
   }
 
   handlePlatformTransitions(){
-    if(!PLATFORM_TRANSITIONS_ENABLED) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
-    const verticalOnly =
-      Math.abs(this.moveY) >= LADDER_VERTICAL_INPUT &&
-      Math.abs(this.moveX) <= LADDER_MAX_SIDE_INPUT;
-
     const nearLadder=this.ladders.find(l=>{
-      const closeX = Math.abs(this.player.x-l.x) <= LADDER_ACTIVATE_X_RANGE;
-      const closeY = Math.abs(this.player.y-l.middleY) <= LADDER_ACTIVATE_Y_RANGE ||
-                     Math.abs(this.player.y-l.topY) <= LADDER_ACTIVATE_Y_RANGE;
-      return closeX && closeY;
+      return Math.abs(this.player.x-l.x)<=34;
     });
 
-    if(nearLadder && verticalOnly){
+    if(nearLadder && Math.abs(this.moveX)<=0.35){
       if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
         this.startClimbing(nearLadder,"up");
         return;
@@ -1213,13 +1119,9 @@ class Game extends Phaser.Scene{
       }
     }
 
-    const stairVerticalOnly =
-      Math.abs(this.moveY) >= STAIR_VERTICAL_INPUT &&
-      Math.abs(this.moveX) <= STAIR_MAX_SIDE_INPUT;
-
     const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
 
-    if(activeStairs && stairVerticalOnly){
+    if(activeStairs && Math.abs(this.moveX)<=0.45){
       if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
         this.startStairTravel(activeStairs,"down");
         return;
@@ -1236,8 +1138,6 @@ class Game extends Phaser.Scene{
     this.currentLadder=ladder;
 
     this.playerBusy=false;
-    this.player.body.setVelocity(0,0);
-
     this.player.x=ladder.x;
 
     if(direction==="down"){
@@ -1273,26 +1173,18 @@ class Game extends Phaser.Scene{
     const l=this.currentLadder;
     if(!l) return;
 
-    const climbAnim=this.getPlayerAnim("climb");
-    const canShowClimbPose=hasAnim(this,climbAnim);
+    const dt=(this.frameDelta || 16.67)/1000;
 
     this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
-    this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
+    this.player.y+=this.moveY*this.climbSpeed*dt;
     this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
 
     this.poseSprite.x=this.player.x;
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=false;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(canShowClimbPose);
 
-    this.player.setVisible(!canShowClimbPose);
-
-    if(canShowClimbPose){
-      safePlay(this.poseSprite,climbAnim);
-    }else{
-      safePlay(this.player,this.getPlayerAnim("idle_up"));
+    if(this.poseSprite.visible){
+      safePlay(this.poseSprite,this.getPlayerAnim("climb"));
     }
 
     if(this.player.y<=l.topY+2 && this.moveY<-0.35){
@@ -1323,7 +1215,6 @@ class Game extends Phaser.Scene{
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
 
     const fromX=this.player.x;
     const fromY=this.player.y;
@@ -1372,10 +1263,10 @@ class Game extends Phaser.Scene{
   }
 
   applyPlatformBounds(){
-    const bounds = this.getCurrentPlatformBounds();
+    const bounds=this.getCurrentPlatformBounds();
 
-    this.player.x = Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
-    this.player.y = Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
+    this.player.x=Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
+    this.player.y=Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
   }
 
   ensureRoundActive(){
@@ -1383,7 +1274,7 @@ class Game extends Phaser.Scene{
       this.unlockPlayerControl();
     }
 
-    return this.matchStarted && !this.matchOver && this.playerHealth > 0;
+    return this.matchStarted && !this.matchOver && this.playerHealth>0;
   }
 
   startContextB(){
@@ -1391,9 +1282,7 @@ class Game extends Phaser.Scene{
     if(this.pauseMenuOpen) return;
     if(this.isClimbing || this.playerHealth<=0) return;
 
-    if(this.grabbedEnemy){
-      return;
-    }
+    if(this.grabbedEnemy) return;
 
     this.readInput();
 
@@ -1463,29 +1352,23 @@ class Game extends Phaser.Scene{
     if(this.pauseMenuOpen) return;
     if(this.isClimbing || this.playerHealth<=0) return;
 
-    const alreadyJumping = this.isJumping;
+    const alreadyJumping=this.isJumping;
 
-    if(alreadyJumping && this.jumpCount >= this.maxJumps){
-      return;
-    }
+    if(alreadyJumping && this.jumpCount>=this.maxJumps) return;
 
-    if(this.playerBusy && !this.isJumping && !this.isCrouching){
-      return;
-    }
+    if(this.playerBusy && !this.isJumping && !this.isCrouching) return;
 
-    const wasCrouching = this.isCrouching;
+    const wasCrouching=this.isCrouching;
 
     if(this.crouchEvent){
       this.crouchEvent.remove(false);
       this.crouchEvent=null;
     }
 
-    this.playerBusy = true;
-    this.isJumping = true;
-    this.isCrouching = false;
-    this.isBlocking = false;
-
-    this.player.body.setVelocity(0,0);
+    this.playerBusy=true;
+    this.isJumping=true;
+    this.isCrouching=false;
+    this.isBlocking=false;
 
     if(this.poseSprite){
       this.poseSprite.stop();
@@ -1495,15 +1378,15 @@ class Game extends Phaser.Scene{
     this.player.setVisible(true);
 
     if(!alreadyJumping){
-      this.jumpCount = 0;
-      this.jumpGroundY = this.player.y;
+      this.jumpCount=0;
+      this.jumpGroundY=this.player.y;
     }
 
     this.jumpCount++;
 
     if(this.activeJumpTween){
       this.activeJumpTween.stop();
-      this.activeJumpTween = null;
+      this.activeJumpTween=null;
     }
 
     const jumpAnim=this.getPlayerAnim("jump");
@@ -1515,40 +1398,40 @@ class Game extends Phaser.Scene{
       this.player.setScale(PLAYER_MOVE_SCALE);
     }
 
-    let height = JUMP_HEIGHT;
+    let height=JUMP_HEIGHT;
 
     if(wasCrouching){
-      height *= CROUCH_JUMP_BOOST;
+      height*=CROUCH_JUMP_BOOST;
     }
 
-    if(this.jumpCount >= 2){
-      height *= DOUBLE_JUMP_HEIGHT_MULT;
+    if(this.jumpCount>=2){
+      height*=DOUBLE_JUMP_HEIGHT_MULT;
       this.createHitFX(this.player.x,this.player.y-60,"jump",6);
     }else{
       this.createHitFX(this.player.x,this.player.y-45,"jump",4);
     }
 
-    const peakY = this.player.y - height;
-    const groundY = this.jumpGroundY;
+    const peakY=this.player.y-height;
+    const groundY=this.jumpGroundY;
 
-    this.activeJumpTween = this.tweens.add({
+    this.activeJumpTween=this.tweens.add({
       targets:this.player,
       y:peakY,
       duration:JUMP_TIME/2,
       ease:"Sine.easeOut",
       onComplete:()=>{
-        this.activeJumpTween = this.tweens.add({
+        this.activeJumpTween=this.tweens.add({
           targets:this.player,
           y:groundY,
           duration:JUMP_TIME/2,
           ease:"Sine.easeIn",
           onComplete:()=>{
-            this.player.y = groundY;
+            this.player.y=groundY;
             this.player.setScale(PLAYER_MOVE_SCALE);
 
-            this.isJumping = false;
-            this.jumpCount = 0;
-            this.activeJumpTween = null;
+            this.isJumping=false;
+            this.jumpCount=0;
+            this.activeJumpTween=null;
 
             this.forcePlayerReady();
           }
@@ -1565,7 +1448,6 @@ class Game extends Phaser.Scene{
     this.playerBusy=true;
     this.isCrouching=true;
     this.isBlocking=false;
-    this.player.body.setVelocity(0,0);
 
     this.poseSprite.loadTexture(this.getPlayerActionSheet());
 
@@ -1595,7 +1477,6 @@ class Game extends Phaser.Scene{
 
     this.playerBusy=true;
     this.isCrouching=false;
-    this.player.body.setVelocity(0,0);
 
     this.positionAttackSprite("kick");
     this.poseSprite.setVisible(true);
@@ -1603,40 +1484,14 @@ class Game extends Phaser.Scene{
 
     safePlay(this.poseSprite,this.getPlayerAnim("kick"));
 
-    this.time.delayedCall(90,()=>this.createSweepHitbox());
+    this.time.delayedCall(90,()=>this.applyPlayerHit({
+      damage:Number((SWEEP_DAMAGE*this.getPlayerDamageMod()).toFixed(1)),
+      stagger:true,
+      range:92
+    }));
 
-    this.time.delayedCall(430,()=>{
-      this.forcePlayerReady();
-    });
-
-    this.time.delayedCall(700,()=>{
-      if(this.playerBusy) this.forcePlayerReady();
-    });
-  }
-
-  createSweepHitbox(){
-    const dir=this.getFacingDir();
-    const boxX=this.player.x+dir*48;
-    const boxY=this.player.y-25;
-    const sweepDamage=Number((SWEEP_DAMAGE*this.getPlayerDamageMod()).toFixed(1));
-
-    const box=this.add.rectangle(boxX,boxY,96,34,0xff0000,0).setDepth(999);
-    this.physics.add.existing(box);
-    box.body.setAllowGravity(false);
-
-    const hit=new Set();
-
-    this.physics.add.overlap(box,this.enemies,(b,e)=>{
-      if(hit.has(e) || e.dead || e.state==="dead") return;
-      if(e.platform!==this.platform) return;
-
-      hit.add(e);
-      this.damageEnemy(e,sweepDamage,true);
-    });
-
-    this.time.delayedCall(130,()=>{
-      if(box && box.destroy) box.destroy();
-    });
+    this.time.delayedCall(430,()=>this.forcePlayerReady());
+    this.time.delayedCall(700,()=>{ if(this.playerBusy) this.forcePlayerReady(); });
   }
 
   startGrab(){
@@ -1644,13 +1499,12 @@ class Game extends Phaser.Scene{
     if(this.pauseMenuOpen) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     if(this.grabbedEnemy) return;
-    if(!this.enemies) return;
 
     let target=null;
     let bestDist=9999;
     const facing=this.getFacingDir();
 
-    this.enemies.children.each(e=>{
+    this.enemies.forEach(e=>{
       if(!e || e.dead || e.state==="dead") return;
       if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
       if(e.platform!==this.platform) return;
@@ -1668,7 +1522,7 @@ class Game extends Phaser.Scene{
     });
 
     if(!target){
-      this.enemies.children.each(e=>{
+      this.enemies.forEach(e=>{
         if(!e || e.dead || e.state==="dead") return;
         if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
         if(e.platform!==this.platform) return;
@@ -1696,14 +1550,12 @@ class Game extends Phaser.Scene{
     this.isCrouching=false;
     this.isJumping=false;
 
-    this.player.body.setVelocity(0,0);
-
     target.grabbed=true;
     target.busy=true;
     target.state="grabbed";
     target.knockbackTime=0;
     target.attackCooldown=9999;
-    target.setVelocity(0,0);
+    target.vx=0;
 
     this.safeEnemyPlay(target,"ko");
     this.showCarryPose();
@@ -1763,20 +1615,12 @@ class Game extends Phaser.Scene{
     e.y=this.player.y;
     e.homeY=this.player.y;
     e.platform=this.platform;
-
-    e.setVelocity(0,0);
-    e.setFlipX(dir<0);
-    e.setDepth(e.y+3);
+    e.vx=0;
+    e.sprite.setFlipX(dir<0);
 
     this.safeEnemyPlay(e,"ko");
     this.showCarryPose();
-
-    if(e.shadow){
-      e.shadow.x=e.x;
-      e.shadow.y=e.y+3;
-    }
-
-    this.updateEnemyNameplate(e);
+    this.updateEnemyVisuals(e);
   }
 
   startCarryEnemy(){
@@ -1842,7 +1686,7 @@ class Game extends Phaser.Scene{
 
     this.createHitFX(e.x,e.y-55,"hit",THROW_DAMAGE);
 
-    e.setVelocityX(dir*THROW_SPEED);
+    e.vx=dir*THROW_SPEED;
     this.safeEnemyPlay(e,"hurt");
     this.updateEnemyHealthBar(e);
 
@@ -1857,7 +1701,7 @@ class Game extends Phaser.Scene{
         e.busy=false;
         e.state="idle";
         e.thrownTime=0;
-        e.setVelocityX(0);
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
       }
     });
@@ -1879,7 +1723,7 @@ class Game extends Phaser.Scene{
     e.state="idle";
     e.attackCooldown=900;
     e.knockbackTime=250;
-    e.setVelocityX(dir*90);
+    e.vx=dir*90;
 
     this.safeEnemyPlay(e,"idle");
 
@@ -1898,26 +1742,19 @@ class Game extends Phaser.Scene{
   }
 
   updateThrownEnemies(delta){
-    if(!this.enemies) return;
+    const dt=delta/1000;
 
-    this.enemies.children.each(e=>{
+    this.enemies.forEach(e=>{
       if(!e || e.dead) return;
       if(!e.thrownTime || e.thrownTime<=0) return;
 
       e.thrownTime-=delta;
       if(e.thrownTime<0) e.thrownTime=0;
 
+      e.x+=e.vx*dt;
       e.y=e.homeY;
-      e.setDepth(e.y+2);
 
-      if(e.shadow){
-        e.shadow.x=e.x;
-        e.shadow.y=e.y+3;
-      }
-
-      this.updateEnemyNameplate(e);
-
-      this.enemies.children.each(other=>{
+      this.enemies.forEach(other=>{
         if(!other || other===e) return;
         if(other.dead || other.state==="dead") return;
         if(other.platform!==e.platform) return;
@@ -1941,9 +1778,11 @@ class Game extends Phaser.Scene{
       if(e.thrownTime<=0 && !e.dead && e.state==="thrown"){
         e.busy=false;
         e.state="idle";
-        e.setVelocityX(0);
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
       }
+
+      this.updateEnemyVisuals(e);
     });
   }
 
@@ -1971,13 +1810,12 @@ class Game extends Phaser.Scene{
   }
 
   safeEnemyPlay(e,action){
-    if(!e || e.dead) return;
-    const anim=this.getEnemyAnim(e,action);
-    safePlay(e,anim);
+    if(!e || e.dead || !e.sprite) return;
+    safePlay(e.sprite,this.getEnemyAnim(e,action));
   }
 
   createEnemies(){
-    this.enemies=this.physics.add.group();
+    this.enemies=[];
 
     this.spawnEnemyType("corpo_wannabe",235,505,"bottom");
     this.spawnEnemyType("sellout",520,250,"top");
@@ -1988,63 +1826,60 @@ class Game extends Phaser.Scene{
   spawnEnemyType(type,x,y,platform="middle"){
     const def=this.getEnemyDef(type);
     const textureKey=hasTex(this,def.key) ? def.key : "feral";
-    const e=this.physics.add.sprite(x,y,textureKey,0);
+    const sprite=this.add.sprite(x,y,textureKey,0);
 
-    e.enemyType=type;
-    e.enemyLabel=def.label;
+    sprite.setOrigin(0.5,1);
+    sprite.setScale(def.scale);
+    sprite.setDepth(y+2);
 
-    e.setOrigin(0.5,1);
-    e.setScale(def.scale);
-    e.setTint(0xffffff);
-    e.setDepth(y+2);
-    e.body.setAllowGravity(false);
-    e.body.setVelocity(0,0);
-    e.setCollideWorldBounds(true);
-
-    e.baseHealth=def.baseHealth || def.maxHealth;
-    e.maxHealth=def.maxHealth;
-    e.health=def.maxHealth;
-
-    e.dead=false;
-    e.busy=false;
-    e.platform=platform;
-    e.homeY=y;
-    e.state="idle";
-
-    e.attackCooldown=Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax);
-    e.attackCooldownMin=def.attackCooldownMin;
-    e.attackCooldownMax=def.attackCooldownMax;
-    e.attackRange=def.attackRange;
-    e.stopRange=def.stopRange;
-    e.chaseSpeed=def.chaseSpeed;
-    e.attackDamage=def.attackDamage;
-    e.canBeGrabbed=def.canBeGrabbed !== false;
-    e.knockbackResist=def.knockbackResist || 1;
-
-    e.bossActive=false;
-    e.bossIntro=false;
-    e.invulnerable=false;
-    e.guardCooldown=0;
-    e.guardTime=0;
-    e.tacticTimer=0;
-    e.tacticState="hold";
-
-    e.specialCooldown=def.specialCooldown || 0;
-    e.specialRange=def.specialRange || 0;
-    e.specialDamage=def.specialDamage || 0;
-
-    e.knockbackTime=0;
-    e.grabbed=false;
-    e.thrownTime=0;
-    e.thrownHit=null;
+    const e={
+      sprite:sprite,
+      enemyType:type,
+      enemyLabel:def.label,
+      x:x,
+      y:y,
+      homeY:y,
+      vx:0,
+      platform:platform,
+      baseHealth:def.baseHealth || def.maxHealth,
+      maxHealth:def.maxHealth,
+      health:def.maxHealth,
+      dead:false,
+      busy:false,
+      state:"idle",
+      attackCooldown:Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax),
+      attackCooldownMin:def.attackCooldownMin,
+      attackCooldownMax:def.attackCooldownMax,
+      attackRange:def.attackRange,
+      stopRange:def.stopRange,
+      chaseSpeed:def.chaseSpeed,
+      attackDamage:def.attackDamage,
+      canBeGrabbed:def.canBeGrabbed !== false,
+      knockbackResist:def.knockbackResist || 1,
+      bossActive:false,
+      bossIntro:false,
+      invulnerable:false,
+      guardCooldown:0,
+      guardTime:0,
+      tacticTimer:0,
+      tacticState:"hold",
+      specialCooldown:def.specialCooldown || 0,
+      specialRange:def.specialRange || 0,
+      specialDamage:def.specialDamage || 0,
+      knockbackTime:0,
+      grabbed:false,
+      thrownTime:0,
+      thrownHit:null
+    };
 
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
 
     this.safeEnemyPlay(e,"idle");
     this.createEnemyNameplate(e);
     this.createEnemyHealthBar(e);
+    this.updateEnemyVisuals(e);
 
-    this.enemies.add(e);
+    this.enemies.push(e);
 
     return e;
   }
@@ -2130,8 +1965,19 @@ class Game extends Phaser.Scene{
     }
   }
 
-  updateEnemyNameplate(e){
+  updateEnemyVisuals(e){
     if(!e) return;
+
+    if(e.sprite){
+      e.sprite.x=e.x;
+      e.sprite.y=e.y;
+      e.sprite.setDepth(e.y+2);
+    }
+
+    if(e.shadow){
+      e.shadow.x=e.x;
+      e.shadow.y=e.y+3;
+    }
 
     if(e.authBadge){
       e.authBadge.x=e.x;
@@ -2168,7 +2014,7 @@ class Game extends Phaser.Scene{
     e.dead=true;
     e.state="dead";
     e.busy=true;
-    e.setVelocityX(0);
+    e.vx=0;
 
     this.safeEnemyPlay(e,"ko");
 
@@ -2200,7 +2046,7 @@ class Game extends Phaser.Scene{
     const resist=e.knockbackResist || 1;
     const knockPower=stagger ? 190 : 120;
 
-    e.setVelocityX((e.x<this.player.x ? -1 : 1)*knockPower*resist);
+    e.vx=(e.x<this.player.x ? -1 : 1)*knockPower*resist;
 
     this.combo++;
     this.rhythm=Math.min(10,this.rhythm+1);
@@ -2217,27 +2063,20 @@ class Game extends Phaser.Scene{
       if(!e.dead){
         e.busy=false;
         e.state="idle";
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
       }
     });
   }
 
-  updateEnemyAI(){
-    if(!this.enemies) return;
+  updateEnemyAI(delta){
+    const dt=delta/1000;
 
-    const delta=this.frameDelta || 16.67;
-
-    this.enemies.children.each(e=>{
+    this.enemies.forEach(e=>{
       if(!e) return;
 
       if(e.grabbed || e.thrownTime>0){
-        this.updateEnemyNameplate(e);
-
-        if(e.shadow){
-          e.shadow.x=e.x;
-          e.shadow.y=e.y+3;
-        }
-
+        this.updateEnemyVisuals(e);
         return;
       }
 
@@ -2256,43 +2095,28 @@ class Game extends Phaser.Scene{
         if(e.specialCooldown<0) e.specialCooldown=0;
       }
 
-      if(e.guardCooldown>0){
-        e.guardCooldown-=delta;
-        if(e.guardCooldown<0) e.guardCooldown=0;
-      }
-
-      if(e.guardTime>0){
-        e.guardTime-=delta;
-        if(e.guardTime<0) e.guardTime=0;
-      }
-
       if(e.dead || e.state==="dead"){
         e.dead=true;
         e.state="dead";
-        e.setVelocityX(0);
-        this.updateEnemyNameplate(e);
-
-        if(e.shadow){
-          e.shadow.x=e.x;
-          e.shadow.y=e.y+3;
-        }
-
+        e.vx=0;
+        this.updateEnemyVisuals(e);
         return;
       }
 
       e.y=e.homeY;
-      e.setDepth(e.y+2);
-
-      this.updateEnemyNameplate(e);
-
-      if(e.shadow){
-        e.shadow.x=e.x;
-        e.shadow.y=e.y+3;
-      }
 
       this.applyEnemySeparation(e);
-      this.keepEnemyOffPlayer(e);
-      this.pushPlayerOutOfEnemy(e);
+      this.repelEnemyFromPlayer(e);
+
+      e.x+=e.vx*dt;
+
+      if(e.platform==="top"){
+        e.x=Phaser.Math.Clamp(e.x,190,820);
+      }else{
+        e.x=Phaser.Math.Clamp(e.x,120,860);
+      }
+
+      this.updateEnemyVisuals(e);
 
       if(e.knockbackTime>0) return;
       if(e.busy) return;
@@ -2304,7 +2128,7 @@ class Game extends Phaser.Scene{
 
       if(this.platform!==e.platform || this.playerHealth<=0){
         e.state="idle";
-        e.setVelocityX(0);
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
         return;
       }
@@ -2313,11 +2137,11 @@ class Game extends Phaser.Scene{
       const dy=this.player.y-e.y;
       const dist=Math.abs(dx);
 
-      e.setFlipX(dx<0);
+      e.sprite.setFlipX(dx<0);
 
       if(Math.abs(dy)>45){
         e.state="idle";
-        e.setVelocityX(0);
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
         return;
       }
@@ -2330,149 +2154,42 @@ class Game extends Phaser.Scene{
       if(dist>e.stopRange){
         e.state="chase";
         const chaseDir=dx>0 ? 1 : -1;
-        e.setVelocityX(chaseDir*e.chaseSpeed);
+        e.vx=chaseDir*e.chaseSpeed;
         this.safeEnemyPlay(e,"walk");
       }else{
         e.state="idle";
-        e.setVelocityX(0);
+        e.vx=0;
         this.safeEnemyPlay(e,"idle");
       }
     });
   }
 
-  updatePlayerAntiStuck(){
-    if(!PLAYER_ANTI_STUCK_ENABLED) return;
-    if(!this.player) return;
-    if(!this.matchStarted || this.matchOver || this.pauseMenuOpen) return;
-    if(this.playerBusy || this.isClimbing || this.isJumping) return;
-    if(this.playerHealth <= 0) return;
-
-    const inputHeld =
-      Math.abs(this.moveX) > PLAYER_STUCK_INPUT_MIN ||
-      Math.abs(this.moveY) > PLAYER_STUCK_INPUT_MIN;
-
-    const movedEnough =
-      Math.abs(this.player.x - this.lastPlayerX) > 0.35 ||
-      Math.abs(this.player.y - this.lastPlayerY) > 0.35;
-
-    if(inputHeld && !movedEnough){
-      this.playerStuckFrames++;
-    }else{
-      this.playerStuckFrames = 0;
-    }
-
-    if(this.playerStuckFrames >= PLAYER_STUCK_FRAME_LIMIT){
-      const bounds=this.getCurrentPlatformBounds();
-
-      let pushX = this.moveX !== 0
-        ? Math.sign(this.moveX) * PLAYER_UNSTUCK_PUSH_X
-        : this.getFacingDir() * PLAYER_UNSTUCK_PUSH_X;
-
-      let pushY = this.moveY !== 0
-        ? Math.sign(this.moveY) * PLAYER_UNSTUCK_PUSH_Y
-        : 0;
-
-      if(this.player.x + pushX < bounds.minX + PLAYER_EDGE_BUFFER){
-        pushX = PLAYER_UNSTUCK_PUSH_X;
-      }
-
-      if(this.player.x + pushX > bounds.maxX - PLAYER_EDGE_BUFFER){
-        pushX = -PLAYER_UNSTUCK_PUSH_X;
-      }
-
-      this.player.x += pushX;
-      this.player.y += pushY;
-
-      this.applyPlatformBounds();
-
-      this.player.body.setVelocity(0,0);
-      this.playerStuckFrames = 0;
-
-      if(this.poseSprite){
-        this.poseSprite.stop();
-        this.poseSprite.setVisible(false);
-      }
-
-      this.player.setVisible(true);
-      this.player.setScale(PLAYER_MOVE_SCALE);
-
-      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
-      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
-      else safePlay(this.player,this.getPlayerAnim("idle_down"));
-    }
-
-    this.lastPlayerX = this.player.x;
-    this.lastPlayerY = this.player.y;
-  }
-
-  keepEnemyOffPlayer(e){
+  repelEnemyFromPlayer(e){
     if(!e || e.dead || !this.player) return;
-    if(e.platform !== this.platform) return;
-    if(e.grabbed || e.thrownTime > 0) return;
+    if(e.platform!==this.platform) return;
+    if(e.grabbed || e.thrownTime>0) return;
+    if(e.enemyType==="doorman") return;
 
-    const dx = e.x - this.player.x;
-    const dy = e.y - this.player.y;
+    const dx=e.x-this.player.x;
+    const dy=e.y-this.player.y;
 
-    if(Math.abs(dx) < 34 && Math.abs(dy) < 30){
-      let pushDir = dx >= 0 ? 1 : -1;
+    if(Math.abs(dx)>58 || Math.abs(dy)>36) return;
 
-      if(Math.abs(this.moveX) > 0.2){
-        pushDir = this.moveX > 0 ? -1 : 1;
-      }
+    let pushDir=dx>=0 ? 1 : -1;
 
-      e.x += pushDir * 4;
-      e.setVelocityX(pushDir * 20);
-    }
-  }
-
-  pushPlayerOutOfEnemy(e){
-    if(!e || e.dead || !this.player) return;
-    if(e.platform !== this.platform) return;
-    if(e.grabbed || e.thrownTime > 0) return;
-    if(this.playerBusy || this.isClimbing || this.isJumping) return;
-
-    const dx = this.player.x - e.x;
-    const dy = this.player.y - e.y;
-
-    const overlapX = Math.abs(dx) < 42;
-    const overlapY = Math.abs(dy) < 34;
-
-    if(!overlapX || !overlapY) return;
-
-    const bounds=this.getCurrentPlatformBounds();
-
-    let pushDir = dx >= 0 ? 1 : -1;
-
-    if(Math.abs(this.moveX) > 0.2){
-      pushDir = this.moveX > 0 ? 1 : -1;
+    if(Math.abs(this.moveX)>0.2){
+      pushDir=this.moveX>0 ? 1 : -1;
     }
 
-    if(this.player.x + pushDir * PLAYER_ENEMY_SOFT_PUSH_X < bounds.minX + PLAYER_EDGE_BUFFER){
-      pushDir = 1;
-    }
-
-    if(this.player.x + pushDir * PLAYER_ENEMY_SOFT_PUSH_X > bounds.maxX - PLAYER_EDGE_BUFFER){
-      pushDir = -1;
-    }
-
-    this.player.x += pushDir * PLAYER_ENEMY_SOFT_PUSH_X;
-    e.x -= pushDir * ENEMY_PLAYER_SOFT_PUSH_X;
-
-    this.applyPlatformBounds();
-
-    if(this.player.body){
-      this.player.body.setVelocity(0,0);
-    }
-
-    if(e.body){
-      e.setVelocityX(0);
-    }
+    e.x+=pushDir*8;
+    e.vx=pushDir*50;
+    e.attackCooldown=Math.max(e.attackCooldown || 0,280);
   }
 
   applyEnemySeparation(e){
-    if(!this.enemies || !e || e.dead) return;
+    if(!e || e.dead) return;
 
-    this.enemies.children.each(other=>{
+    this.enemies.forEach(other=>{
       if(!other || other===e || other.dead) return;
       if(other.platform!==e.platform) return;
       if(other.grabbed || other.thrownTime>0) return;
@@ -2481,20 +2198,13 @@ class Game extends Phaser.Scene{
       const absGap=Math.abs(gap);
 
       if(absGap>0 && absGap<44){
-        const push=gap>0 ? 1.1 : -1.1;
-        e.x+=push;
+        e.x+=gap>0 ? 1.2 : -1.2;
       }
 
       if(absGap===0){
         e.x+=Phaser.Math.Between(-2,2);
       }
     });
-
-    if(e.platform==="top"){
-      e.x=Phaser.Math.Clamp(e.x,190,820);
-    }else{
-      e.x=Phaser.Math.Clamp(e.x,120,860);
-    }
   }
 
   startEnemyAttack(e){
@@ -2504,7 +2214,7 @@ class Game extends Phaser.Scene{
     e.state="attack";
     e.busy=true;
     e.attackCooldown=Phaser.Math.Between(e.attackCooldownMin || 500,e.attackCooldownMax || 900);
-    e.setVelocityX(0);
+    e.vx=0;
 
     this.safeEnemyPlay(e,"punch");
 
@@ -2525,6 +2235,7 @@ class Game extends Phaser.Scene{
 
       e.busy=false;
       e.state="idle";
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
     });
   }
@@ -2532,23 +2243,13 @@ class Game extends Phaser.Scene{
   updateDoormanAI(e,delta){
     if(!e || e.dead) return;
 
-    this.updateEnemyNameplate(e);
-
-    if(e.shadow){
-      e.shadow.x=e.x;
-      e.shadow.y=e.y+3;
-    }
-
-    e.y=e.homeY;
-    e.setDepth(e.y+2);
-
     if(e.bossIntro || !e.bossActive || e.invulnerable){
-      e.setVelocityX(0);
+      e.vx=0;
       return;
     }
 
     if(this.platform!==e.platform || this.playerHealth<=0){
-      e.setVelocityX(0);
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
       return;
     }
@@ -2561,26 +2262,11 @@ class Game extends Phaser.Scene{
     const dist=Math.abs(dx);
     const dir=dx>0 ? 1 : -1;
 
-    e.setFlipX(dx<0);
+    e.sprite.setFlipX(dx<0);
 
     if(Math.abs(dy)>50){
-      e.setVelocityX(0);
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
-      return;
-    }
-
-    if(this.playerBusy && dist<110 && e.guardCooldown<=0){
-      e.guardTime=520;
-      e.guardCooldown=2200;
-      e.attackCooldown=500;
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"taunt");
-      return;
-    }
-
-    if(e.guardTime>0){
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"taunt");
       return;
     }
 
@@ -2594,47 +2280,13 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    if(dist<48){
-      e.setVelocityX(-dir*e.chaseSpeed*0.75);
+    if(dist>e.stopRange){
+      e.vx=dir*e.chaseSpeed;
       this.safeEnemyPlay(e,"walk");
-      return;
-    }
-
-    if(dist>e.specialRange){
-      e.setVelocityX(dir*e.chaseSpeed);
-      this.safeEnemyPlay(e,"walk");
-      return;
-    }
-
-    e.tacticTimer-=delta;
-
-    if(e.tacticTimer<=0){
-      const roll=Phaser.Math.Between(0,2);
-
-      if(roll===0){
-        e.tacticState="hold";
-        e.tacticTimer=Phaser.Math.Between(450,850);
-      }else if(roll===1){
-        e.tacticState="step_in";
-        e.tacticTimer=Phaser.Math.Between(300,600);
-      }else{
-        e.tacticState="step_back";
-        e.tacticTimer=Phaser.Math.Between(300,600);
-      }
-    }
-
-    if(e.tacticState==="hold"){
-      e.setVelocityX(0);
+    }else{
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
-    }else if(e.tacticState==="step_in"){
-      e.setVelocityX(dir*e.chaseSpeed*0.45);
-      this.safeEnemyPlay(e,"walk");
-    }else if(e.tacticState==="step_back"){
-      e.setVelocityX(-dir*e.chaseSpeed*0.45);
-      this.safeEnemyPlay(e,"walk");
     }
-
-    e.x=Phaser.Math.Clamp(e.x,120,860);
   }
 
   startDoormanPunch(e){
@@ -2643,7 +2295,7 @@ class Game extends Phaser.Scene{
     e.state="attack";
     e.busy=true;
     e.attackCooldown=Phaser.Math.Between(850,1250);
-    e.setVelocityX(0);
+    e.vx=0;
 
     this.safeEnemyPlay(e,"punch");
 
@@ -2664,6 +2316,7 @@ class Game extends Phaser.Scene{
 
       e.busy=false;
       e.state="idle";
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
     });
   }
@@ -2673,7 +2326,7 @@ class Game extends Phaser.Scene{
 
     e.state="special";
     e.busy=true;
-    e.setVelocityX(0);
+    e.vx=0;
     e.specialCooldown=Phaser.Math.Between(3000,4200);
     e.attackCooldown=1200;
 
@@ -2707,6 +2360,7 @@ class Game extends Phaser.Scene{
 
       e.busy=false;
       e.state="idle";
+      e.vx=0;
       this.safeEnemyPlay(e,"idle");
     });
   }
@@ -2720,16 +2374,15 @@ class Game extends Phaser.Scene{
     const boss=this.spawnEnemyType("doorman",DOORMAN_DOOR_X,DOORMAN_DOOR_Y,"middle");
     this.doorman=boss;
 
-    boss.setFlipX(this.player.x < boss.x);
+    boss.sprite.setFlipX(this.player.x<boss.x);
     boss.homeY=DOORMAN_DOOR_Y;
     boss.platform="middle";
-
     boss.bossIntro=true;
     boss.bossActive=false;
     boss.invulnerable=true;
     boss.busy=true;
     boss.state="intro";
-    boss.setVelocityX(0);
+    boss.vx=0;
 
     this.zoneText.setText("SUB-BOSS: THE DOORMAN");
 
@@ -2806,7 +2459,7 @@ class Game extends Phaser.Scene{
   createDoormanFireTaunt(e){
     if(!e) return;
 
-    const dir=e.flipX ? -1 : 1;
+    const dir=e.sprite.flipX ? -1 : 1;
     const fxX=e.x + dir*55;
     const fxY=e.y - 68;
 
@@ -2833,24 +2486,6 @@ class Game extends Phaser.Scene{
       duration:360,
       onComplete:()=>core.destroy()
     });
-
-    for(let i=0;i<12;i++){
-      const spark=this.add.circle(fxX,fxY,Phaser.Math.Between(2,4),0xffaa22,1)
-        .setDepth(14502)
-        .setBlendMode(Phaser.BlendModes.ADD);
-
-      const angle=Phaser.Math.FloatBetween(-0.8,0.8);
-      const dist=Phaser.Math.Between(30,70);
-
-      this.tweens.add({
-        targets:spark,
-        x:fxX + dir*Math.cos(angle)*dist,
-        y:fxY + Math.sin(angle)*dist,
-        alpha:0,
-        duration:350,
-        onComplete:()=>spark.destroy()
-      });
-    }
 
     this.cameras.main.shake(120,0.004);
   }
@@ -2879,7 +2514,6 @@ class Game extends Phaser.Scene{
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
 
     this.poseSprite.loadTexture(this.getPlayerActionSheet());
 
@@ -2909,20 +2543,15 @@ class Game extends Phaser.Scene{
 
     if(!animKey || !hasAnim(this,animKey)) return false;
 
-    const nudge=REACTION_NUDGE[type] || REACTION_NUDGE.hurt;
-    const dir=this.player.flipX ? -1 : 1;
-
     this.playerBusy=true;
     this.isBlocking=false;
 
-    this.player.body.setVelocity(0,0);
-
     this.poseSprite.loadTexture(this.getPlayerReactionSheet());
-    this.poseSprite.x=this.player.x+(nudge.x*dir);
-    this.poseSprite.y=this.player.y+nudge.y;
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,nudge.originY);
-    this.poseSprite.setScale(nudge.scale);
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_REACTION_SCALE);
     this.poseSprite.setVisible(true);
 
     this.player.setVisible(false);
@@ -2955,26 +2584,6 @@ class Game extends Phaser.Scene{
       duration:190,
       onComplete:()=>flash.destroy()
     });
-
-    for(let i=0;i<8;i++){
-      const spark=this.add.rectangle(x,y,10,3,color,1)
-        .setDepth(14001)
-        .setBlendMode(Phaser.BlendModes.ADD);
-
-      const angle=Phaser.Math.FloatBetween(0,Math.PI*2);
-      const dist=Phaser.Math.Between(18,44);
-
-      spark.rotation=angle;
-
-      this.tweens.add({
-        targets:spark,
-        x:x+Math.cos(angle)*dist,
-        y:y+Math.sin(angle)*dist,
-        alpha:0,
-        duration:210,
-        onComplete:()=>spark.destroy()
-      });
-    }
 
     if(type==="hit"){
       const txt=this.add.text(x,y-18,"HIT",{
@@ -3017,83 +2626,43 @@ class Game extends Phaser.Scene{
       this.playerBusy=true;
 
       if(!this.showReaction("ko",9999)){
-        if(this.player){
-          this.player.body.setVelocity(0,0);
-          this.player.setTint(0xff4444);
-        }
+        this.player.setTint(0xff4444);
       }
 
       return;
     }
 
     if(this.isBlocking){
-      if(this.player){
-        this.player.setTint(0x44ffff);
+      this.player.setTint(0x44ffff);
 
-        this.time.delayedCall(120,()=>{
-          if(this.player) this.player.clearTint();
-        });
-      }
+      this.time.delayedCall(120,()=>{
+        if(this.player) this.player.clearTint();
+      });
 
       return;
     }
 
     if(!this.showReaction("hurt",350)){
-      if(this.player){
-        this.player.body.setVelocityX(dir*90);
-        this.player.setTint(0xff4444);
+      this.player.x+=dir*16;
+      this.player.setTint(0xff4444);
 
-        this.time.delayedCall(120,()=>{
-          if(this.player) this.player.clearTint();
-        });
-      }
+      this.time.delayedCall(120,()=>{
+        if(this.player) this.player.clearTint();
+      });
     }
   }
 
   positionAttackSprite(type="light"){
     if(!this.player || !this.poseSprite) return;
 
-    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
     const dir=this.player.flipX ? -1 : 1;
 
     this.poseSprite.loadTexture(this.getPlayerAttackSheet());
-    this.poseSprite.x=this.player.x+(nudge.x*dir);
-    this.poseSprite.y=this.player.y+nudge.y;
+    this.poseSprite.x=this.player.x+(-6*dir);
+    this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,nudge.originY);
-    this.poseSprite.setScale(nudge.scale);
-  }
-
-  updateBusyWatchdog(){
-    if(!this.player) return;
-
-    if(!this.playerBusy){
-      this.lastBusyValue=false;
-      this.busyWatchStartedAt=0;
-      return;
-    }
-
-    if(!this.lastBusyValue){
-      this.lastBusyValue=true;
-      this.busyWatchStartedAt=this.time.now;
-      return;
-    }
-
-    const stuckFor=this.time.now-this.busyWatchStartedAt;
-
-    const allowedLongBusy =
-      this.playerHealth<=0 ||
-      this.isClimbing ||
-      this.isJumping ||
-      this.grabbedEnemy ||
-      this.pauseMenuOpen ||
-      this.matchOver;
-
-    if(!allowedLongBusy && stuckFor>BUSY_WATCHDOG_MS){
-      this.forcePlayerReady();
-      this.busyWatchStartedAt=0;
-      this.lastBusyValue=false;
-    }
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
   }
 
   forcePlayerReady(){
@@ -3123,7 +2692,6 @@ class Game extends Phaser.Scene{
       this.player.setVisible(true);
       this.player.setScale(PLAYER_MOVE_SCALE);
       this.player.clearTint();
-      this.player.body.setVelocity(0,0);
 
       if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
       else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
@@ -3144,7 +2712,6 @@ class Game extends Phaser.Scene{
     if(!data) return;
 
     this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
 
     this.positionAttackSprite(type);
     this.poseSprite.setVisible(true);
@@ -3152,36 +2719,34 @@ class Game extends Phaser.Scene{
 
     safePlay(this.poseSprite,data.anim);
 
-    this.time.delayedCall(100,()=>this.createHitbox(data));
+    this.time.delayedCall(100,()=>this.applyPlayerHit(data));
 
-    this.time.delayedCall(420,()=>{
-      this.forcePlayerReady();
-    });
-
-    this.time.delayedCall(700,()=>{
-      if(this.playerBusy) this.forcePlayerReady();
-    });
+    this.time.delayedCall(420,()=>this.forcePlayerReady());
+    this.time.delayedCall(700,()=>{ if(this.playerBusy) this.forcePlayerReady(); });
   }
 
-  createHitbox(data){
-    const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
-    const boxX=this.player.x+dir*50;
-    const boxY=this.player.y-45;
+  applyPlayerHit(data){
+    const dir=this.getFacingDir();
+    const hitX=this.player.x+dir*52;
+    const hitY=this.player.y-42;
 
-    const box=this.add.rectangle(boxX,boxY,80,50,0xff0000,0).setDepth(999);
-    this.physics.add.existing(box);
-    box.body.setAllowGravity(false);
+    const box=this.add.rectangle(hitX,hitY,data.range || 86,54,0xff0000,0).setDepth(999);
 
-    const hit=new Set();
+    const hitSet=new Set();
 
-    this.physics.add.overlap(box,this.enemies,(b,e)=>{
-      if(hit.has(e) || e.dead || e.state==="dead") return;
+    this.enemies.forEach(e=>{
+      if(hitSet.has(e) || e.dead || e.state==="dead") return;
       if(e.platform!==this.platform) return;
       if(e.grabbed || e.thrownTime>0) return;
       if(e.invulnerable) return;
 
-      hit.add(e);
-      this.damageEnemy(e,data.damage,data.stagger);
+      const dx=Math.abs(e.x-hitX);
+      const dy=Math.abs((e.y-45)-hitY);
+
+      if(dx<(data.range || 86)/2+28 && dy<48){
+        hitSet.add(e);
+        this.damageEnemy(e,data.damage,data.stagger);
+      }
     });
 
     this.time.delayedCall(120,()=>{
@@ -3208,7 +2773,6 @@ class Game extends Phaser.Scene{
 
     this.playerBusy=true;
     this.isBlocking=true;
-    this.player.body.setVelocity(0,0);
 
     this.positionAttackSprite("block");
     this.poseSprite.setVisible(true);
@@ -3245,8 +2809,6 @@ class Game extends Phaser.Scene{
     this.isJumping=false;
     this.isCrouching=false;
     this.jumpCount=0;
-    this.busyWatchStartedAt=0;
-    this.lastBusyValue=false;
 
     if(this.poseSprite){
       this.poseSprite.stop();
@@ -3256,12 +2818,7 @@ class Game extends Phaser.Scene{
     if(this.player){
       this.player.setVisible(true);
       this.player.setScale(PLAYER_MOVE_SCALE);
-      this.player.body.setVelocity(0,0);
       this.player.clearTint();
-
-      this.lastPlayerX = this.player.x;
-      this.lastPlayerY = this.player.y;
-      this.playerStuckFrames = 0;
 
       if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
       else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
@@ -3270,10 +2827,8 @@ class Game extends Phaser.Scene{
   }
 
   showRuntimeError(err){
-    if(!DEBUG_RUNTIME) return;
-
-    const msg = err && err.message ? err.message : String(err);
-    window.__MP_LAST_ERROR = msg;
+    const msg=err && err.message ? err.message : String(err);
+    window.__MP_LAST_ERROR=msg;
     console.error(err);
 
     if(!this.runtimeErrorText){
@@ -3291,13 +2846,6 @@ class Game extends Phaser.Scene{
   startMatchCountdown(){
     this.matchStarted=false;
     this.roundUnlockDone=false;
-
-    if(SKIP_COUNTDOWN_FOR_TEST){
-      this.time.delayedCall(250,()=>{
-        this.unlockPlayerControl();
-      });
-      return;
-    }
 
     const shade=this.add.rectangle(480,270,960,540,0x000000,0.42)
       .setDepth(19990);
@@ -3368,12 +2916,11 @@ class Game extends Phaser.Scene{
 
   checkVictory(){
     if(!this.matchStarted || this.matchOver || this.victoryShown) return;
-    if(!this.enemies) return;
 
     let aliveNormalEnemies=0;
     let aliveDoorman=0;
 
-    this.enemies.children.each(e=>{
+    this.enemies.forEach(e=>{
       if(!e || e.dead || e.state==="dead" || e.health<=0) return;
 
       if(e.enemyType==="doorman"){
@@ -3403,8 +2950,6 @@ class Game extends Phaser.Scene{
     this.victoryShown=true;
     this.matchOver=true;
 
-    this.freezeActors();
-
     this.add.rectangle(480,270,960,540,0x000000,0.35)
       .setDepth(19990);
 
@@ -3431,20 +2976,6 @@ class Game extends Phaser.Scene{
     this.cameras.main.shake(250,0.004);
   }
 
-  freezeActors(){
-    if(this.player && this.player.body){
-      this.player.body.setVelocity(0,0);
-    }
-
-    if(this.enemies){
-      this.enemies.children.each(e=>{
-        if(e && e.body && !e.grabbed){
-          e.setVelocity(0,0);
-        }
-      });
-    }
-  }
-
   togglePauseMenu(){
     if(!this.matchStarted || this.matchOver) return;
 
@@ -3459,8 +2990,6 @@ class Game extends Phaser.Scene{
     if(this.pauseMenuOpen) return;
 
     this.pauseMenuOpen=true;
-    this.pauseCursor=0;
-    this.freezeActors();
 
     const shade=this.add.rectangle(480,270,960,540,0x000000,0.55)
       .setDepth(30000);
@@ -3747,13 +3276,6 @@ const config={
   scale:{
     mode:Phaser.Scale.FIT,
     autoCenter:Phaser.Scale.CENTER_BOTH
-  },
-  physics:{
-    default:"arcade",
-    arcade:{
-      gravity:{y:0},
-      debug:false
-    }
   },
   scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
