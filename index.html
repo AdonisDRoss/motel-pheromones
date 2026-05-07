@@ -13,22 +13,18 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 595;
+const VERSION = 596;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
-
 const ATTACK_FRAME_W = 288;
 const ATTACK_FRAME_H = 232;
-
 const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
-
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
-
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
 
@@ -36,7 +32,6 @@ const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
 const PLAYER_ACTION_SCALE = 0.32;
 const PLAYER_REACTION_SCALE = 0.32;
-
 const ENEMY_SCALE = 0.55;
 
 const WALK_SPEED = 190;
@@ -54,17 +49,17 @@ const LIGHTNING_MIN_DELAY = 15000;
 const LIGHTNING_MAX_DELAY = 30000;
 
 const ATTACK_NUDGE = {
-  light: {x: -6, y: 0, scale: 0.32, originY: 1},
-  heavy: {x: -8, y: 0, scale: 0.32, originY: 1},
-  kick:  {x: -4, y: 0, scale: 0.32, originY: 1},
-  block: {x:  0, y: 0, scale: 0.26, originY: 1}
+  light: {x:-6,y:0,scale:0.32,originY:1},
+  heavy: {x:-8,y:0,scale:0.32,originY:1},
+  kick:  {x:-4,y:0,scale:0.32,originY:1},
+  block: {x:0,y:0,scale:0.26,originY:1}
 };
 
 const REACTION_NUDGE = {
-  hurt:      {x: 0, y: 0, scale: 0.32, originY: 1},
-  knockback: {x: 0, y: 0, scale: 0.32, originY: 1},
-  ko:        {x: 0, y: 0, scale: 0.32, originY: 1},
-  getup:     {x: 0, y: 0, scale: 0.32, originY: 1}
+  hurt:{x:0,y:0,scale:0.32,originY:1},
+  knockback:{x:0,y:0,scale:0.32,originY:1},
+  ko:{x:0,y:0,scale:0.32,originY:1},
+  getup:{x:0,y:0,scale:0.32,originY:1}
 };
 
 const ENEMY_NAMES = [
@@ -72,9 +67,7 @@ const ENEMY_NAMES = [
   "DUSTY","CHUCK","VANCE","KNOX","SPIKE","LENNY","DRAKE","AXEL"
 ];
 
-const ENEMY_AUTH_TAGS = [
-  "GOON","PUNK","CREW","HYPE","MOSH","CORPO","SEC"
-];
+const ENEMY_AUTH_TAGS = ["GOON","PUNK","CREW","HYPE","MOSH","CORPO","SEC"];
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -90,11 +83,7 @@ function safePlay(sprite,key){
   if(!sprite || !sprite.scene) return;
   if(!hasAnim(sprite.scene,key)) return;
 
-  if(
-    sprite.anims.currentAnim &&
-    sprite.anims.currentAnim.key === key &&
-    sprite.anims.isPlaying
-  ){
+  if(sprite.anims.currentAnim && sprite.anims.currentAnim.key===key && sprite.anims.isPlaying){
     return;
   }
 
@@ -126,35 +115,35 @@ function loadAssets(scene){
 
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
 
-  scene.load.spritesheet("jt_movement", JT_BASE + "/movement.png?v=" + VERSION,{
+  scene.load.spritesheet("jt_movement",JT_BASE+"/movement.png?v="+VERSION,{
     frameWidth:MOVE_FRAME_W,
     frameHeight:MOVE_FRAME_H,
     margin:0,
     spacing:0
   });
 
-  scene.load.spritesheet("jt_attacks", JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
+  scene.load.spritesheet("jt_attacks",JT_BASE+"/attacks/jt_attacks.png?v="+VERSION,{
     frameWidth:ATTACK_FRAME_W,
     frameHeight:ATTACK_FRAME_H,
     margin:0,
     spacing:0
   });
 
-  scene.load.spritesheet("jt_actions", JT_BASE + "/actions/jt_actions.png?v=" + VERSION,{
+  scene.load.spritesheet("jt_actions",JT_BASE+"/actions/jt_actions.png?v="+VERSION,{
     frameWidth:ACTION_FRAME_W,
     frameHeight:ACTION_FRAME_H,
     margin:0,
     spacing:0
   });
 
-  scene.load.spritesheet("jt_reactions", JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
+  scene.load.spritesheet("jt_reactions",JT_BASE+"/reactions/jt_reactions.png?v="+VERSION,{
     frameWidth:REACTION_FRAME_W,
     frameHeight:REACTION_FRAME_H,
     margin:0,
     spacing:0
   });
 
-  scene.load.spritesheet("corpo_sellout", ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
+  scene.load.spritesheet("corpo_sellout",ENEMY_BASE+"/corpo_sellout.png?v="+VERSION,{
     frameWidth:ENEMY_FRAME_W,
     frameHeight:ENEMY_FRAME_H,
     margin:0,
@@ -565,27 +554,24 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
-    const keyUpHeld =
-      this.keys &&
-      (this.keys.up.isDown || this.keys.w.isDown);
-
-    const stickUpHeld = this.stickY < -0.65;
-    const upHeld = keyUpHeld || stickUpHeld;
+    const keyUpHeld=this.keys && (this.keys.up.isDown || this.keys.w.isDown);
+    const stickUpHeld=this.stickY < -0.65;
+    const upHeld=keyUpHeld || stickUpHeld;
 
     if(upHeld && !this.upTapHeld){
-      const now = this.time.now;
+      const now=this.time.now;
 
-      if(now - this.lastUpTapTime <= DOUBLE_UP_WINDOW){
-        this.lastUpTapTime = 0;
-        this.upTapHeld = true;
+      if(now-this.lastUpTapTime<=DOUBLE_UP_WINDOW){
+        this.lastUpTapTime=0;
+        this.upTapHeld=true;
         this.startJump();
         return;
       }
 
-      this.lastUpTapTime = now;
+      this.lastUpTapTime=now;
     }
 
-    this.upTapHeld = upHeld;
+    this.upTapHeld=upHeld;
   }
 
   updateMovement(){
@@ -662,23 +648,32 @@ class Game extends Phaser.Scene{
   }
 
   addForegroundOverlays(){
-    if(selectedLevel !== "outdoor") return;
+    if(selectedLevel!=="outdoor") return;
+
+    const frontDepth=650;
 
     if(hasTex(this,"outdoor_barricade_front")){
-      this.barricadeFront=this.add.image(305,405,"outdoor_barricade_front");
-this.barricadeFront.setDepth(260);
-      return;
+      const tex=this.textures.get("outdoor_barricade_front");
+      const source=tex.getSourceImage();
+
+      if(source && source.width<=260 && source.height<=180){
+        this.barricadeFront=this.add.image(300,408,"outdoor_barricade_front")
+          .setOrigin(0.5,1)
+          .setScale(0.32)
+          .setDepth(frontDepth);
+        return;
+      }
     }
 
     if(hasTex(this,"outdoor")){
-      const cropX=285;
-      const cropY=348;
-      const cropW=90;
-      const cropH=48;
+      const cropX=282;
+      const cropY=344;
+      const cropW=98;
+      const cropH=56;
 
       this.barricadeOverlay=this.add.image(cropX+cropW/2,cropY+cropH/2,"outdoor")
         .setOrigin(0.5)
-        .setDepth(260);
+        .setDepth(frontDepth);
 
       this.barricadeOverlay.setCrop(cropX,cropY,cropW,cropH);
     }
@@ -688,49 +683,13 @@ this.barricadeFront.setDepth(260);
     const alpha=0;
 
     this.ladders=[
-      {
-        name:"left",
-        x:332,
-        y:355,
-        w:64,
-        h:235,
-        topY:250,
-        middleY:390
-      },
-      {
-        name:"right",
-        x:806,
-        y:355,
-        w:64,
-        h:235,
-        topY:250,
-        middleY:390
-      }
+      {name:"left",x:332,y:355,w:64,h:235,topY:250,middleY:390},
+      {name:"right",x:806,y:355,w:64,h:235,topY:250,middleY:390}
     ];
 
     this.stairs=[
-      {
-        name:"leftStairs",
-        x:118,
-        y:452,
-        w:120,
-        h:120,
-        middleX:150,
-        middleY:390,
-        bottomX:120,
-        bottomY:505
-      },
-      {
-        name:"rightStairs",
-        x:846,
-        y:452,
-        w:120,
-        h:120,
-        middleX:816,
-        middleY:390,
-        bottomX:860,
-        bottomY:505
-      }
+      {name:"leftStairs",x:118,y:452,w:120,h:120,middleX:150,middleY:390,bottomX:120,bottomY:505},
+      {name:"rightStairs",x:846,y:452,w:120,h:120,middleX:816,middleY:390,bottomX:860,bottomY:505}
     ];
 
     this.ladders.forEach(l=>{
@@ -1473,7 +1432,7 @@ this.barricadeFront.setDepth(260);
     if(!hasAnim(this,animKey)) return false;
 
     this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y + yOffset;
+    this.poseSprite.y=this.player.y+yOffset;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(scale);
@@ -1527,8 +1486,8 @@ this.barricadeFront.setDepth(260);
 
     this.player.body.setVelocity(0,0);
 
-    this.poseSprite.x=this.player.x + (nudge.x * dir);
-    this.poseSprite.y=this.player.y + nudge.y;
+    this.poseSprite.x=this.player.x+(nudge.x*dir);
+    this.poseSprite.y=this.player.y+nudge.y;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,nudge.originY);
     this.poseSprite.setScale(nudge.scale);
@@ -1551,7 +1510,7 @@ this.barricadeFront.setDepth(260);
     if(!VIBRATION_ENABLED) return;
     if(typeof navigator==="undefined" || !navigator.vibrate) return;
 
-    const power=Phaser.Math.Clamp(Math.round(20 + damage*6),30,150);
+    const power=Phaser.Math.Clamp(Math.round(20+damage*6),30,150);
 
     if(type==="block"){
       navigator.vibrate([20,25,20]);
@@ -1598,7 +1557,7 @@ this.barricadeFront.setDepth(260);
       });
     }
 
-    const shakePower=Phaser.Math.Clamp(0.002 + damage*0.00022,0.003,0.009);
+    const shakePower=Phaser.Math.Clamp(0.002+damage*0.00022,0.003,0.009);
     this.cameras.main.shake(80,shakePower);
   }
 
@@ -1661,8 +1620,8 @@ this.barricadeFront.setDepth(260);
     const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
     const dir=this.player.flipX ? -1 : 1;
 
-    this.poseSprite.x=this.player.x + (nudge.x * dir);
-    this.poseSprite.y=this.player.y + nudge.y;
+    this.poseSprite.x=this.player.x+(nudge.x*dir);
+    this.poseSprite.y=this.player.y+nudge.y;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,nudge.originY);
     this.poseSprite.setScale(nudge.scale);
@@ -1726,8 +1685,8 @@ this.barricadeFront.setDepth(260);
 
   createHitbox(data){
     const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
-    const boxX=this.player.x + dir*50;
-    const boxY=this.player.y - 45;
+    const boxX=this.player.x+dir*50;
+    const boxY=this.player.y-45;
 
     const box=this.add.rectangle(boxX,boxY,80,50,0xff0000,0).setDepth(999);
     this.physics.add.existing(box);
@@ -2051,14 +2010,7 @@ this.barricadeFront.setDepth(260);
       this.selectPauseOption();
     });
 
-    this.pauseItems=[
-      shade,
-      panel,
-      title,
-      continueText,
-      quitText,
-      hint
-    ];
+    this.pauseItems=[shade,panel,title,continueText,quitText,hint];
 
     this.updatePauseCursor();
   }
