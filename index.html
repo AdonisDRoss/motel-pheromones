@@ -33,7 +33,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 641;
+const VERSION = 642;
 const W = 960;
 const H = 540;
 
@@ -823,6 +823,7 @@ class Game extends Phaser.Scene{
 
       this.updateGrabbedEnemy();
       this.updateEnemyAI(delta);
+      this.resolvePlayerEnemyContact();
       this.checkVictory();
     }
 
@@ -2172,6 +2173,13 @@ class Game extends Phaser.Scene{
       }
 
       if(dist<=e.attackRange && e.attackCooldown<=0){
+        if(dist<64){
+          e.vx=(e.x<this.player.x ? -1 : 1)*110;
+          e.attackCooldown=480;
+          this.safeEnemyPlay(e,"walk");
+          return;
+        }
+
         const closeAttackers=this.enemies.filter(other=>{
           if(!other || other===e || other.dead) return false;
           if(other.platform!==e.platform) return false;
@@ -2212,31 +2220,25 @@ class Game extends Phaser.Scene{
     const dx=e.x-this.player.x;
     const dy=e.y-this.player.y;
 
-    if(Math.abs(dy)>40) return;
+    if(Math.abs(dy)>42) return;
 
-    const tooClose=Math.abs(dx)<82;
+    const minGap=76;
 
-    if(!tooClose) return;
-
-    const primary=this.getPrimaryPressureEnemy();
-
-    if(primary===e){
-      if(Math.abs(dx)<38){
-        const softDir=dx>=0 ? 1 : -1;
-        e.x+=softDir*3;
-      }
-      return;
-    }
+    if(Math.abs(dx)>=minGap) return;
 
     let pushDir=dx>=0 ? 1 : -1;
 
-    if(Math.abs(this.moveX)>0.15){
-      pushDir=this.moveX>0 ? 1 : -1;
+    if(Math.abs(dx)<4){
+      if(Math.abs(this.moveX)>0.1){
+        pushDir=this.moveX>0 ? 1 : -1;
+      }else{
+        pushDir=this.getFacingDir();
+      }
     }
 
-    e.x+=pushDir*14;
-    e.vx=pushDir*85;
-    e.attackCooldown=Math.max(e.attackCooldown || 0,420);
+    e.x=this.player.x+(pushDir*minGap);
+    e.vx=pushDir*105;
+    e.attackCooldown=Math.max(e.attackCooldown || 0,520);
 
     if(e.platform==="top"){
       e.x=Phaser.Math.Clamp(e.x,190,820);
@@ -2245,6 +2247,52 @@ class Game extends Phaser.Scene{
     }
 
     this.safeEnemyPlay(e,"walk");
+    this.updateEnemyVisuals(e);
+  }
+
+  resolvePlayerEnemyContact(){
+    if(!this.player || !this.enemies) return;
+
+    this.enemies.forEach(e=>{
+      if(!e || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
+      if(e.grabbed || e.thrownTime>0) return;
+
+      const dx=e.x-this.player.x;
+      const dy=e.y-this.player.y;
+
+      if(Math.abs(dy)>45) return;
+
+      const minGap=e.enemyType==="doorman" ? 92 : 78;
+
+      if(Math.abs(dx)>=minGap) return;
+
+      let pushDir=dx>=0 ? 1 : -1;
+
+      if(Math.abs(dx)<4){
+        if(Math.abs(this.moveX)>0.1){
+          pushDir=this.moveX>0 ? 1 : -1;
+        }else{
+          pushDir=this.getFacingDir();
+        }
+      }
+
+      e.x=this.player.x+(pushDir*minGap);
+      e.vx=pushDir*120;
+      e.attackCooldown=Math.max(e.attackCooldown || 0,650);
+
+      if(e.platform==="top"){
+        e.x=Phaser.Math.Clamp(e.x,190,820);
+      }else{
+        e.x=Phaser.Math.Clamp(e.x,120,860);
+      }
+
+      if(e.state!=="attack"){
+        this.safeEnemyPlay(e,"walk");
+      }
+
+      this.updateEnemyVisuals(e);
+    });
   }
 
   applyEnemySeparation(e){
@@ -2690,7 +2738,7 @@ class Game extends Phaser.Scene{
     }
 
     this.playerHealth=Math.max(0,this.playerHealth-finalDamage);
-    this.playerInvuln=650;
+    this.playerInvuln=900;
 
     this.createHitFX(this.player.x,this.player.y-60,this.isBlocking ? "block" : "hit",finalDamage);
 
@@ -2705,24 +2753,32 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    if(this.isBlocking){
-      this.player.setTint(0x44ffff);
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.isCrouching=false;
 
-      this.time.delayedCall(120,()=>{
-        if(this.player) this.player.clearTint();
-      });
-
-      return;
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
     }
 
-    if(!this.showReaction("hurt",350)){
-      this.player.x+=dir*16;
-      this.player.setTint(0xff4444);
+    this.player.setVisible(true);
+    this.player.setScale(PLAYER_MOVE_SCALE);
 
-      this.time.delayedCall(120,()=>{
-        if(this.player) this.player.clearTint();
-      });
-    }
+    this.player.x+=dir*18;
+    this.applyPlatformBounds();
+
+    this.player.setTint(0xff4444);
+
+    this.time.delayedCall(120,()=>{
+      if(this.player){
+        this.player.clearTint();
+      }
+    });
+
+    this.time.delayedCall(40,()=>{
+      this.resolvePlayerEnemyContact();
+    });
   }
 
   positionAttackSprite(type="light"){
