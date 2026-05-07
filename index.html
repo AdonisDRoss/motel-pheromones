@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 582;
+const VERSION = 587;
 const W = 960;
 const H = 540;
 
@@ -34,16 +34,21 @@ const ENEMY_FRAME_H = 128;
 
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
-const PLAYER_ACTION_SCALE = 0.44;
-const PLAYER_REACTION_SCALE = 0.44;
+const PLAYER_ACTION_SCALE = 0.32;
+const PLAYER_REACTION_SCALE = 0.32;
 
 const ENEMY_SCALE = 0.55;
+
+const WALK_SPEED = 190;
+const RUN_SPEED = 270;
+const RUN_STICK_THRESHOLD = 0.72;
+const STICK_DEADZONE = 0.08;
 
 const ATTACK_NUDGE = {
   light: {x: -6, y: 0, scale: 0.32, originY: 1},
   heavy: {x: -8, y: 0, scale: 0.32, originY: 1},
   kick:  {x: -4, y: 0, scale: 0.32, originY: 1},
-  block: {x: 0,  y: 0, scale: 0.32, originY: 1}
+  block: {x:  0, y: 0, scale: 0.26, originY: 1}
 };
 
 let selectedFighter = "JT";
@@ -59,7 +64,15 @@ function hasAnim(scene,key){ return scene.anims.exists(key); }
 function safePlay(sprite,key){
   if(!sprite || !sprite.scene) return;
   if(!hasAnim(sprite.scene,key)) return;
-  if(sprite.anims.currentAnim && sprite.anims.currentAnim.key === key) return;
+
+  if(
+    sprite.anims.currentAnim &&
+    sprite.anims.currentAnim.key === key &&
+    sprite.anims.isPlaying
+  ){
+    return;
+  }
+
   sprite.play(key,true);
 }
 
@@ -375,9 +388,11 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
     this.input.keyboard.on("keydown-K",()=>this.startAttack("heavy"));
     this.input.keyboard.on("keydown-U",()=>this.startAttack("kick"));
-    this.input.keyboard.on("keydown-L",()=>this.startBlock());
-    this.input.keyboard.on("keyup-L",()=>this.endBlock());
+    this.input.keyboard.on("keydown-L",()=>this.startContextB());
     this.input.keyboard.on("keydown-SPACE",()=>this.startAttack("heavy"));
+
+    this.input.keyboard.on("keydown-E",()=>this.startGrab());
+    this.input.keyboard.on("keydown-G",()=>this.startGrab());
 
     this.input.keyboard.on("keydown-C",()=>this.playPlayerPose("jt_crouch",450,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-T",()=>this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE));
@@ -449,17 +464,38 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    const stickPower=Math.hypot(this.stickX,this.stickY);
-    const running=(this.keys && this.keys.shift.isDown) || this.mobileRun || stickPower>0.75;
-    const speed=running ? 260 : 200;
+    const stickPower=Math.min(1,Math.hypot(this.stickX,this.stickY));
+    const usingStick=stickPower>STICK_DEADZONE;
+    const keyboardRunning=(this.keys && this.keys.shift.isDown);
 
     let vx=this.moveX;
     let vy=this.moveY;
+
+    if(Math.abs(vx)<STICK_DEADZONE) vx=0;
+    if(Math.abs(vy)<STICK_DEADZONE) vy=0;
 
     if(vx!==0 && vy!==0){
       vx*=0.707;
       vy*=0.707;
     }
+
+    let speed=WALK_SPEED;
+
+    if(usingStick){
+      const runPressure=Phaser.Math.Clamp(
+        (stickPower-RUN_STICK_THRESHOLD)/(1-RUN_STICK_THRESHOLD),
+        0,
+        1
+      );
+
+      speed=Phaser.Math.Linear(WALK_SPEED,RUN_SPEED,runPressure);
+    }
+
+    if(keyboardRunning){
+      speed=RUN_SPEED;
+    }
+
+    const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
 
     this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
     this.player.body.velocity.y=0;
@@ -536,9 +572,21 @@ class Game extends Phaser.Scene{
     this.isClimbing=true;
     this.currentLadder=ladder;
     this.playerBusy=false;
+
     this.player.body.setVelocity(0,0);
     this.player.x=ladder.x;
-    safePlay(this.player,"jt_idle_up");
+
+    this.player.setVisible(false);
+
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=false;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(true);
+
+    safePlay(this.poseSprite,"jt_climb");
+
     this.zoneText.setText("CLIMBING LADDER");
   }
 
@@ -550,12 +598,24 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
     this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
 
+    if(this.poseSprite){
+      this.poseSprite.x=this.player.x;
+      this.poseSprite.y=this.player.y;
+      this.poseSprite.flipX=false;
+      this.poseSprite.setOrigin(0.5,1);
+      this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+      this.poseSprite.setVisible(true);
+      safePlay(this.poseSprite,"jt_climb");
+    }
+
     if(this.player.y<=l.topY+2 && this.moveY<-0.45){
       this.isClimbing=false;
       this.platform="top";
       this.player.y=l.topY;
       this.zoneText.setText("TOP PLATFORM");
       this.currentLadder=null;
+      this.forcePlayerReady();
+      return;
     }
 
     if(this.player.y>=l.middleY-2 && this.moveY>0.45){
@@ -564,6 +624,8 @@ class Game extends Phaser.Scene{
       this.player.y=l.middleY;
       this.zoneText.setText("MIDDLE PLATFORM");
       this.currentLadder=null;
+      this.forcePlayerReady();
+      return;
     }
 
     if(Math.abs(this.moveX)>0.65){
@@ -572,6 +634,8 @@ class Game extends Phaser.Scene{
       this.player.y=l.middleY;
       this.zoneText.setText("MIDDLE PLATFORM");
       this.currentLadder=null;
+      this.forcePlayerReady();
+      return;
     }
   }
 
@@ -590,6 +654,154 @@ class Game extends Phaser.Scene{
       this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
       this.player.y=250;
     }
+  }
+
+  getFacingDir(){
+    return this.player && this.player.flipX ? -1 : 1;
+  }
+
+  isForwardHeld(){
+    const facing=this.getFacingDir();
+    return this.moveX*facing>0.35;
+  }
+
+  isBackHeld(){
+    const facing=this.getFacingDir();
+    return this.moveX*facing<-0.35;
+  }
+
+  isUpHeld(){
+    return this.moveY<-0.35;
+  }
+
+  isDownHeld(){
+    return this.moveY>0.35;
+  }
+
+  startContextB(){
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.readInput();
+
+    if(this.isForwardHeld()){
+      this.startGrab();
+      return;
+    }
+
+    if(this.isBackHeld()){
+      this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE);
+      return;
+    }
+
+    if(this.isUpHeld()){
+      this.startJump();
+      return;
+    }
+
+    if(this.isDownHeld()){
+      this.playPlayerPose("jt_crouch",450,PLAYER_ACTION_SCALE);
+      return;
+    }
+
+    this.quickBlock();
+  }
+
+  startJump(){
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    const startY=this.player.y;
+
+    this.tweens.add({
+      targets:this.player,
+      y:startY-55,
+      duration:160,
+      yoyo:true,
+      ease:"Sine.easeOut",
+      onComplete:()=>{
+        this.player.y=startY;
+        this.forcePlayerReady();
+      }
+    });
+  }
+
+  startGrab(){
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(!this.enemies) return;
+
+    let target=null;
+    let bestDist=9999;
+
+    this.enemies.children.each(e=>{
+      if(!e || e.dead || e.state==="dead") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+
+      if(dx<65 && dy<45 && dx<bestDist){
+        target=e;
+        bestDist=dx;
+      }
+    });
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    if(hasAnim(this,"jt_special")){
+      this.showPose("jt_special",PLAYER_ACTION_SCALE);
+    }
+
+    if(!target){
+      this.time.delayedCall(300,()=>{
+        this.forcePlayerReady();
+      });
+      return;
+    }
+
+    const dir=target.x<this.player.x ? -1 : 1;
+
+    target.busy=true;
+    target.state="hurt";
+    target.knockbackTime=450;
+    target.attackCooldown=900;
+    target.health-=14;
+
+    target.setVelocityX(dir*220);
+    safePlay(target,"enemy_hurt");
+
+    if(target.hpText){
+      target.hpText.setText("HP "+Math.max(0,target.health));
+    }
+
+    this.combo++;
+    this.rhythm=Math.min(10,this.rhythm+1);
+
+    if(target.health<=0){
+      target.health=0;
+      target.dead=true;
+      target.state="dead";
+      target.busy=true;
+      target.setVelocityX(0);
+      safePlay(target,"enemy_ko");
+
+      if(target.hpText){
+        target.hpText.setText("KO");
+      }
+    }else{
+      this.time.delayedCall(450,()=>{
+        if(!target.dead){
+          target.busy=false;
+          target.state="idle";
+          safePlay(target,"enemy_idle");
+        }
+      });
+    }
+
+    this.time.delayedCall(420,()=>{
+      this.forcePlayerReady();
+    });
   }
 
   createEnemies(){
@@ -1102,8 +1314,7 @@ class Game extends Phaser.Scene{
     this.mobileButton(820,340,"X",()=>this.startAttack("light"));
     this.mobileButton(760,410,"Y",()=>this.startAttack("heavy"));
     this.mobileButton(880,410,"A",()=>this.startAttack("kick"));
-    this.mobileButton(820,480,"B",()=>this.quickBlock());
-    this.mobileButton(700,405,"RUN",()=>{this.mobileRun=true;},()=>{this.mobileRun=false;});
+    this.mobileButton(820,480,"B",()=>this.startContextB());
     this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
 
     this.add.text(480,505,"MENU",{
