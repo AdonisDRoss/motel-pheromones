@@ -33,7 +33,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 625;
+const VERSION = 626;
 const W = 960;
 const H = 540;
 
@@ -76,6 +76,10 @@ const PLATFORM_BOUNDS = {
 const JUMP_HEIGHT = 68;
 const JUMP_TIME = 420;
 const DOUBLE_UP_WINDOW = 360;
+const MAX_JUMPS = 2;
+const CROUCH_JUMP_BOOST = 1.15;
+const DOUBLE_JUMP_HEIGHT_MULT = 0.85;
+
 const SWEEP_DAMAGE = 10;
 
 const JT_BASE = "assets/sprites/player/jt";
@@ -87,7 +91,7 @@ const PLATFORM_TRANSITIONS_ENABLED = false;
 const DISABLE_DOORMAN_FOR_TEST = true;
 const DEBUG_RUNTIME = true;
 const DEBUG_INPUT = true;
-const SKIP_COUNTDOWN_FOR_TEST = true;
+const SKIP_COUNTDOWN_FOR_TEST = false;
 const SIMPLE_DIRECT_MOVEMENT = true;
 const BUSY_WATCHDOG_MS = 1400;
 
@@ -696,6 +700,11 @@ class Game extends Phaser.Scene{
     this.isJumping=false;
     this.isCrouching=false;
 
+    this.jumpCount=0;
+    this.maxJumps=MAX_JUMPS;
+    this.jumpGroundY=390;
+    this.activeJumpTween=null;
+
     this.combo=0;
     this.rhythm=0;
 
@@ -860,13 +869,14 @@ class Game extends Phaser.Scene{
       this.debugInputText.setText(
         "STARTED: "+this.matchStarted+
         " | BUSY: "+this.playerBusy+
+        " | JUMP: "+this.jumpCount+"/"+this.maxJumps+
+        " | CROUCH: "+this.isCrouching+
         " | CLIMB: "+this.isClimbing+
         " | PLATFORM: "+this.platform+
         " | INPUT X: "+this.moveX.toFixed(2)+
         " | INPUT Y: "+this.moveY.toFixed(2)+
         " | PX: "+Math.floor(this.player.x)+
         " | PY: "+Math.floor(this.player.y)+
-        " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)+
         " | ERR: "+window.__MP_LAST_ERROR
       );
     }
@@ -951,7 +961,9 @@ class Game extends Phaser.Scene{
   checkDoubleUpJump(){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    if(this.playerBusy && !this.isJumping && !this.isCrouching) return;
 
     const keyUpHeld=this.keys && (this.keys.up.isDown || this.keys.w.isDown);
     const stickUpHeld=this.stickY < -0.65;
@@ -1131,21 +1143,26 @@ class Game extends Phaser.Scene{
 
   startContextB(){
     if(!this.ensureRoundActive()) return;
-
     if(this.pauseMenuOpen) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
 
     this.readInput();
 
     if(this.isUpHeld()){
-      this.startJump();
+      if(!this.playerBusy || this.isJumping || this.isCrouching){
+        this.startJump();
+      }
       return;
     }
 
     if(this.isDownHeld()){
-      this.startCrouch();
+      if(!this.playerBusy){
+        this.startCrouch();
+      }
       return;
     }
+
+    if(this.playerBusy) return;
 
     this.quickBlock();
   }
@@ -1178,13 +1195,26 @@ class Game extends Phaser.Scene{
 
   startJump(){
     if(!this.ensureRoundActive()) return;
-
     if(this.pauseMenuOpen) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
 
-    this.playerBusy=true;
-    this.isJumping=true;
-    this.isCrouching=false;
+    const alreadyJumping = this.isJumping;
+
+    if(alreadyJumping && this.jumpCount >= this.maxJumps){
+      return;
+    }
+
+    if(this.playerBusy && !this.isJumping && !this.isCrouching){
+      return;
+    }
+
+    const wasCrouching = this.isCrouching;
+
+    this.playerBusy = true;
+    this.isJumping = true;
+    this.isCrouching = false;
+    this.isBlocking = false;
+
     this.player.body.setVelocity(0,0);
 
     if(this.poseSprite){
@@ -1193,6 +1223,18 @@ class Game extends Phaser.Scene{
     }
 
     this.player.setVisible(true);
+
+    if(!alreadyJumping){
+      this.jumpCount = 0;
+      this.jumpGroundY = this.player.y;
+    }
+
+    this.jumpCount++;
+
+    if(this.activeJumpTween){
+      this.activeJumpTween.stop();
+      this.activeJumpTween = null;
+    }
 
     const jumpAnim=this.getPlayerAnim("jump");
 
@@ -1203,23 +1245,46 @@ class Game extends Phaser.Scene{
       this.player.setScale(PLAYER_MOVE_SCALE);
     }
 
-    const startY=this.player.y;
+    let height = JUMP_HEIGHT;
 
-    this.tweens.add({
+    if(wasCrouching){
+      height *= CROUCH_JUMP_BOOST;
+    }
+
+    if(this.jumpCount >= 2){
+      height *= DOUBLE_JUMP_HEIGHT_MULT;
+      this.createHitFX(this.player.x,this.player.y-60,"jump",6);
+    }else{
+      this.createHitFX(this.player.x,this.player.y-45,"jump",4);
+    }
+
+    const peakY = this.player.y - height;
+    const groundY = this.jumpGroundY;
+
+    this.activeJumpTween = this.tweens.add({
       targets:this.player,
-      y:startY-JUMP_HEIGHT,
+      y:peakY,
       duration:JUMP_TIME/2,
-      yoyo:true,
       ease:"Sine.easeOut",
       onComplete:()=>{
-        this.player.y=startY;
-        this.player.setScale(PLAYER_MOVE_SCALE);
-        this.isJumping=false;
-        this.forcePlayerReady();
+        this.activeJumpTween = this.tweens.add({
+          targets:this.player,
+          y:groundY,
+          duration:JUMP_TIME/2,
+          ease:"Sine.easeIn",
+          onComplete:()=>{
+            this.player.y = groundY;
+            this.player.setScale(PLAYER_MOVE_SCALE);
+
+            this.isJumping = false;
+            this.jumpCount = 0;
+            this.activeJumpTween = null;
+
+            this.forcePlayerReady();
+          }
+        });
       }
     });
-
-    this.createHitFX(this.player.x,this.player.y-45,"jump",4);
   }
 
   startCrouch(){
@@ -1755,6 +1820,10 @@ class Game extends Phaser.Scene{
     this.playerBusy=false;
     this.isBlocking=false;
 
+    if(!this.isJumping){
+      this.jumpCount = 0;
+    }
+
     if(this.poseSprite){
       this.poseSprite.stop();
       this.poseSprite.setVisible(false);
@@ -1880,6 +1949,7 @@ class Game extends Phaser.Scene{
     this.isBlocking=false;
     this.isJumping=false;
     this.isCrouching=false;
+    this.jumpCount=0;
     this.busyWatchStartedAt=0;
     this.lastBusyValue=false;
 
@@ -1929,6 +1999,72 @@ class Game extends Phaser.Scene{
       });
       return;
     }
+
+    const shade=this.add.rectangle(480,270,960,540,0x000000,0.42)
+      .setDepth(19990);
+
+    const main=this.makeArcadeText(480,235,"READY",62,"#ff4fc3");
+    const sub=this.makeArcadeText(480,330,"GET SET",30,"#00eaff");
+
+    const steps=[
+      {main:"READY",sub:"GET SET",color:"#ff4fc3",size:62},
+      {main:"3",sub:"",color:"#fff45c",size:96},
+      {main:"2",sub:"",color:"#00eaff",size:96},
+      {main:"1",sub:"",color:"#ff4fc3",size:96},
+      {main:"FIGHT!",sub:"",color:"#7CFF6B",size:72}
+    ];
+
+    let i=0;
+
+    const finish=()=>{
+      if(this.roundUnlockDone) return;
+
+      this.roundUnlockDone=true;
+
+      if(shade) shade.destroy();
+      if(main) main.destroy();
+      if(sub) sub.destroy();
+
+      this.unlockPlayerControl();
+    };
+
+    const showStep=()=>{
+      if(i>=steps.length){
+        this.time.delayedCall(450,finish);
+        return;
+      }
+
+      const step=steps[i];
+
+      main.setText(step.main);
+      main.setStyle({
+        font:step.size+"px monospace",
+        fill:step.color,
+        stroke:"#000000",
+        strokeThickness:8
+      });
+
+      sub.setText(step.sub || "");
+
+      main.setScale(0.65);
+      main.setAlpha(1);
+
+      this.tweens.add({
+        targets:main,
+        scale:1.18,
+        duration:160,
+        yoyo:true
+      });
+
+      this.cameras.main.shake(60,0.002);
+
+      i++;
+      this.time.delayedCall(650,showStep);
+    };
+
+    showStep();
+
+    this.time.delayedCall(4800,finish);
   }
 
   checkVictory(){
