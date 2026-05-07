@@ -33,7 +33,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 628;
+const VERSION = 630;
 const W = 960;
 const H = 540;
 
@@ -94,6 +94,9 @@ const PLAYER_STUCK_FRAME_LIMIT = 14;
 const PLAYER_STUCK_INPUT_MIN = 0.25;
 const PLAYER_UNSTUCK_PUSH_X = 18;
 const PLAYER_UNSTUCK_PUSH_Y = 8;
+const PLAYER_ENEMY_SOFT_PUSH_X = 5;
+const ENEMY_PLAYER_SOFT_PUSH_X = 4;
+const PLAYER_EDGE_BUFFER = 18;
 
 const SWEEP_DAMAGE = 10;
 
@@ -155,7 +158,7 @@ const ENEMY_TYPES = {
     scale:0.46,
     chaseSpeed:65,
     attackRange:72,
-    stopRange:58,
+    stopRange:78,
     attackCooldownMin:200,
     attackCooldownMax:650,
     attackDamage:8,
@@ -170,7 +173,7 @@ const ENEMY_TYPES = {
     scale:0.46,
     chaseSpeed:78,
     attackRange:68,
-    stopRange:54,
+    stopRange:76,
     attackCooldownMin:180,
     attackCooldownMax:500,
     attackDamage:7,
@@ -185,7 +188,7 @@ const ENEMY_TYPES = {
     scale:0.46,
     chaseSpeed:72,
     attackRange:70,
-    stopRange:56,
+    stopRange:78,
     attackCooldownMin:250,
     attackCooldownMax:700,
     attackDamage:8,
@@ -200,7 +203,7 @@ const ENEMY_TYPES = {
     scale:0.46,
     chaseSpeed:88,
     attackRange:64,
-    stopRange:50,
+    stopRange:74,
     attackCooldownMin:160,
     attackCooldownMax:460,
     attackDamage:7,
@@ -1364,8 +1367,12 @@ class Game extends Phaser.Scene{
     });
   }
 
+  getCurrentPlatformBounds(){
+    return PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
+  }
+
   applyPlatformBounds(){
-    const bounds = PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
+    const bounds = this.getCurrentPlatformBounds();
 
     this.player.x = Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
     this.player.y = Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
@@ -2285,6 +2292,7 @@ class Game extends Phaser.Scene{
 
       this.applyEnemySeparation(e);
       this.keepEnemyOffPlayer(e);
+      this.pushPlayerOutOfEnemy(e);
 
       if(e.knockbackTime>0) return;
       if(e.busy) return;
@@ -2354,13 +2362,23 @@ class Game extends Phaser.Scene{
     }
 
     if(this.playerStuckFrames >= PLAYER_STUCK_FRAME_LIMIT){
-      const pushX = this.moveX !== 0
+      const bounds=this.getCurrentPlatformBounds();
+
+      let pushX = this.moveX !== 0
         ? Math.sign(this.moveX) * PLAYER_UNSTUCK_PUSH_X
         : this.getFacingDir() * PLAYER_UNSTUCK_PUSH_X;
 
-      const pushY = this.moveY !== 0
+      let pushY = this.moveY !== 0
         ? Math.sign(this.moveY) * PLAYER_UNSTUCK_PUSH_Y
         : 0;
+
+      if(this.player.x + pushX < bounds.minX + PLAYER_EDGE_BUFFER){
+        pushX = PLAYER_UNSTUCK_PUSH_X;
+      }
+
+      if(this.player.x + pushX > bounds.maxX - PLAYER_EDGE_BUFFER){
+        pushX = -PLAYER_UNSTUCK_PUSH_X;
+      }
 
       this.player.x += pushX;
       this.player.y += pushY;
@@ -2396,9 +2414,58 @@ class Game extends Phaser.Scene{
     const dy = e.y - this.player.y;
 
     if(Math.abs(dx) < 34 && Math.abs(dy) < 30){
-      const pushDir = dx >= 0 ? 1 : -1;
-      e.x += pushDir * 3;
+      let pushDir = dx >= 0 ? 1 : -1;
+
+      if(Math.abs(this.moveX) > 0.2){
+        pushDir = this.moveX > 0 ? -1 : 1;
+      }
+
+      e.x += pushDir * 4;
       e.setVelocityX(pushDir * 20);
+    }
+  }
+
+  pushPlayerOutOfEnemy(e){
+    if(!e || e.dead || !this.player) return;
+    if(e.platform !== this.platform) return;
+    if(e.grabbed || e.thrownTime > 0) return;
+    if(this.playerBusy || this.isClimbing || this.isJumping) return;
+
+    const dx = this.player.x - e.x;
+    const dy = this.player.y - e.y;
+
+    const overlapX = Math.abs(dx) < 42;
+    const overlapY = Math.abs(dy) < 34;
+
+    if(!overlapX || !overlapY) return;
+
+    const bounds=this.getCurrentPlatformBounds();
+
+    let pushDir = dx >= 0 ? 1 : -1;
+
+    if(Math.abs(this.moveX) > 0.2){
+      pushDir = this.moveX > 0 ? 1 : -1;
+    }
+
+    if(this.player.x + pushDir * PLAYER_ENEMY_SOFT_PUSH_X < bounds.minX + PLAYER_EDGE_BUFFER){
+      pushDir = 1;
+    }
+
+    if(this.player.x + pushDir * PLAYER_ENEMY_SOFT_PUSH_X > bounds.maxX - PLAYER_EDGE_BUFFER){
+      pushDir = -1;
+    }
+
+    this.player.x += pushDir * PLAYER_ENEMY_SOFT_PUSH_X;
+    e.x -= pushDir * ENEMY_PLAYER_SOFT_PUSH_X;
+
+    this.applyPlatformBounds();
+
+    if(this.player.body){
+      this.player.body.setVelocity(0,0);
+    }
+
+    if(e.body){
+      e.setVelocityX(0);
     }
   }
 
@@ -2447,7 +2514,7 @@ class Game extends Phaser.Scene{
       const dx=Math.abs(this.player.x-e.x);
       const dy=Math.abs(this.player.y-e.y);
 
-      if(dx<=e.attackRange+10 && dy<=45){
+      if(dx<=e.attackRange+10 && dy<=38){
         const dir=e.x<this.player.x ? 1 : -1;
         this.damagePlayer(e.attackDamage || 8,dir);
       }
