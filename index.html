@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 619;
+const VERSION = 620;
 const W = 960;
 const H = 540;
 
@@ -55,6 +55,14 @@ const RUN_SPEED = 270;
 const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
+
+const LADDER_ACTIVATE_X_RANGE = 34;
+const LADDER_ACTIVATE_Y_RANGE = 120;
+const LADDER_VERTICAL_INPUT = 0.65;
+const LADDER_MAX_SIDE_INPUT = 0.35;
+
+const STAIR_VERTICAL_INPUT = 0.65;
+const STAIR_MAX_SIDE_INPUT = 0.45;
 
 const JUMP_HEIGHT = 68;
 const JUMP_TIME = 360;
@@ -875,6 +883,8 @@ class Game extends Phaser.Scene{
         "STARTED: "+this.matchStarted+
         " | BUSY: "+this.playerBusy+
         " | BUSYMS: "+(this.busyWatchStartedAt ? Math.floor(this.time.now-this.busyWatchStartedAt) : 0)+
+        " | CLIMB: "+this.isClimbing+
+        " | PLATFORM: "+this.platform+
         " | X: "+this.moveX.toFixed(2)+
         " | Y: "+this.moveY.toFixed(2)+
         " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)
@@ -1120,31 +1130,42 @@ class Game extends Phaser.Scene{
   handlePlatformTransitions(){
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
+    const verticalOnly =
+      Math.abs(this.moveY) >= LADDER_VERTICAL_INPUT &&
+      Math.abs(this.moveX) <= LADDER_MAX_SIDE_INPUT;
+
     const nearLadder=this.ladders.find(l=>{
-      return Math.abs(this.player.x-l.x)<=60;
+      const closeX = Math.abs(this.player.x-l.x) <= LADDER_ACTIVATE_X_RANGE;
+      const closeY = Math.abs(this.player.y-l.middleY) <= LADDER_ACTIVATE_Y_RANGE ||
+                     Math.abs(this.player.y-l.topY) <= LADDER_ACTIVATE_Y_RANGE;
+      return closeX && closeY;
     });
 
-    if(nearLadder){
-      if(this.platform==="middle" && this.moveY<-0.35){
+    if(nearLadder && verticalOnly){
+      if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
         this.startClimbing(nearLadder,"up");
         return;
       }
 
-      if(this.platform==="top" && this.moveY>0.35){
+      if(this.platform==="top" && this.moveY > LADDER_VERTICAL_INPUT){
         this.startClimbing(nearLadder,"down");
         return;
       }
     }
 
+    const stairVerticalOnly =
+      Math.abs(this.moveY) >= STAIR_VERTICAL_INPUT &&
+      Math.abs(this.moveX) <= STAIR_MAX_SIDE_INPUT;
+
     const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
 
-    if(activeStairs){
-      if(this.platform==="middle" && this.moveY>0.45){
+    if(activeStairs && stairVerticalOnly){
+      if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
         this.startStairTravel(activeStairs,"down");
         return;
       }
 
-      if(this.platform==="bottom" && this.moveY<-0.45){
+      if(this.platform==="bottom" && this.moveY < -STAIR_VERTICAL_INPUT){
         this.startStairTravel(activeStairs,"up");
       }
     }
@@ -1165,7 +1186,10 @@ class Game extends Phaser.Scene{
       this.player.y=ladder.middleY;
     }
 
-    this.player.setVisible(false);
+    const climbAnim=this.getPlayerAnim("climb");
+    const canShowClimbPose=hasAnim(this,climbAnim);
+
+    this.player.setVisible(!canShowClimbPose);
 
     this.poseSprite.loadTexture(this.getPlayerActionSheet());
     this.poseSprite.x=this.player.x;
@@ -1173,15 +1197,24 @@ class Game extends Phaser.Scene{
     this.poseSprite.flipX=false;
     this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(true);
+    this.poseSprite.setVisible(canShowClimbPose);
 
-    safePlay(this.poseSprite,this.getPlayerAnim("climb"));
+    if(canShowClimbPose){
+      safePlay(this.poseSprite,climbAnim);
+    }else{
+      this.poseSprite.setVisible(false);
+      safePlay(this.player,this.getPlayerAnim("idle_up"));
+    }
+
     this.zoneText.setText("CLIMBING LADDER");
   }
 
   updateClimbing(){
     const l=this.currentLadder;
     if(!l) return;
+
+    const climbAnim=this.getPlayerAnim("climb");
+    const canShowClimbPose=hasAnim(this,climbAnim);
 
     this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
     this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
@@ -1192,9 +1225,16 @@ class Game extends Phaser.Scene{
     this.poseSprite.flipX=false;
     this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(true);
+    this.poseSprite.setVisible(canShowClimbPose);
 
-    safePlay(this.poseSprite,this.getPlayerAnim("climb"));
+    this.player.setVisible(!canShowClimbPose);
+
+    if(canShowClimbPose){
+      safePlay(this.poseSprite,climbAnim);
+    }else{
+      this.poseSprite.setVisible(false);
+      safePlay(this.player,this.getPlayerAnim("idle_up"));
+    }
 
     if(this.player.y<=l.topY+2 && this.moveY<-0.35){
       this.isClimbing=false;
