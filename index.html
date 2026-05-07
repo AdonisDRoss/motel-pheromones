@@ -1,625 +1,3698 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Motel Pheromones Brawler</title>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <style>
-    body { margin:0; background:#000; overflow:hidden; }
-    canvas { display:block; margin:auto; image-rendering: pixelated; }
-  </style>
+<meta charset="UTF-8" />
+<title>Motel Pheromones</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{
+  width:100vw!important;
+  height:100vh!important;
+  object-fit:contain;
+  image-rendering:pixelated;
+}
+</style>
 </head>
 <body>
-
 <script>
-const GAME_W = 960;
-const GAME_H = 540;
 
-const ASSETS = {
-  title: "levels/title-screen.png",
-  levelOutdoor: "levels/outdoor.png",
+window.__MP_LAST_ERROR = "";
 
-  jtMovement: "sprites/jt/movement.png",
-  jtActions: "sprites/jt/actions.png",
+window.addEventListener("error",function(e){
+  window.__MP_LAST_ERROR = e.message || String(e);
+  console.error("Motel runtime error:",e);
+});
 
-  enemyCorpo: "sprites/enemies/corpo_sellout.png"
+const VERSION = 628;
+const W = 960;
+const H = 540;
+
+const MOVE_FRAME_W = 204;
+const MOVE_FRAME_H = 170;
+
+const MOVE2_FRAME_W = 324;
+const MOVE2_FRAME_H = 243;
+
+const ATTACK_FRAME_W = 288;
+const ATTACK_FRAME_H = 232;
+
+const ACTION_FRAME_W = 284;
+const ACTION_FRAME_H = 236;
+
+const REACTION_FRAME_W = 284;
+const REACTION_FRAME_H = 236;
+
+const ENEMY_FRAME_W = 163;
+const ENEMY_FRAME_H = 164;
+
+const PLAYER_MOVE_SCALE = 0.44;
+const PLAYER_MOVE2_SCALE = 0.31;
+const PLAYER_ATTACK_SCALE = 0.32;
+const PLAYER_ACTION_SCALE = 0.32;
+const PLAYER_REACTION_SCALE = 0.32;
+
+const WALK_SPEED = 190;
+const RUN_SPEED = 270;
+const RUN_STICK_THRESHOLD = 0.72;
+const STICK_DEADZONE = 0.08;
+const ACTION_DEADZONE = 0.35;
+
+const PLATFORM_BOUNDS = {
+  top:{minX:190,maxX:820,minY:238,maxY:268},
+  middle:{minX:120,maxX:860,minY:365,maxY:420},
+  bottom:{minX:120,maxX:860,minY:485,maxY:520}
 };
 
-let SELECTED_CHARACTER = "JT";
-let SELECTED_LEVEL = "OUTDOOR";
+const LADDER_ACTIVATE_X_RANGE = 34;
+const LADDER_ACTIVATE_Y_RANGE = 120;
+const LADDER_VERTICAL_INPUT = 0.65;
+const LADDER_MAX_SIDE_INPUT = 0.35;
 
-class TitleScene extends Phaser.Scene {
-  constructor() { super("TitleScene"); }
+const STAIR_VERTICAL_INPUT = 0.65;
+const STAIR_MAX_SIDE_INPUT = 0.45;
+const STAIR_TRAVEL_DURATION = 720;
 
-  preload() {
-    this.load.image("title", ASSETS.title);
+const JUMP_HEIGHT = 68;
+const JUMP_TIME = 420;
+const DOUBLE_UP_WINDOW = 360;
+const MAX_JUMPS = 2;
+const CROUCH_JUMP_BOOST = 1.15;
+const DOUBLE_JUMP_HEIGHT_MULT = 0.85;
+
+const PLAYER_ANTI_STUCK_ENABLED = true;
+const PLAYER_STUCK_FRAME_LIMIT = 14;
+const PLAYER_STUCK_INPUT_MIN = 0.25;
+const PLAYER_UNSTUCK_PUSH_X = 18;
+const PLAYER_UNSTUCK_PUSH_Y = 8;
+
+const SWEEP_DAMAGE = 10;
+
+const GRAB_HOLD_TIME = 3000;
+const CARRY_BREAK_TIME = 5000;
+const THROW_DAMAGE = 16;
+const THROW_COLLISION_DAMAGE = 12;
+const THROW_SPEED = 430;
+const GRAB_OFFSET_X = 42;
+const CARRY_OFFSET_X = 58;
+
+const DOORMAN_DOOR_X = 505;
+const DOORMAN_DOOR_Y = 390;
+
+const JT_BASE = "assets/sprites/player/jt";
+const HEW_BASE = "assets/sprites/player/hew";
+const ENEMY_BASE = "assets/sprites/enemies";
+
+const ENEMY_AI_ENABLED = true;
+const PLATFORM_TRANSITIONS_ENABLED = true;
+const DISABLE_DOORMAN_FOR_TEST = false;
+const DEBUG_RUNTIME = true;
+const DEBUG_INPUT = true;
+const SKIP_COUNTDOWN_FOR_TEST = false;
+const SIMPLE_DIRECT_MOVEMENT = true;
+const BUSY_WATCHDOG_MS = 1600;
+
+let selectedFighter = "JT";
+let selectedLevel = "outdoor";
+let selectedLevelName = "OUTDOOR";
+
+const ATTACK_NUDGE = {
+  light:{x:-6,y:0,scale:0.32,originY:1},
+  heavy:{x:-8,y:0,scale:0.32,originY:1},
+  kick:{x:-4,y:0,scale:0.32,originY:1},
+  block:{x:0,y:0,scale:0.26,originY:1}
+};
+
+const REACTION_NUDGE = {
+  hurt:{x:0,y:0,scale:0.32,originY:1},
+  knockback:{x:0,y:0,scale:0.32,originY:1},
+  ko:{x:0,y:0,scale:0.32,originY:1},
+  getup:{x:0,y:0,scale:0.32,originY:1}
+};
+
+const ENEMY_NAMES = [
+  "VINNY","MOOSE","TANK","DIEGO","RICO","BUZZ","SLIM","ROCCO",
+  "DUSTY","CHUCK","VANCE","KNOX","SPIKE","LENNY","DRAKE","AXEL"
+];
+
+const ENEMY_AUTH_TAGS = ["GOON","PUNK","CREW","HYPE","MOSH","CORPO","SEC"];
+
+const ENEMY_TYPES = {
+  corpo_sellout:{
+    key:"corpo_sellout",
+    prefix:"enemy",
+    label:"CORPO",
+    maxHealth:30,
+    scale:0.46,
+    chaseSpeed:65,
+    attackRange:72,
+    stopRange:58,
+    attackCooldownMin:200,
+    attackCooldownMax:650,
+    attackDamage:8,
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+  corpo_wannabe:{
+    key:"corpo_wannabe",
+    prefix:"wannabe",
+    label:"WANNABE",
+    maxHealth:24,
+    scale:0.46,
+    chaseSpeed:78,
+    attackRange:68,
+    stopRange:54,
+    attackCooldownMin:180,
+    attackCooldownMax:500,
+    attackDamage:7,
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+  sellout:{
+    key:"sellout",
+    prefix:"sellout",
+    label:"SELLOUT",
+    maxHealth:28,
+    scale:0.46,
+    chaseSpeed:72,
+    attackRange:70,
+    stopRange:56,
+    attackCooldownMin:250,
+    attackCooldownMax:700,
+    attackDamage:8,
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+  feral:{
+    key:"feral",
+    prefix:"feral",
+    label:"FERAL",
+    maxHealth:22,
+    scale:0.46,
+    chaseSpeed:88,
+    attackRange:64,
+    stopRange:50,
+    attackCooldownMin:160,
+    attackCooldownMax:460,
+    attackDamage:7,
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+  doorman:{
+    key:"doorman",
+    prefix:"doorman",
+    label:"DOORMAN",
+    baseHealth:90,
+    maxHealth:180,
+    scale:0.55,
+    chaseSpeed:48,
+    attackRange:92,
+    stopRange:72,
+    attackCooldownMin:650,
+    attackCooldownMax:1200,
+    attackDamage:15,
+    canBeGrabbed:false,
+    knockbackResist:0.35,
+    specialCooldown:3200,
+    specialRange:175,
+    specialDamage:20
+  }
+};
+
+function hasTex(scene,key){
+  return scene.textures.exists(key);
+}
+
+function hasAnim(scene,key){
+  return scene.anims.exists(key);
+}
+
+function safePlay(sprite,key){
+  if(!sprite || !sprite.scene) return;
+  if(!hasAnim(sprite.scene,key)) return;
+
+  if(sprite.anims.currentAnim && sprite.anims.currentAnim.key === key && sprite.anims.isPlaying){
+    return;
   }
 
-  create() {
-    this.add.image(GAME_W/2, GAME_H/2, "title").setDisplaySize(GAME_W, GAME_H);
+  sprite.play(key,true);
+}
 
-    this.add.text(GAME_W/2, 420, "TAP / PRESS ENTER", {
-      fontFamily: "monospace",
-      fontSize: "28px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
+function textureHasFrame(scene,sheet,frameIndex){
+  if(!hasTex(scene,sheet)) return false;
 
-    this.input.keyboard.once("keydown-ENTER", () => {
-      this.scene.start("CharacterSelectScene");
-    });
+  const tex=scene.textures.get(sheet);
 
-    this.input.once("pointerdown", () => {
-      this.scene.start("CharacterSelectScene");
+  if(!tex) return false;
+
+  try{
+    return !!tex.get(frameIndex);
+  }catch(e){
+    return false;
+  }
+}
+
+function makeAnim(scene,key,sheet,start,end,rate,repeat){
+  if(!hasTex(scene,sheet)) return;
+  if(hasAnim(scene,key)) return;
+
+  const frames=[];
+
+  for(let i=start;i<=end;i++){
+    if(textureHasFrame(scene,sheet,i)){
+      frames.push({key:sheet,frame:i});
+    }
+  }
+
+  if(frames.length<=0){
+    console.warn("Missing frames for animation:",key,sheet,start,end);
+    return;
+  }
+
+  scene.anims.create({
+    key:key,
+    frames:frames,
+    frameRate:rate,
+    repeat:repeat
+  });
+}
+
+function makeEnemyAnimSet(scene,sheet,prefix){
+  makeAnim(scene,prefix+"_idle",sheet,0,4,8,-1);
+  makeAnim(scene,prefix+"_walk",sheet,5,9,10,-1);
+  makeAnim(scene,prefix+"_punch",sheet,10,14,14,0);
+  makeAnim(scene,prefix+"_kick",sheet,15,19,12,0);
+  makeAnim(scene,prefix+"_hurt",sheet,20,24,10,0);
+  makeAnim(scene,prefix+"_knockback",sheet,25,29,8,0);
+  makeAnim(scene,prefix+"_ko",sheet,30,34,8,0);
+  makeAnim(scene,prefix+"_taunt",sheet,35,39,8,0);
+  makeAnim(scene,prefix+"_special",sheet,35,39,8,0);
+}
+
+function makePlayerAnimSet(scene,prefix){
+  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);
+  makeAnim(scene,prefix+"_idle_up",prefix+"_movement",5,9,6,-1);
+  makeAnim(scene,prefix+"_idle_side",prefix+"_movement",10,14,6,-1);
+
+  makeAnim(scene,prefix+"_walk_down",prefix+"_movement",15,19,8,-1);
+  makeAnim(scene,prefix+"_walk_up",prefix+"_movement",15,19,8,-1);
+  makeAnim(scene,prefix+"_walk_side",prefix+"_movement",15,19,8,-1);
+
+  makeAnim(scene,prefix+"_run_down",prefix+"_movement",20,24,12,-1);
+  makeAnim(scene,prefix+"_run_up",prefix+"_movement",20,24,12,-1);
+  makeAnim(scene,prefix+"_run_side",prefix+"_movement",20,24,12,-1);
+
+  makeAnim(scene,prefix+"_jump",prefix+"_movement2",0,4,10,0);
+  makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
+  makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
+  makeAnim(scene,prefix+"_combo_2",prefix+"_movement2",15,19,12,0);
+
+  makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,14,0);
+  makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,12,0);
+  makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,13,0);
+  makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+
+  makeAnim(scene,prefix+"_climb",prefix+"_actions",0,3,8,-1);
+  makeAnim(scene,prefix+"_crouch",prefix+"_actions",4,7,8,-1);
+  makeAnim(scene,prefix+"_taunt",prefix+"_actions",8,11,8,0);
+  makeAnim(scene,prefix+"_special",prefix+"_actions",12,15,10,0);
+  makeAnim(scene,prefix+"_carry",prefix+"_actions",12,15,8,-1);
+
+  makeAnim(scene,prefix+"_hurt",prefix+"_reactions",0,3,8,0);
+  makeAnim(scene,prefix+"_knockback",prefix+"_reactions",4,7,8,0);
+  makeAnim(scene,prefix+"_ko",prefix+"_reactions",8,11,6,0);
+  makeAnim(scene,prefix+"_getup",prefix+"_reactions",12,15,8,0);
+}
+
+function loadAssets(scene){
+  scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
+  scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
+  scene.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
+
+  scene.load.image("house","assets/levels/house-party.png?v="+VERSION);
+  scene.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
+  scene.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
+  scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
+  scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
+  scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
+
+  scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
+    frameWidth:MOVE_FRAME_W,
+    frameHeight:MOVE_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_movement2",JT_BASE + "/movement2.png?v=" + VERSION,{
+    frameWidth:MOVE2_FRAME_W,
+    frameHeight:MOVE2_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_attacks",JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
+    frameWidth:ATTACK_FRAME_W,
+    frameHeight:ATTACK_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_actions",JT_BASE + "/actions/jt_actions.png?v=" + VERSION,{
+    frameWidth:ACTION_FRAME_W,
+    frameHeight:ACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("jt_reactions",JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
+    frameWidth:REACTION_FRAME_W,
+    frameHeight:REACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{
+    frameWidth:MOVE_FRAME_W,
+    frameHeight:MOVE_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_movement2",HEW_BASE + "/movement2.png?v=" + VERSION,{
+    frameWidth:MOVE2_FRAME_W,
+    frameHeight:MOVE2_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_attacks",HEW_BASE + "/attacks/hew_attacks.png?v=" + VERSION,{
+    frameWidth:ATTACK_FRAME_W,
+    frameHeight:ATTACK_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_actions",HEW_BASE + "/actions/hew_actions.png?v=" + VERSION,{
+    frameWidth:ACTION_FRAME_W,
+    frameHeight:ACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_reactions",HEW_BASE + "/reactions/hew_reactions.png?v=" + VERSION,{
+    frameWidth:REACTION_FRAME_W,
+    frameHeight:REACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("corpo_sellout",ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("corpo_wannabe",ENEMY_BASE + "/corpo_wannabe.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("sellout",ENEMY_BASE + "/sellout.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("feral",ENEMY_BASE + "/feral.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("doorman",ENEMY_BASE + "/doorman.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+}
+
+function createAllAnims(scene){
+  makePlayerAnimSet(scene,"jt");
+  makePlayerAnimSet(scene,"hew");
+
+  makeEnemyAnimSet(scene,"corpo_sellout","enemy");
+  makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
+  makeEnemyAnimSet(scene,"sellout","sellout");
+  makeEnemyAnimSet(scene,"feral","feral");
+  makeEnemyAnimSet(scene,"doorman","doorman");
+}
+
+class Boot extends Phaser.Scene{
+  constructor(){
+    super("Boot");
+  }
+
+  preload(){
+    loadAssets(this);
+  }
+
+  create(){
+    createAllAnims(this);
+    this.scene.start("Title");
+  }
+}
+
+class Title extends Phaser.Scene{
+  constructor(){
+    super("Title");
+  }
+
+  create(){
+    if(hasTex(this,"title")){
+      this.add.image(480,270,"title").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x000000,1);
+      this.add.text(480,220,"MOTEL PHEROMONES",{
+        font:"36px monospace",
+        fill:"#ff4fc3"
+      }).setOrigin(0.5);
+    }
+
+    this.add.text(480,485,"TAP TO START",{
+      font:"24px monospace",
+      fill:"#ffffff",
+      backgroundColor:"#000000"
+    }).setOrigin(0.5).setDepth(9999);
+
+    this.time.delayedCall(500,()=>{
+      this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
+      this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
     });
   }
 }
 
-class CharacterSelectScene extends Phaser.Scene {
-  constructor() { super("CharacterSelectScene"); }
-
-  create() {
-    this.cameras.main.setBackgroundColor("#050505");
-
-    this.add.text(GAME_W/2, 60, "CHARACTER SELECT", {
-      fontFamily: "monospace",
-      fontSize: "36px",
-      color: "#ff4fd8"
-    }).setOrigin(0.5);
-
-    const jtBox = this.add.rectangle(GAME_W/2, 220, 240, 120, 0x111111, 1);
-    jtBox.setStrokeStyle(3, 0x00eaff);
-
-    this.add.text(GAME_W/2, 210, "JT", {
-      fontFamily: "monospace",
-      fontSize: "32px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_W/2, 260, "Rhythm of the Night", {
-      fontFamily: "monospace",
-      fontSize: "16px",
-      color: "#00eaff"
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_W/2, 420, "PRESS ENTER / TAP TO SELECT", {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
-
-    this.input.keyboard.once("keydown-ENTER", () => {
-      SELECTED_CHARACTER = "JT";
-      this.scene.start("LevelSelectScene");
-    });
-
-    this.input.once("pointerdown", () => {
-      SELECTED_CHARACTER = "JT";
-      this.scene.start("LevelSelectScene");
-    });
-  }
-}
-
-class LevelSelectScene extends Phaser.Scene {
-  constructor() { super("LevelSelectScene"); }
-
-  create() {
-    this.cameras.main.setBackgroundColor("#090018");
-
-    this.add.text(GAME_W/2, 60, "LEVEL SELECT", {
-      fontFamily: "monospace",
-      fontSize: "36px",
-      color: "#00eaff"
-    }).setOrigin(0.5);
-
-    const levelBox = this.add.rectangle(GAME_W/2, 230, 320, 140, 0x111111, 1);
-    levelBox.setStrokeStyle(3, 0xff4fd8);
-
-    this.add.text(GAME_W/2, 220, "OUTDOOR", {
-      fontFamily: "monospace",
-      fontSize: "32px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_W/2, 265, "Lefty's Rooftop / Street", {
-      fontFamily: "monospace",
-      fontSize: "16px",
-      color: "#ffff55"
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_W/2, 420, "PRESS ENTER / TAP TO START", {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
-
-    this.input.keyboard.once("keydown-ENTER", () => {
-      SELECTED_LEVEL = "OUTDOOR";
-      this.scene.start("GameScene");
-    });
-
-    this.input.once("pointerdown", () => {
-      SELECTED_LEVEL = "OUTDOOR";
-      this.scene.start("GameScene");
-    });
-  }
-}
-
-class GameScene extends Phaser.Scene {
-  constructor() {
-    super("GameScene");
+class CharacterSelect extends Phaser.Scene{
+  constructor(){
+    super("CharacterSelect");
   }
 
-  preload() {
-    this.load.image("level_outdoor", ASSETS.levelOutdoor);
-
-    this.load.spritesheet("jt_movement", ASSETS.jtMovement, {
-      frameWidth: 128,
-      frameHeight: 128
-    });
-
-    this.load.spritesheet("jt_actions", ASSETS.jtActions, {
-      frameWidth: 128,
-      frameHeight: 128
-    });
-
-    this.load.spritesheet("enemy_corpo", ASSETS.enemyCorpo, {
-      frameWidth: 128,
-      frameHeight: 128
-    });
-  }
-
-  create() {
-    this.started = true;
-    this.busy = false;
-    this.combo = 0;
-    this.rhythm = 0;
-
-    this.add.image(GAME_W/2, GAME_H/2, "level_outdoor").setDisplaySize(GAME_W, GAME_H);
-
-    this.createAnimations();
-    this.createPlayer();
-    this.createEnemies();
-    this.createControls();
-    this.createHUD();
-    this.createCollisions();
-    this.createTouchControls();
-  }
-
-  createAnimations() {
-    this.anims.create({
-      key: "jt_idle",
-      frames: this.anims.generateFrameNumbers("jt_movement", { start: 0, end: 7 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "jt_walk",
-      frames: this.anims.generateFrameNumbers("jt_movement", { start: 16, end: 23 }),
-      frameRate: 10,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "jt_punch",
-      frames: this.anims.generateFrameNumbers("jt_actions", { start: 32, end: 39 }),
-      frameRate: 14,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "jt_kick",
-      frames: this.anims.generateFrameNumbers("jt_actions", { start: 48, end: 55 }),
-      frameRate: 12,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "enemy_idle",
-      frames: this.anims.generateFrameNumbers("enemy_corpo", { start: 0, end: 15 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "enemy_walk",
-      frames: this.anims.generateFrameNumbers("enemy_corpo", { start: 16, end: 31 }),
-      frameRate: 10,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: "enemy_punch",
-      frames: this.anims.generateFrameNumbers("enemy_corpo", { start: 32, end: 47 }),
-      frameRate: 12,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "enemy_hurt",
-      frames: this.anims.generateFrameNumbers("enemy_corpo", { start: 64, end: 79 }),
-      frameRate: 12,
-      repeat: 0
-    });
-
-    this.anims.create({
-      key: "enemy_ko",
-      frames: this.anims.generateFrameNumbers("enemy_corpo", { start: 80, end: 95 }),
-      frameRate: 8,
-      repeat: 0
-    });
-  }
-
-  createPlayer() {
-    this.player = this.physics.add.sprite(480, 290, "jt_movement", 0);
-    this.player.setScale(1.35);
-    this.player.setCollideWorldBounds(true);
-    this.player.play("jt_idle");
-
-    this.player.hp = 100;
-    this.player.facing = 1;
-    this.player.isAttacking = false;
-
-    // IMPORTANT: smaller body, not full 128x128 sprite
-    this.player.body.setSize(40, 44);
-    this.player.body.setOffset(44, 82);
-
-    this.playerAttackHitbox = this.add.rectangle(0, 0, 56, 34, 0xff0000, 0);
-    this.physics.add.existing(this.playerAttackHitbox);
-    this.playerAttackHitbox.body.enable = false;
-  }
-
-  createEnemies() {
-    this.enemies = this.physics.add.group();
-
-    this.spawnEnemy(300, 380, "DIEGO", "CORPO");
-    this.spawnEnemy(720, 300, "LENNY", "GOON");
-    this.spawnEnemy(420, 245, "BUZZ", "PUNK");
-  }
-
-  spawnEnemy(x, y, name, type) {
-    const enemy = this.physics.add.sprite(x, y, "enemy_corpo", 0);
-    enemy.setScale(1.15);
-    enemy.setCollideWorldBounds(true);
-    enemy.play("enemy_idle");
-
-    enemy.nameLabel = name;
-    enemy.typeLabel = type;
-    enemy.hp = 60;
-    enemy.speed = 55;
-    enemy.dead = false;
-    enemy.attackCooldown = 0;
-
-    // IMPORTANT: smaller body to stop bad collision
-    enemy.body.setSize(38, 42);
-    enemy.body.setOffset(45, 82);
-
-    this.enemies.add(enemy);
-
-    const typeText = this.add.text(x, y - 80, type, {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#00eaff",
-      backgroundColor: "#000000"
-    }).setOrigin(0.5);
-
-    const nameText = this.add.text(x, y - 62, name, {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#ffff55"
-    }).setOrigin(0.5);
-
-    const hpBar = this.add.rectangle(x, y - 45, 48, 8, 0x00ff55);
-
-    enemy.ui = { typeText, nameText, hpBar };
-
-    return enemy;
-  }
-
-  createControls() {
-    this.keys = this.input.keyboard.addKeys({
-      up: "W",
-      down: "S",
-      left: "A",
-      right: "D",
-      punch: "J",
-      kick: "K",
-      special: "L"
-    });
-
-    this.cursors = this.input.keyboard.createCursorKeys();
-
-    this.input.keyboard.on("keydown-J", () => this.playerPunch());
-    this.input.keyboard.on("keydown-K", () => this.playerKick());
-  }
-
-  createHUD() {
-    this.hud = this.add.text(16, 16, "", {
-      fontFamily: "monospace",
-      fontSize: "16px",
-      color: "#ffffff"
-    });
-
-    this.debugText = this.add.text(16, 118, "", {
-      fontFamily: "monospace",
-      fontSize: "14px",
-      color: "#66ff66",
-      backgroundColor: "#000000"
-    });
-  }
-
-  createCollisions() {
-    // Physical blocking
-    this.physics.add.collider(this.player, this.enemies);
-    this.physics.add.collider(this.enemies, this.enemies);
-
-    // Attack detection only
-    this.physics.add.overlap(
-      this.playerAttackHitbox,
-      this.enemies,
-      this.onPlayerHitEnemy,
-      null,
-      this
-    );
-  }
-
-  update() {
-    this.updatePlayer();
-    this.updateEnemies();
-    this.updateEnemyUI();
-    this.updateHUD();
-  }
-
-  updatePlayer() {
-    if (!this.player || this.player.hp <= 0) return;
-
-    let vx = 0;
-    let vy = 0;
-
-    const left = this.keys.left.isDown || this.cursors.left.isDown;
-    const right = this.keys.right.isDown || this.cursors.right.isDown;
-    const up = this.keys.up.isDown || this.cursors.up.isDown;
-    const down = this.keys.down.isDown || this.cursors.down.isDown;
-
-    if (left) {
-      vx = -150;
-      this.player.facing = -1;
-      this.player.setFlipX(true);
+  create(){
+    if(hasTex(this,"charSelect")){
+      this.add.image(480,270,"charSelect").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x120012,1);
+      this.add.text(480,90,"CHARACTER SELECT",{
+        font:"30px monospace",
+        fill:"#ff4fc3"
+      }).setOrigin(0.5);
     }
 
-    if (right) {
-      vx = 150;
-      this.player.facing = 1;
-      this.player.setFlipX(false);
-    }
-
-    if (up) vy = -110;
-    if (down) vy = 110;
-
-    this.player.setVelocity(vx, vy);
-
-    if (!this.player.isAttacking) {
-      if (vx !== 0 || vy !== 0) {
-        this.player.play("jt_walk", true);
-      } else {
-        this.player.play("jt_idle", true);
-      }
-    }
-  }
-
-  updateEnemies() {
-    this.enemies.forEach(enemy => {
-      if (!enemy || enemy.dead) return;
-
-      enemy.attackCooldown -= this.game.loop.delta;
-
-      const dist = Phaser.Math.Distance.Between(
-        enemy.x, enemy.y,
-        this.player.x, this.player.y
-      );
-
-      if (dist > 55) {
-        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
-
-        enemy.setVelocity(
-          Math.cos(angle) * enemy.speed,
-          Math.sin(angle) * enemy.speed
-        );
-
-        enemy.play("enemy_walk", true);
-        enemy.setFlipX(this.player.x < enemy.x);
-      } else {
-        enemy.setVelocity(0, 0);
-
-        if (enemy.attackCooldown <= 0) {
-          enemy.play("enemy_punch", true);
-          enemy.attackCooldown = 1200;
-
-          if (dist < 60) {
-            this.player.hp -= 5;
-          }
-        }
-      }
-    });
-  }
-
-  updateEnemyUI() {
-    this.enemies.forEach(enemy => {
-      if (!enemy || !enemy.ui) return;
-
-      enemy.ui.typeText.setPosition(enemy.x, enemy.y - 80);
-      enemy.ui.nameText.setPosition(enemy.x, enemy.y - 62);
-      enemy.ui.hpBar.setPosition(enemy.x, enemy.y - 45);
-
-      enemy.ui.hpBar.width = Math.max(0, enemy.hp / 60 * 48);
-
-      if (enemy.dead) {
-        enemy.ui.hpBar.visible = false;
-      }
-    });
-  }
-
-  updateHUD() {
-    this.hud.setText(
-      `CHAR: ${SELECTED_CHARACTER}\n` +
-      `LEVEL: ${SELECTED_LEVEL}\n` +
-      `COMBO: ${this.combo} | RHYTHM: ${this.rhythm}\n` +
-      `HP: ${this.player.hp}`
-    );
-
-    this.debugText.setText(
-      `STARTED: ${this.started} | BUSY: ${this.busy} | ` +
-      `PLAYER X:${Math.round(this.player.x)} Y:${Math.round(this.player.y)}`
-    );
-  }
-
-  playerPunch() {
-    if (this.player.isAttacking) return;
-
-    this.player.isAttacking = true;
-    this.player.setVelocity(0, 0);
-    this.player.play("jt_punch", true);
-
-    this.activatePlayerHitbox(70, 36, 120);
-
-    this.player.once("animationcomplete", () => {
-      this.player.isAttacking = false;
-      this.player.play("jt_idle", true);
-    });
-  }
-
-  playerKick() {
-    if (this.player.isAttacking) return;
-
-    this.player.isAttacking = true;
-    this.player.setVelocity(0, 0);
-    this.player.play("jt_kick", true);
-
-    this.activatePlayerHitbox(82, 40, 140);
-
-    this.player.once("animationcomplete", () => {
-      this.player.isAttacking = false;
-      this.player.play("jt_idle", true);
-    });
-  }
-
-  activatePlayerHitbox(width, height, duration) {
-    const facing = this.player.facing || 1;
-
-    this.playerAttackHitbox.setSize(width, height);
-    this.playerAttackHitbox.setPosition(
-      this.player.x + facing * 48,
-      this.player.y + 8
-    );
-
-    this.playerAttackHitbox.body.setSize(width, height);
-    this.playerAttackHitbox.body.enable = true;
-
-    this.time.delayedCall(duration, () => {
-      this.playerAttackHitbox.body.enable = false;
-    });
-  }
-
-  onPlayerHitEnemy(hitbox, enemy) {
-    if (!enemy || enemy.dead) return;
-
-    enemy.hp -= 15;
-    this.combo += 1;
-    this.rhythm += 5;
-
-    enemy.setVelocity(this.player.facing * 160, -20);
-
-    if (enemy.hp <= 0) {
-      enemy.dead = true;
-      enemy.setVelocity(0, 0);
-      enemy.play("enemy_ko", true);
-      enemy.body.enable = false;
-    } else {
-      enemy.play("enemy_hurt", true);
-    }
-  }
-
-  // SAFE texture switch helper — fixes bad loadTexture crashes
-  safeSetTexture(sprite, textureKey, frame = 0) {
-    if (!sprite) return;
-
-    if (sprite.setTexture) {
-      sprite.setTexture(textureKey, frame);
-    } else {
-      console.warn("Sprite has no setTexture method:", sprite);
-    }
-  }
-
-  createTouchControls() {
-    const alpha = 0.28;
-
-    this.joy = this.add.circle(80, GAME_H - 90, 55, 0xffffff, alpha);
-    this.joyText = this.add.text(80, GAME_H - 98, "MOVE", {
-      fontFamily: "monospace",
-      fontSize: "14px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
-
-    const buttons = [
-      { label: "X", x: GAME_W - 125, y: GAME_H - 160, action: () => this.playerPunch() },
-      { label: "Y", x: GAME_W - 170, y: GAME_H - 115, action: () => this.playerKick() },
-      { label: "A", x: GAME_W - 80, y: GAME_H - 115, action: () => this.playerPunch() },
-      { label: "B", x: GAME_W - 125, y: GAME_H - 70, action: () => this.playerKick() },
-      { label: "SP", x: GAME_W - 210, y: GAME_H - 190, action: () => this.playerKick() }
+    const fighters=[
+      {name:"DOTTIE",x:260,y:300,w:170,h:260,unlocked:false},
+      {name:"JT",x:480,y:300,w:170,h:260,unlocked:true},
+      {name:"HEW",x:700,y:300,w:170,h:260,unlocked:true,collectible:true}
     ];
 
-    buttons.forEach(btn => {
-      const c = this.add.circle(btn.x, btn.y, 36, 0xffffff, alpha);
-      const t = this.add.text(btn.x, btn.y, btn.label, {
-        fontFamily: "monospace",
-        fontSize: "18px",
-        color: "#ffffff"
-      }).setOrigin(0.5);
+    const outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
 
-      c.setInteractive();
-      c.on("pointerdown", btn.action);
-    });
+    this.add.text(480,505,"HEW IS A COLLECTIBLE CHARACTER",{
+      font:"16px monospace",
+      fill:"#fff45c",
+      backgroundColor:"#000000"
+    }).setOrigin(0.5).setDepth(60);
 
-    const menu = this.add.rectangle(GAME_W/2, GAME_H - 35, 120, 38, 0xffffff, 0.25);
-    this.add.text(GAME_W/2, GAME_H - 43, "MENU", {
-      fontFamily: "monospace",
-      fontSize: "16px",
-      color: "#ffffff"
-    }).setOrigin(0.5);
+    this.time.delayedCall(250,()=>{
+      fighters.forEach(f=>{
+        const hit=this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
+          .setInteractive()
+          .setDepth(40);
 
-    menu.setInteractive();
-    menu.on("pointerdown", () => {
-      this.scene.start("TitleScene");
+        if(!f.unlocked){
+          this.add.text(f.x,f.y,"LOCKED",{
+            font:"18px monospace",
+            fill:"#ff2222",
+            backgroundColor:"#000000"
+          }).setOrigin(0.5).setDepth(61);
+        }
+
+        if(f.collectible){
+          this.add.text(f.x,f.y-150,"COLLECTIBLE",{
+            font:"14px monospace",
+            fill:"#00eaff",
+            backgroundColor:"#000000"
+          }).setOrigin(0.5).setDepth(61);
+        }
+
+        hit.on("pointerdown",()=>{
+          if(!f.unlocked) return;
+
+          selectedFighter=f.name;
+          outline.setPosition(f.x,f.y);
+
+          this.time.delayedCall(180,()=>{
+            this.scene.start("LevelSelect");
+          });
+        });
+      });
     });
   }
 }
 
-const config = {
-  type: Phaser.AUTO,
-  width: GAME_W,
-  height: GAME_H,
-  backgroundColor: "#000000",
-  physics: {
-    default: "arcade",
-    arcade: {
-      debug: false,
-      gravity: { y: 0 }
+class LevelSelect extends Phaser.Scene{
+  constructor(){
+    super("LevelSelect");
+  }
+
+  create(){
+    if(hasTex(this,"levelSelect")){
+      this.add.image(480,270,"levelSelect").setDisplaySize(960,540);
+    }else{
+      this.add.rectangle(480,270,960,540,0x001111,1);
+      this.add.text(480,90,"LEVEL SELECT",{
+        font:"30px monospace",
+        fill:"#00eaff"
+      }).setOrigin(0.5);
+    }
+
+    const levels=[
+      {name:"HOUSE PARTY",key:"house",x:190,y:300,w:165,h:300},
+      {name:"LEFTY'S INDOOR",key:"indoor",x:355,y:300,w:165,h:300},
+      {name:"OUTDOOR",key:"outdoor",x:520,y:300,w:190,h:330},
+      {name:"LMNOP",key:"lmnop",x:690,y:300,w:165,h:300},
+      {name:"CHICKEN COUPE",key:"chicken",x:845,y:300,w:165,h:300}
+    ];
+
+    const outline=this.add.rectangle(520,300,190,330,0xff4fc3,0)
+      .setStrokeStyle(5,0xff4fc3)
+      .setDepth(50);
+
+    const status=this.add.text(480,505,"TAP A LEVEL",{
+      font:"20px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5).setDepth(60);
+
+    this.time.delayedCall(250,()=>{
+      levels.forEach(l=>{
+        this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
+          .setInteractive()
+          .setDepth(40)
+          .on("pointerdown",()=>{
+            selectedLevel=l.key;
+            selectedLevelName=l.name;
+            outline.setPosition(l.x,l.y);
+            outline.setSize(l.w,l.h);
+            status.setText("LOADING: "+l.name);
+
+            this.time.delayedCall(250,()=>{
+              this.scene.start("Game");
+            });
+          });
+      });
+    });
+  }
+}
+
+class Game extends Phaser.Scene{
+  constructor(){
+    super("Game");
+  }
+
+  getPlayerPrefix(){
+    return selectedFighter==="HEW" ? "hew" : "jt";
+  }
+
+  getSafeTextureKey(key,fallback){
+    return hasTex(this,key) ? key : fallback;
+  }
+
+  getSafeAnimKey(key,fallback){
+    return hasAnim(this,key) ? key : fallback;
+  }
+
+  getPlayerMoveSheet(){
+    const key=this.getPlayerPrefix()+"_movement";
+    return this.getSafeTextureKey(key,"jt_movement");
+  }
+
+  getPlayerAttackSheet(){
+    const key=this.getPlayerPrefix()+"_attacks";
+    return this.getSafeTextureKey(key,"jt_attacks");
+  }
+
+  getPlayerActionSheet(){
+    const key=this.getPlayerPrefix()+"_actions";
+    return this.getSafeTextureKey(key,"jt_actions");
+  }
+
+  getPlayerReactionSheet(){
+    const key=this.getPlayerPrefix()+"_reactions";
+    return this.getSafeTextureKey(key,"jt_reactions");
+  }
+
+  getPlayerAnim(action){
+    const key=this.getPlayerPrefix()+"_"+action;
+    const fallback="jt_"+action;
+    return this.getSafeAnimKey(key,fallback);
+  }
+
+  getPlayerSpeedMod(){
+    return selectedFighter==="HEW" ? 0.94 : 1;
+  }
+
+  getPlayerDamageMod(){
+    return selectedFighter==="HEW" ? 1.05 : 1;
+  }
+
+  getAttackData(type){
+    const base={
+      light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false},
+      heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false},
+      kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false}
+    }[type];
+
+    if(!base) return null;
+
+    return {
+      anim:base.anim,
+      damage:Number((base.damage*this.getPlayerDamageMod()).toFixed(1)),
+      stagger:selectedFighter==="HEW" && type==="heavy"
+    };
+  }
+
+  create(){
+    this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
+      .setDisplaySize(960,540)
+      .setDepth(0);
+
+    this.platform="middle";
+    this.isClimbing=false;
+    this.currentLadder=null;
+    this.climbSpeed=120;
+
+    this.stickX=0;
+    this.stickY=0;
+    this.moveX=0;
+    this.moveY=0;
+    this.lastDir="down";
+
+    this.lastUpTapTime=0;
+    this.upTapHeld=false;
+    this.downCrouchHeld=false;
+
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.isJumping=false;
+    this.isCrouching=false;
+
+    this.jumpCount=0;
+    this.maxJumps=MAX_JUMPS;
+    this.jumpGroundY=390;
+    this.activeJumpTween=null;
+    this.crouchEvent=null;
+
+    this.grabbedEnemy=null;
+    this.grabMode="none";
+    this.grabHoldEvent=null;
+    this.carryBreakEvent=null;
+
+    this.combo=0;
+    this.rhythm=0;
+
+    this.playerHealth=100;
+    this.playerInvuln=0;
+
+    this.matchStarted=false;
+    this.matchOver=false;
+    this.victoryShown=false;
+    this.roundUnlockDone=false;
+
+    this.doormanSpawned=false;
+    this.doormanIntroActive=false;
+    this.doorman=null;
+
+    this.pauseMenuOpen=false;
+    this.pauseItems=[];
+    this.pauseCursor=0;
+    this.pauseOptions=[];
+
+    this.runtimeErrorText=null;
+    this.busyWatchStartedAt=0;
+    this.lastBusyValue=false;
+    this.frameDelta=16.67;
+
+    this.addRain();
+    this.addBottomFog();
+
+    this.add.text(20,20,"CHAR: "+selectedFighter,{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setDepth(1000);
+
+    this.add.text(20,45,"LEVEL: "+selectedLevelName,{
+      font:"16px monospace",
+      fill:"#ff4fc3"
+    }).setDepth(1000);
+
+    this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
+      font:"16px monospace",
+      fill:"#ffff00"
+    }).setOrigin(0.5).setDepth(1000);
+
+    this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
+      font:"16px monospace",
+      fill:"#00eaff"
+    }).setDepth(1000);
+
+    this.playerHealthText=this.add.text(20,95,"HP: 100",{
+      font:"16px monospace",
+      fill:"#ffffff",
+      backgroundColor:"#000000"
+    }).setDepth(1000);
+
+    this.debugInputText=this.add.text(20,120,"",{
+      font:"13px monospace",
+      fill:"#7CFF6B",
+      backgroundColor:"#000000"
+    }).setDepth(50000);
+
+    this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
+      .setDepth(199);
+
+    this.player=this.physics.add.sprite(470,390,this.getPlayerMoveSheet());
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(PLAYER_MOVE_SCALE);
+    this.player.setDepth(200);
+    this.player.setCollideWorldBounds(true);
+    this.player.body.setAllowGravity(false);
+    this.player.body.setVelocity(0,0);
+
+    safePlay(this.player,this.getPlayerAnim("idle_down"));
+
+    this.lastPlayerX = this.player.x;
+    this.lastPlayerY = this.player.y;
+    this.playerStuckFrames = 0;
+
+    this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.poseSprite.setDepth(201);
+    this.poseSprite.setVisible(false);
+
+    this.createPlatformZones();
+    this.createEnemies();
+    this.makeKeyboard();
+
+    this.input.topOnly=false;
+    this.input.addPointer(6);
+
+    this.makeMobileControls();
+    this.addForegroundOverlays();
+    this.startMatchCountdown();
+
+    this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
+    this.input.keyboard.on("keydown-K",()=>this.startContextY());
+    this.input.keyboard.on("keydown-U",()=>this.startContextKick());
+    this.input.keyboard.on("keydown-L",()=>this.startContextB());
+    this.input.keyboard.on("keydown-SPACE",()=>this.startContextY());
+
+    this.input.keyboard.on("keydown-E",()=>this.startGrab());
+    this.input.keyboard.on("keydown-G",()=>this.startGrab());
+
+    this.input.keyboard.on("keydown-C",()=>this.startCrouch());
+    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-H",()=>this.showReaction("hurt",350));
+    this.input.keyboard.on("keydown-N",()=>this.showReaction("knockback",500));
+    this.input.keyboard.on("keydown-M",()=>this.showReaction("ko",9999));
+    this.input.keyboard.on("keydown-R",()=>this.showReaction("getup",600));
+
+    this.input.keyboard.on("keydown-ESC",()=>this.togglePauseMenu());
+  }
+
+  update(time,delta){
+    try{
+      this.safeUpdate(time,delta);
+    }catch(err){
+      this.showRuntimeError(err);
+      this.forcePlayerReady();
+    }
+  }
+
+  safeUpdate(time,delta){
+    delta=Math.min(delta || 16.67,33.33);
+    this.frameDelta=delta;
+
+    this.updateRain();
+    this.updateBottomFog();
+    this.readInput();
+    this.updateBusyWatchdog();
+
+    if(!this.pauseMenuOpen && this.matchStarted && !this.matchOver){
+      this.updateThrownEnemies(delta);
+      this.checkDoubleUpJump();
+      this.checkDirectCrouch();
+    }
+
+    if(this.playerInvuln>0){
+      this.playerInvuln-=delta;
+      if(this.playerInvuln<0) this.playerInvuln=0;
+    }
+
+    if(!this.matchStarted || this.matchOver || this.pauseMenuOpen){
+      this.freezeActors();
+    }else{
+      if(this.isClimbing){
+        this.updateClimbing();
+      }else{
+        this.updateMovement();
+      }
+
+      this.updateGrabbedEnemy();
+
+      if(ENEMY_AI_ENABLED){
+        this.updateEnemyAI();
+      }
+
+      this.checkVictory();
+    }
+
+    if(this.comboText){
+      this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
+    }
+
+    if(this.playerHealthText){
+      this.playerHealthText.setText("HP: "+this.playerHealth);
+    }
+
+    if(this.shadow && this.player){
+      this.shadow.x=this.player.x;
+      this.shadow.y=this.player.y+5;
+    }
+
+    this.updatePlayerAntiStuck();
+
+    if(DEBUG_INPUT && this.debugInputText && this.player){
+      this.debugInputText.setText(
+        "STARTED: "+this.matchStarted+
+        " | BUSY: "+this.playerBusy+
+        " | JUMP: "+this.jumpCount+"/"+this.maxJumps+
+        " | CROUCH: "+this.isCrouching+
+        " | CLIMB: "+this.isClimbing+
+        " | PLATFORM: "+this.platform+
+        " | X: "+this.moveX.toFixed(2)+
+        " | Y: "+this.moveY.toFixed(2)+
+        " | PX: "+Math.floor(this.player.x)+
+        " | PY: "+Math.floor(this.player.y)+
+        " | STUCK: "+this.playerStuckFrames+
+        " | ERR: "+window.__MP_LAST_ERROR
+      );
+    }
+
+    this.keepForegroundInFront();
+  }
+
+  makeKeyboard(){
+    this.keys=this.input.keyboard.addKeys({
+      up:"UP",
+      down:"DOWN",
+      left:"LEFT",
+      right:"RIGHT",
+      w:"W",
+      a:"A",
+      s:"S",
+      d:"D",
+      c:"C",
+      shift:"SHIFT"
+    });
+  }
+
+  readInput(){
+    let keyX=0;
+    let keyY=0;
+
+    if(this.keys){
+      if(this.keys.left.isDown || this.keys.a.isDown) keyX=-1;
+      if(this.keys.right.isDown || this.keys.d.isDown) keyX=1;
+      if(this.keys.up.isDown || this.keys.w.isDown) keyY=-1;
+      if(this.keys.down.isDown || this.keys.s.isDown) keyY=1;
+    }
+
+    this.moveX=Math.abs(this.stickX)>0.05 ? this.stickX : keyX;
+    this.moveY=Math.abs(this.stickY)>0.05 ? this.stickY : keyY;
+  }
+
+  getLiveInputX(){
+    let x=this.stickX;
+
+    if(this.keys){
+      if(this.keys.left.isDown || this.keys.a.isDown) x=-1;
+      if(this.keys.right.isDown || this.keys.d.isDown) x=1;
+    }
+
+    return x;
+  }
+
+  getLiveInputY(){
+    let y=this.stickY;
+
+    if(this.keys){
+      if(this.keys.up.isDown || this.keys.w.isDown) y=-1;
+      if(this.keys.down.isDown || this.keys.s.isDown) y=1;
+    }
+
+    return y;
+  }
+
+  getFacingDir(){
+    return this.player && this.player.flipX ? -1 : 1;
+  }
+
+  isForwardHeld(){
+    const facing=this.getFacingDir();
+    return this.getLiveInputX()*facing>ACTION_DEADZONE;
+  }
+
+  isBackHeld(){
+    const facing=this.getFacingDir();
+    return this.getLiveInputX()*facing<-ACTION_DEADZONE;
+  }
+
+  isUpHeld(){
+    return this.getLiveInputY()<-ACTION_DEADZONE;
+  }
+
+  isDownHeld(){
+    return this.getLiveInputY()>ACTION_DEADZONE;
+  }
+
+  checkDoubleUpJump(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    if(this.playerBusy && !this.isJumping && !this.isCrouching) return;
+
+    const keyUpHeld=this.keys && (this.keys.up.isDown || this.keys.w.isDown);
+    const stickUpHeld=this.stickY < -0.65;
+    const upHeld=keyUpHeld || stickUpHeld;
+
+    if(upHeld && !this.upTapHeld){
+      const now=this.time.now;
+
+      if(now-this.lastUpTapTime<=DOUBLE_UP_WINDOW){
+        this.lastUpTapTime=0;
+        this.upTapHeld=true;
+        this.startJump();
+        return;
+      }
+
+      this.lastUpTapTime=now;
+    }
+
+    this.upTapHeld=upHeld;
+  }
+
+  checkDirectCrouch(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    const downHeld=this.isDownHeld();
+
+    if(!downHeld){
+      this.downCrouchHeld=false;
+      return;
+    }
+
+    if(this.downCrouchHeld) return;
+
+    const activeStairs=this.stairs && this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
+
+    if(activeStairs && this.platform==="middle"){
+      this.downCrouchHeld=true;
+      return;
+    }
+
+    this.downCrouchHeld=true;
+
+    if(Math.abs(this.moveX) < 0.15 && this.moveY > 0.75){
+      this.startCrouch();
+    }
+  }
+
+  updateMovement(){
+    if(this.playerBusy || this.playerHealth<=0){
+      this.player.body.setVelocity(0,0);
+      return;
+    }
+
+    const dt=(this.frameDelta || 16.67)/1000;
+
+    const stickPower=Math.min(1,Math.hypot(this.stickX,this.stickY));
+    const usingStick=stickPower>STICK_DEADZONE;
+    const keyboardRunning=(this.keys && this.keys.shift.isDown);
+
+    let vx=this.moveX;
+    let vy=this.moveY;
+
+    if(Math.abs(vx)<STICK_DEADZONE) vx=0;
+    if(Math.abs(vy)<STICK_DEADZONE) vy=0;
+
+    if(vx!==0 && vy!==0){
+      vx*=0.707;
+      vy*=0.707;
+    }
+
+    let speed=WALK_SPEED;
+
+    if(usingStick){
+      const runPressure=Phaser.Math.Clamp(
+        (stickPower-RUN_STICK_THRESHOLD)/(1-RUN_STICK_THRESHOLD),
+        0,
+        1
+      );
+
+      speed=Phaser.Math.Linear(WALK_SPEED,RUN_SPEED,runPressure);
+    }
+
+    if(keyboardRunning){
+      speed=RUN_SPEED;
+    }
+
+    speed*=this.getPlayerSpeedMod();
+
+    const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
+
+    this.player.body.setVelocity(0,0);
+    this.player.x += vx * speed * dt;
+    this.player.y += vy * speed * 0.55 * dt;
+
+    if(Math.abs(vx)>0.1){
+      this.lastDir="side";
+      this.player.setFlipX(vx<0);
+    }else if(vy<-0.1){
+      this.lastDir="up";
+    }else if(vy>0.1){
+      this.lastDir="down";
+    }
+
+    this.handlePlatformTransitions();
+    this.applyPlatformBounds();
+
+    const moving=Math.abs(vx)>0.05 || Math.abs(vy)>0.05;
+
+    if(!Number.isFinite(this.player.x) || !Number.isFinite(this.player.y)){
+      this.player.x=470;
+      this.player.y=390;
+    }
+
+    this.playMoveAnim(moving,running);
+  }
+
+  playMoveAnim(moving,running){
+    if(this.playerBusy) return;
+
+    if(this.grabbedEnemy && this.grabMode==="carry"){
+      this.showCarryPose();
+      return;
+    }
+
+    this.player.setScale(PLAYER_MOVE_SCALE);
+
+    if(!moving){
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
+      return;
+    }
+
+    if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim(running ? "run_up" : "walk_up"));
+    else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim(running ? "run_side" : "walk_side"));
+    else safePlay(this.player,this.getPlayerAnim(running ? "run_down" : "walk_down"));
+  }
+
+  createPlatformZones(){
+    const alpha=0;
+
+    this.ladders=[
+      {name:"left",x:332,y:355,w:90,h:250,topY:250,middleY:390},
+      {name:"right",x:806,y:355,w:90,h:250,topY:250,middleY:390}
+    ];
+
+    this.stairs=[
+      {name:"leftStairs",x:118,y:452,w:120,h:120,middleX:150,middleY:390,bottomX:120,bottomY:505},
+      {name:"rightStairs",x:846,y:452,w:120,h:120,middleX:816,middleY:390,bottomX:860,bottomY:505}
+    ];
+
+    this.ladders.forEach(l=>{
+      l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
+    });
+
+    this.stairs.forEach(s=>{
+      s.zone=this.add.rectangle(s.x,s.y,s.w,s.h,0xff00ff,alpha).setDepth(10);
+    });
+  }
+
+  isPlayerInZone(zone,padX=0,padY=0){
+    const b=zone.getBounds();
+
+    const r=new Phaser.Geom.Rectangle(
+      b.x-padX,
+      b.y-padY,
+      b.width+padX*2,
+      b.height+padY*2
+    );
+
+    return Phaser.Geom.Rectangle.Contains(r,this.player.x,this.player.y);
+  }
+
+  handlePlatformTransitions(){
+    if(!PLATFORM_TRANSITIONS_ENABLED) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    const verticalOnly =
+      Math.abs(this.moveY) >= LADDER_VERTICAL_INPUT &&
+      Math.abs(this.moveX) <= LADDER_MAX_SIDE_INPUT;
+
+    const nearLadder=this.ladders.find(l=>{
+      const closeX = Math.abs(this.player.x-l.x) <= LADDER_ACTIVATE_X_RANGE;
+      const closeY = Math.abs(this.player.y-l.middleY) <= LADDER_ACTIVATE_Y_RANGE ||
+                     Math.abs(this.player.y-l.topY) <= LADDER_ACTIVATE_Y_RANGE;
+      return closeX && closeY;
+    });
+
+    if(nearLadder && verticalOnly){
+      if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
+        this.startClimbing(nearLadder,"up");
+        return;
+      }
+
+      if(this.platform==="top" && this.moveY > LADDER_VERTICAL_INPUT){
+        this.startClimbing(nearLadder,"down");
+        return;
+      }
+    }
+
+    const stairVerticalOnly =
+      Math.abs(this.moveY) >= STAIR_VERTICAL_INPUT &&
+      Math.abs(this.moveX) <= STAIR_MAX_SIDE_INPUT;
+
+    const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
+
+    if(activeStairs && stairVerticalOnly){
+      if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
+        this.startStairTravel(activeStairs,"down");
+        return;
+      }
+
+      if(this.platform==="bottom" && this.moveY < -STAIR_VERTICAL_INPUT){
+        this.startStairTravel(activeStairs,"up");
+      }
+    }
+  }
+
+  startClimbing(ladder,direction="up"){
+    this.isClimbing=true;
+    this.currentLadder=ladder;
+
+    this.playerBusy=false;
+    this.player.body.setVelocity(0,0);
+
+    this.player.x=ladder.x;
+
+    if(direction==="down"){
+      this.player.y=PLATFORM_BOUNDS.top.maxY;
+    }else{
+      this.player.y=PLATFORM_BOUNDS.middle.minY;
+    }
+
+    const climbAnim=this.getPlayerAnim("climb");
+    const canShowClimbPose=hasAnim(this,climbAnim);
+
+    this.player.setVisible(!canShowClimbPose);
+
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=false;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(canShowClimbPose);
+
+    if(canShowClimbPose){
+      safePlay(this.poseSprite,climbAnim);
+    }else{
+      this.poseSprite.setVisible(false);
+      safePlay(this.player,this.getPlayerAnim("idle_up"));
+    }
+
+    this.zoneText.setText("CLIMBING LADDER");
+  }
+
+  updateClimbing(){
+    const l=this.currentLadder;
+    if(!l) return;
+
+    const climbAnim=this.getPlayerAnim("climb");
+    const canShowClimbPose=hasAnim(this,climbAnim);
+
+    this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
+    this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
+    this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
+
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=false;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(canShowClimbPose);
+
+    this.player.setVisible(!canShowClimbPose);
+
+    if(canShowClimbPose){
+      safePlay(this.poseSprite,climbAnim);
+    }else{
+      safePlay(this.player,this.getPlayerAnim("idle_up"));
+    }
+
+    if(this.player.y<=l.topY+2 && this.moveY<-0.35){
+      this.isClimbing=false;
+      this.platform="top";
+      this.player.y=PLATFORM_BOUNDS.top.maxY;
+      this.player.x=l.x;
+      this.currentLadder=null;
+      this.zoneText.setText("TOP PLATFORM");
+      this.forcePlayerReady();
+      return;
+    }
+
+    if(this.player.y>=l.middleY-2 && this.moveY>0.35){
+      this.isClimbing=false;
+      this.platform="middle";
+      this.player.y=PLATFORM_BOUNDS.middle.minY;
+      this.player.x=l.x;
+      this.currentLadder=null;
+      this.zoneText.setText("MIDDLE PLATFORM");
+      this.forcePlayerReady();
+    }
+  }
+
+  startStairTravel(stair,direction="down"){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    const fromX=this.player.x;
+    const fromY=this.player.y;
+    const toX=direction==="down" ? stair.bottomX : stair.middleX;
+    const toY=direction==="down" ? stair.bottomY : stair.middleY;
+
+    this.lastDir="side";
+
+    if(stair.name==="leftStairs"){
+      this.player.setFlipX(direction==="down");
+    }else{
+      this.player.setFlipX(direction!=="down");
+    }
+
+    safePlay(this.player,this.getPlayerAnim("walk_side"));
+
+    this.tweens.addCounter({
+      from:0,
+      to:1,
+      duration:STAIR_TRAVEL_DURATION,
+      ease:"Sine.easeInOut",
+      onUpdate:tween=>{
+        const t=tween.getValue();
+        this.player.x=Phaser.Math.Linear(fromX,toX,t);
+        this.player.y=Phaser.Math.Linear(fromY,toY,t);
+      },
+      onComplete:()=>{
+        this.player.x=toX;
+        this.player.y=toY;
+
+        if(direction==="down"){
+          this.platform="bottom";
+          this.zoneText.setText("BOTTOM LEVEL");
+        }else{
+          this.platform="middle";
+          this.zoneText.setText("MIDDLE PLATFORM");
+        }
+
+        this.forcePlayerReady();
+      }
+    });
+  }
+
+  applyPlatformBounds(){
+    const bounds = PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
+
+    this.player.x = Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
+    this.player.y = Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
+  }
+
+  ensureRoundActive(){
+    if(!this.matchStarted && !this.matchOver){
+      this.unlockPlayerControl();
+    }
+
+    return this.matchStarted && !this.matchOver && this.playerHealth > 0;
+  }
+
+  startContextB(){
+    if(!this.ensureRoundActive()) return;
+    if(this.pauseMenuOpen) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    if(this.grabbedEnemy){
+      return;
+    }
+
+    this.readInput();
+
+    if(this.isForwardHeld() && !this.playerBusy){
+      this.startGrab();
+      return;
+    }
+
+    if(this.isUpHeld()){
+      if(!this.playerBusy || this.isJumping || this.isCrouching){
+        this.startJump();
+      }
+      return;
+    }
+
+    if(this.isDownHeld()){
+      if(!this.playerBusy){
+        this.startCrouch();
+      }
+      return;
+    }
+
+    if(this.playerBusy) return;
+
+    this.quickBlock();
+  }
+
+  startContextY(){
+    if(!this.ensureRoundActive()) return;
+
+    if(this.grabbedEnemy){
+      this.throwGrabbedEnemy();
+      return;
+    }
+
+    this.startAttack("heavy");
+  }
+
+  startContextKick(){
+    if(!this.ensureRoundActive()) return;
+
+    if(this.grabbedEnemy){
+      this.startCarryEnemy();
+      return;
+    }
+
+    if(this.pauseMenuOpen) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    const cHeld=this.keys && this.keys.c && this.keys.c.isDown;
+    const crouchKick=this.isDownHeld() || cHeld || this.isCrouching;
+
+    if(crouchKick){
+      if(this.playerBusy && this.isCrouching){
+        this.forcePlayerReady();
+      }
+
+      this.startSweep();
+      return;
+    }
+
+    this.startAttack("kick");
+  }
+
+  startJump(){
+    if(!this.ensureRoundActive()) return;
+    if(this.pauseMenuOpen) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    const alreadyJumping = this.isJumping;
+
+    if(alreadyJumping && this.jumpCount >= this.maxJumps){
+      return;
+    }
+
+    if(this.playerBusy && !this.isJumping && !this.isCrouching){
+      return;
+    }
+
+    const wasCrouching = this.isCrouching;
+
+    if(this.crouchEvent){
+      this.crouchEvent.remove(false);
+      this.crouchEvent=null;
+    }
+
+    this.playerBusy = true;
+    this.isJumping = true;
+    this.isCrouching = false;
+    this.isBlocking = false;
+
+    this.player.body.setVelocity(0,0);
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    this.player.setVisible(true);
+
+    if(!alreadyJumping){
+      this.jumpCount = 0;
+      this.jumpGroundY = this.player.y;
+    }
+
+    this.jumpCount++;
+
+    if(this.activeJumpTween){
+      this.activeJumpTween.stop();
+      this.activeJumpTween = null;
+    }
+
+    const jumpAnim=this.getPlayerAnim("jump");
+
+    if(hasAnim(this,jumpAnim)){
+      this.player.setScale(PLAYER_MOVE2_SCALE);
+      safePlay(this.player,jumpAnim);
+    }else{
+      this.player.setScale(PLAYER_MOVE_SCALE);
+    }
+
+    let height = JUMP_HEIGHT;
+
+    if(wasCrouching){
+      height *= CROUCH_JUMP_BOOST;
+    }
+
+    if(this.jumpCount >= 2){
+      height *= DOUBLE_JUMP_HEIGHT_MULT;
+      this.createHitFX(this.player.x,this.player.y-60,"jump",6);
+    }else{
+      this.createHitFX(this.player.x,this.player.y-45,"jump",4);
+    }
+
+    const peakY = this.player.y - height;
+    const groundY = this.jumpGroundY;
+
+    this.activeJumpTween = this.tweens.add({
+      targets:this.player,
+      y:peakY,
+      duration:JUMP_TIME/2,
+      ease:"Sine.easeOut",
+      onComplete:()=>{
+        this.activeJumpTween = this.tweens.add({
+          targets:this.player,
+          y:groundY,
+          duration:JUMP_TIME/2,
+          ease:"Sine.easeIn",
+          onComplete:()=>{
+            this.player.y = groundY;
+            this.player.setScale(PLAYER_MOVE_SCALE);
+
+            this.isJumping = false;
+            this.jumpCount = 0;
+            this.activeJumpTween = null;
+
+            this.forcePlayerReady();
+          }
+        });
+      }
+    });
+  }
+
+  startCrouch(){
+    if(!this.ensureRoundActive()) return;
+    if(this.pauseMenuOpen) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.isCrouching=true;
+    this.isBlocking=false;
+    this.player.body.setVelocity(0,0);
+
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
+
+    const played=this.showPose(this.getPlayerAnim("crouch"),PLAYER_ACTION_SCALE);
+
+    if(!played){
+      this.forcePlayerReady();
+      return;
+    }
+
+    if(this.crouchEvent){
+      this.crouchEvent.remove(false);
+    }
+
+    this.crouchEvent=this.time.delayedCall(650,()=>{
+      if(this.isCrouching && !this.isJumping){
+        this.isCrouching=false;
+        this.forcePlayerReady();
+      }
+    });
+  }
+
+  startSweep(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.isCrouching=false;
+    this.player.body.setVelocity(0,0);
+
+    this.positionAttackSprite("kick");
+    this.poseSprite.setVisible(true);
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,this.getPlayerAnim("kick"));
+
+    this.time.delayedCall(90,()=>this.createSweepHitbox());
+
+    this.time.delayedCall(430,()=>{
+      this.forcePlayerReady();
+    });
+
+    this.time.delayedCall(700,()=>{
+      if(this.playerBusy) this.forcePlayerReady();
+    });
+  }
+
+  createSweepHitbox(){
+    const dir=this.getFacingDir();
+    const boxX=this.player.x+dir*48;
+    const boxY=this.player.y-25;
+    const sweepDamage=Number((SWEEP_DAMAGE*this.getPlayerDamageMod()).toFixed(1));
+
+    const box=this.add.rectangle(boxX,boxY,96,34,0xff0000,0).setDepth(999);
+    this.physics.add.existing(box);
+    box.body.setAllowGravity(false);
+
+    const hit=new Set();
+
+    this.physics.add.overlap(box,this.enemies,(b,e)=>{
+      if(hit.has(e) || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
+
+      hit.add(e);
+      this.damageEnemy(e,sweepDamage,true);
+    });
+
+    this.time.delayedCall(130,()=>{
+      if(box && box.destroy) box.destroy();
+    });
+  }
+
+  startGrab(){
+    if(!this.ensureRoundActive()) return;
+    if(this.pauseMenuOpen) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+    if(this.grabbedEnemy) return;
+    if(!this.enemies) return;
+
+    let target=null;
+    let bestDist=9999;
+    const facing=this.getFacingDir();
+
+    this.enemies.children.each(e=>{
+      if(!e || e.dead || e.state==="dead") return;
+      if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
+      if(e.platform!==this.platform) return;
+      if(e.grabbed || e.thrownTime>0) return;
+
+      const dx=e.x-this.player.x;
+      const dy=Math.abs(this.player.y-e.y);
+      const inFront=dx*facing>0;
+      const dist=Math.abs(dx);
+
+      if(inFront && dist<75 && dy<45 && dist<bestDist){
+        target=e;
+        bestDist=dist;
+      }
+    });
+
+    if(!target){
+      this.enemies.children.each(e=>{
+        if(!e || e.dead || e.state==="dead") return;
+        if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
+        if(e.platform!==this.platform) return;
+        if(e.grabbed || e.thrownTime>0) return;
+
+        const dx=Math.abs(this.player.x-e.x);
+        const dy=Math.abs(this.player.y-e.y);
+
+        if(dx<55 && dy<45 && dx<bestDist){
+          target=e;
+          bestDist=dx;
+        }
+      });
+    }
+
+    if(!target) return;
+
+    this.clearGrabTimers();
+
+    this.grabbedEnemy=target;
+    this.grabMode="hold";
+
+    this.playerBusy=true;
+    this.isBlocking=false;
+    this.isCrouching=false;
+    this.isJumping=false;
+
+    this.player.body.setVelocity(0,0);
+
+    target.grabbed=true;
+    target.busy=true;
+    target.state="grabbed";
+    target.knockbackTime=0;
+    target.attackCooldown=9999;
+    target.setVelocity(0,0);
+
+    this.safeEnemyPlay(target,"ko");
+    this.showCarryPose();
+    this.updateGrabbedEnemy();
+
+    this.grabHoldEvent=this.time.delayedCall(GRAB_HOLD_TIME,()=>{
+      if(this.grabbedEnemy && this.grabMode==="hold"){
+        this.enemyBreakGrab();
+      }
+    });
+  }
+
+  showCarryPose(){
+    if(!this.player || !this.poseSprite) return;
+
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,this.getPlayerAnim("carry"));
+  }
+
+  clearGrabTimers(){
+    if(this.grabHoldEvent){
+      this.grabHoldEvent.remove(false);
+      this.grabHoldEvent=null;
+    }
+
+    if(this.carryBreakEvent){
+      this.carryBreakEvent.remove(false);
+      this.carryBreakEvent=null;
+    }
+  }
+
+  updateGrabbedEnemy(){
+    if(!this.grabbedEnemy || !this.player) return;
+
+    const e=this.grabbedEnemy;
+
+    if(e.dead || e.state==="dead"){
+      this.clearGrabTimers();
+      this.grabbedEnemy=null;
+      this.grabMode="none";
+      return;
+    }
+
+    const dir=this.getFacingDir();
+    const offset=this.grabMode==="carry" ? CARRY_OFFSET_X : GRAB_OFFSET_X;
+
+    e.x=this.player.x+dir*offset;
+    e.y=this.player.y;
+    e.homeY=this.player.y;
+    e.platform=this.platform;
+
+    e.setVelocity(0,0);
+    e.setFlipX(dir<0);
+    e.setDepth(e.y+3);
+
+    this.safeEnemyPlay(e,"ko");
+    this.showCarryPose();
+
+    if(e.shadow){
+      e.shadow.x=e.x;
+      e.shadow.y=e.y+3;
+    }
+
+    this.updateEnemyNameplate(e);
+  }
+
+  startCarryEnemy(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(!this.grabbedEnemy) return;
+    if(this.grabMode==="carry") return;
+
+    this.clearGrabTimers();
+
+    this.grabMode="carry";
+    this.playerBusy=false;
+
+    this.showCarryPose();
+
+    this.carryBreakEvent=this.time.delayedCall(CARRY_BREAK_TIME,()=>{
+      if(this.grabbedEnemy && this.grabMode==="carry"){
+        this.enemyBreakGrab();
+      }
+    });
+  }
+
+  throwGrabbedEnemy(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(!this.grabbedEnemy) return;
+
+    const e=this.grabbedEnemy;
+    const dir=this.getFacingDir();
+
+    this.clearGrabTimers();
+
+    this.grabbedEnemy=null;
+    this.grabMode="none";
+
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.isCrouching=false;
+    this.isJumping=false;
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+      safePlay(this.player,this.getPlayerAnim("idle_side"));
+    }
+
+    e.grabbed=false;
+    e.busy=true;
+    e.state="thrown";
+    e.thrownTime=850;
+    e.thrownHit=new Set();
+    e.knockbackTime=850;
+    e.attackCooldown=1200;
+    e.platform=this.platform;
+    e.homeY=this.player.y;
+
+    e.health-=THROW_DAMAGE;
+
+    this.createHitFX(e.x,e.y-55,"hit",THROW_DAMAGE);
+
+    e.setVelocityX(dir*THROW_SPEED);
+    this.safeEnemyPlay(e,"hurt");
+    this.updateEnemyHealthBar(e);
+
+    if(e.health<=0){
+      this.killEnemy(e);
+      e.thrownTime=0;
+      return;
+    }
+
+    this.time.delayedCall(850,()=>{
+      if(!e.dead && e.state==="thrown"){
+        e.busy=false;
+        e.state="idle";
+        e.thrownTime=0;
+        e.setVelocityX(0);
+        this.safeEnemyPlay(e,"idle");
+      }
+    });
+  }
+
+  enemyBreakGrab(){
+    if(!this.grabbedEnemy) return;
+
+    const e=this.grabbedEnemy;
+    const dir=this.getFacingDir();
+
+    this.clearGrabTimers();
+
+    this.grabbedEnemy=null;
+    this.grabMode="none";
+
+    e.grabbed=false;
+    e.busy=false;
+    e.state="idle";
+    e.attackCooldown=900;
+    e.knockbackTime=250;
+    e.setVelocityX(dir*90);
+
+    this.safeEnemyPlay(e,"idle");
+
+    this.playerBusy=false;
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+      safePlay(this.player,this.getPlayerAnim("idle_side"));
+    }
+  }
+
+  updateThrownEnemies(delta){
+    if(!this.enemies) return;
+
+    this.enemies.children.each(e=>{
+      if(!e || e.dead) return;
+      if(!e.thrownTime || e.thrownTime<=0) return;
+
+      e.thrownTime-=delta;
+      if(e.thrownTime<0) e.thrownTime=0;
+
+      e.y=e.homeY;
+      e.setDepth(e.y+2);
+
+      if(e.shadow){
+        e.shadow.x=e.x;
+        e.shadow.y=e.y+3;
+      }
+
+      this.updateEnemyNameplate(e);
+
+      this.enemies.children.each(other=>{
+        if(!other || other===e) return;
+        if(other.dead || other.state==="dead") return;
+        if(other.platform!==e.platform) return;
+        if(other.grabbed) return;
+
+        if(!e.thrownHit){
+          e.thrownHit=new Set();
+        }
+
+        if(e.thrownHit.has(other)) return;
+
+        const dx=Math.abs(e.x-other.x);
+        const dy=Math.abs(e.y-other.y);
+
+        if(dx<70 && dy<45){
+          e.thrownHit.add(other);
+          this.damageEnemy(other,THROW_COLLISION_DAMAGE,true);
+        }
+      });
+
+      if(e.thrownTime<=0 && !e.dead && e.state==="thrown"){
+        e.busy=false;
+        e.state="idle";
+        e.setVelocityX(0);
+        this.safeEnemyPlay(e,"idle");
+      }
+    });
+  }
+
+  getEnemyDef(type){
+    return ENEMY_TYPES[type] || ENEMY_TYPES.corpo_sellout;
+  }
+
+  getEnemyAnim(e,action){
+    const def=this.getEnemyDef(e.enemyType);
+    const prefix=def.prefix;
+
+    const map={
+      idle:prefix+"_idle",
+      walk:prefix+"_walk",
+      punch:prefix+"_punch",
+      kick:prefix+"_kick",
+      hurt:prefix+"_hurt",
+      knockback:prefix+"_knockback",
+      ko:prefix+"_ko",
+      taunt:prefix+"_taunt",
+      special:prefix+"_special"
+    };
+
+    return map[action] || map.idle;
+  }
+
+  safeEnemyPlay(e,action){
+    if(!e || e.dead) return;
+    const anim=this.getEnemyAnim(e,action);
+    safePlay(e,anim);
+  }
+
+  createEnemies(){
+    this.enemies=this.physics.add.group();
+
+    this.spawnEnemyType("corpo_wannabe",235,505,"bottom");
+    this.spawnEnemyType("sellout",520,250,"top");
+    this.spawnEnemyType("feral",640,390,"middle");
+    this.spawnEnemyType("corpo_sellout",850,390,"middle");
+  }
+
+  spawnEnemyType(type,x,y,platform="middle"){
+    const def=this.getEnemyDef(type);
+    const textureKey=hasTex(this,def.key) ? def.key : "feral";
+    const e=this.physics.add.sprite(x,y,textureKey,0);
+
+    e.enemyType=type;
+    e.enemyLabel=def.label;
+
+    e.setOrigin(0.5,1);
+    e.setScale(def.scale);
+    e.setTint(0xffffff);
+    e.setDepth(y+2);
+    e.body.setAllowGravity(false);
+    e.body.setVelocity(0,0);
+    e.setCollideWorldBounds(true);
+
+    e.baseHealth=def.baseHealth || def.maxHealth;
+    e.maxHealth=def.maxHealth;
+    e.health=def.maxHealth;
+
+    e.dead=false;
+    e.busy=false;
+    e.platform=platform;
+    e.homeY=y;
+    e.state="idle";
+
+    e.attackCooldown=Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax);
+    e.attackCooldownMin=def.attackCooldownMin;
+    e.attackCooldownMax=def.attackCooldownMax;
+    e.attackRange=def.attackRange;
+    e.stopRange=def.stopRange;
+    e.chaseSpeed=def.chaseSpeed;
+    e.attackDamage=def.attackDamage;
+    e.canBeGrabbed=def.canBeGrabbed !== false;
+    e.knockbackResist=def.knockbackResist || 1;
+
+    e.bossActive=false;
+    e.bossIntro=false;
+    e.invulnerable=false;
+    e.guardCooldown=0;
+    e.guardTime=0;
+    e.tacticTimer=0;
+    e.tacticState="hold";
+
+    e.specialCooldown=def.specialCooldown || 0;
+    e.specialRange=def.specialRange || 0;
+    e.specialDamage=def.specialDamage || 0;
+
+    e.knockbackTime=0;
+    e.grabbed=false;
+    e.thrownTime=0;
+    e.thrownHit=null;
+
+    e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
+
+    this.safeEnemyPlay(e,"idle");
+    this.createEnemyNameplate(e);
+    this.createEnemyHealthBar(e);
+
+    this.enemies.add(e);
+
+    return e;
+  }
+
+  pickRandomEnemyName(){
+    return ENEMY_NAMES[Phaser.Math.Between(0,ENEMY_NAMES.length-1)];
+  }
+
+  pickRandomEnemyAuth(){
+    return ENEMY_AUTH_TAGS[Phaser.Math.Between(0,ENEMY_AUTH_TAGS.length-1)];
+  }
+
+  createEnemyNameplate(e){
+    if(e.enemyType==="doorman"){
+      e.enemyName="THE DOORMAN";
+      e.authTag="SUB-BOSS";
+    }else{
+      e.enemyName=this.pickRandomEnemyName();
+      e.authTag=this.pickRandomEnemyAuth();
+    }
+
+    e.authBadge=this.add.rectangle(e.x,e.y-106,64,14,0x000000,0.78)
+      .setStrokeStyle(1,0x00eaff,0.9)
+      .setDepth(1000);
+
+    e.authText=this.add.text(e.x,e.y-106,e.authTag,{
+      font:"9px monospace",
+      fill:"#00eaff"
+    }).setOrigin(0.5).setDepth(1001);
+
+    e.nameText=this.add.text(e.x,e.y-91,e.enemyName,{
+      font:"11px monospace",
+      fill:"#fff45c",
+      stroke:"#000000",
+      strokeThickness:3
+    }).setOrigin(0.5).setDepth(1001);
+  }
+
+  createEnemyHealthBar(e){
+    const barW=e.enemyType==="doorman" ? 84 : 48;
+
+    e.hpBack=this.add.rectangle(e.x,e.y-76,barW,7,0x000000,0.9)
+      .setOrigin(0.5,0.5)
+      .setStrokeStyle(1,0xffffff,0.8)
+      .setDepth(1000);
+
+    e.hpFill=this.add.rectangle(e.x-(barW-4)/2,e.y-76,barW-4,5,0x00ff44,1)
+      .setOrigin(0,0.5)
+      .setDepth(1001);
+
+    this.updateEnemyHealthBar(e);
+  }
+
+  updateEnemyHealthBar(e){
+    if(!e || !e.hpFill || !e.hpBack) return;
+
+    const max=e.maxHealth || 30;
+    const fillRatio=Phaser.Math.Clamp(e.health/max,0,1);
+    const barW=e.enemyType==="doorman" ? 84 : 48;
+    const fillW=barW-4;
+
+    let color=0x00ff44;
+
+    if(fillRatio<=0.15){
+      color=0xff2222;
+    }else if(fillRatio<=0.5){
+      color=0xffa000;
+    }
+
+    e.hpBack.setDisplaySize(barW,7);
+    e.hpBack.x=e.x;
+    e.hpBack.y=e.y-76;
+
+    e.hpFill.x=e.x-fillW/2;
+    e.hpFill.y=e.y-76;
+
+    if(fillRatio<=0){
+      e.hpFill.setVisible(false);
+    }else{
+      e.hpFill.setVisible(true);
+      e.hpFill.setDisplaySize(fillW*fillRatio,5);
+      e.hpFill.setFillStyle(color,1);
+    }
+  }
+
+  updateEnemyNameplate(e){
+    if(!e) return;
+
+    if(e.authBadge){
+      e.authBadge.x=e.x;
+      e.authBadge.y=e.y-106;
+    }
+
+    if(e.authText){
+      e.authText.x=e.x;
+      e.authText.y=e.y-106;
+    }
+
+    if(e.nameText){
+      e.nameText.x=e.x;
+      e.nameText.y=e.y-91;
+    }
+
+    if(e.speechBox){
+      e.speechBox.x=e.x;
+      e.speechBox.y=e.y-142;
+    }
+
+    if(e.speechText){
+      e.speechText.x=e.x;
+      e.speechText.y=e.y-142;
+    }
+
+    this.updateEnemyHealthBar(e);
+  }
+
+  killEnemy(e){
+    if(!e) return;
+
+    e.health=0;
+    e.dead=true;
+    e.state="dead";
+    e.busy=true;
+    e.setVelocityX(0);
+
+    this.safeEnemyPlay(e,"ko");
+
+    if(e.authText){
+      e.authText.setText("KO");
+      e.authText.setFill("#ff4fc3");
+    }
+
+    if(e.nameText){
+      e.nameText.setFill("#777777");
+    }
+
+    if(e.hpFill){
+      e.hpFill.setVisible(false);
+    }
+  }
+
+  damageEnemy(e,damage,stagger=false){
+    if(!e || e.dead || e.invulnerable) return;
+
+    e.health-=damage;
+    this.createHitFX(e.x,e.y-55,"hit",damage);
+
+    e.busy=true;
+    e.state=stagger ? "stagger" : "hurt";
+    e.knockbackTime=stagger ? 650 : 300;
+    e.attackCooldown=stagger ? 1100 : 500;
+
+    const resist=e.knockbackResist || 1;
+    const knockPower=stagger ? 190 : 120;
+
+    e.setVelocityX((e.x<this.player.x ? -1 : 1)*knockPower*resist);
+
+    this.combo++;
+    this.rhythm=Math.min(10,this.rhythm+1);
+
+    if(e.health<=0){
+      this.killEnemy(e);
+      return;
+    }
+
+    this.safeEnemyPlay(e,stagger ? "knockback" : "hurt");
+    this.updateEnemyHealthBar(e);
+
+    this.time.delayedCall(stagger ? 650 : 300,()=>{
+      if(!e.dead){
+        e.busy=false;
+        e.state="idle";
+        this.safeEnemyPlay(e,"idle");
+      }
+    });
+  }
+
+  updateEnemyAI(){
+    if(!this.enemies) return;
+
+    const delta=this.frameDelta || 16.67;
+
+    this.enemies.children.each(e=>{
+      if(!e) return;
+
+      if(e.grabbed || e.thrownTime>0){
+        this.updateEnemyNameplate(e);
+
+        if(e.shadow){
+          e.shadow.x=e.x;
+          e.shadow.y=e.y+3;
+        }
+
+        return;
+      }
+
+      if(e.attackCooldown>0){
+        e.attackCooldown-=delta;
+        if(e.attackCooldown<0) e.attackCooldown=0;
+      }
+
+      if(e.knockbackTime>0){
+        e.knockbackTime-=delta;
+        if(e.knockbackTime<0) e.knockbackTime=0;
+      }
+
+      if(e.specialCooldown>0){
+        e.specialCooldown-=delta;
+        if(e.specialCooldown<0) e.specialCooldown=0;
+      }
+
+      if(e.guardCooldown>0){
+        e.guardCooldown-=delta;
+        if(e.guardCooldown<0) e.guardCooldown=0;
+      }
+
+      if(e.guardTime>0){
+        e.guardTime-=delta;
+        if(e.guardTime<0) e.guardTime=0;
+      }
+
+      if(e.dead || e.state==="dead"){
+        e.dead=true;
+        e.state="dead";
+        e.setVelocityX(0);
+        this.updateEnemyNameplate(e);
+
+        if(e.shadow){
+          e.shadow.x=e.x;
+          e.shadow.y=e.y+3;
+        }
+
+        return;
+      }
+
+      e.y=e.homeY;
+      e.setDepth(e.y+2);
+
+      this.updateEnemyNameplate(e);
+
+      if(e.shadow){
+        e.shadow.x=e.x;
+        e.shadow.y=e.y+3;
+      }
+
+      this.applyEnemySeparation(e);
+      this.keepEnemyOffPlayer(e);
+
+      if(e.knockbackTime>0) return;
+      if(e.busy) return;
+
+      if(e.enemyType==="doorman"){
+        this.updateDoormanAI(e,delta);
+        return;
+      }
+
+      if(this.platform!==e.platform || this.playerHealth<=0){
+        e.state="idle";
+        e.setVelocityX(0);
+        this.safeEnemyPlay(e,"idle");
+        return;
+      }
+
+      const dx=this.player.x-e.x;
+      const dy=this.player.y-e.y;
+      const dist=Math.abs(dx);
+
+      e.setFlipX(dx<0);
+
+      if(Math.abs(dy)>45){
+        e.state="idle";
+        e.setVelocityX(0);
+        this.safeEnemyPlay(e,"idle");
+        return;
+      }
+
+      if(dist<=e.attackRange && e.attackCooldown<=0){
+        this.startEnemyAttack(e);
+        return;
+      }
+
+      if(dist>e.stopRange){
+        e.state="chase";
+        const chaseDir=dx>0 ? 1 : -1;
+        e.setVelocityX(chaseDir*e.chaseSpeed);
+        this.safeEnemyPlay(e,"walk");
+      }else{
+        e.state="idle";
+        e.setVelocityX(0);
+        this.safeEnemyPlay(e,"idle");
+      }
+    });
+  }
+
+  updatePlayerAntiStuck(){
+    if(!PLAYER_ANTI_STUCK_ENABLED) return;
+    if(!this.player) return;
+    if(!this.matchStarted || this.matchOver || this.pauseMenuOpen) return;
+    if(this.playerBusy || this.isClimbing || this.isJumping) return;
+    if(this.playerHealth <= 0) return;
+
+    const inputHeld =
+      Math.abs(this.moveX) > PLAYER_STUCK_INPUT_MIN ||
+      Math.abs(this.moveY) > PLAYER_STUCK_INPUT_MIN;
+
+    const movedEnough =
+      Math.abs(this.player.x - this.lastPlayerX) > 0.35 ||
+      Math.abs(this.player.y - this.lastPlayerY) > 0.35;
+
+    if(inputHeld && !movedEnough){
+      this.playerStuckFrames++;
+    }else{
+      this.playerStuckFrames = 0;
+    }
+
+    if(this.playerStuckFrames >= PLAYER_STUCK_FRAME_LIMIT){
+      const pushX = this.moveX !== 0
+        ? Math.sign(this.moveX) * PLAYER_UNSTUCK_PUSH_X
+        : this.getFacingDir() * PLAYER_UNSTUCK_PUSH_X;
+
+      const pushY = this.moveY !== 0
+        ? Math.sign(this.moveY) * PLAYER_UNSTUCK_PUSH_Y
+        : 0;
+
+      this.player.x += pushX;
+      this.player.y += pushY;
+
+      this.applyPlatformBounds();
+
+      this.player.body.setVelocity(0,0);
+      this.playerStuckFrames = 0;
+
+      if(this.poseSprite){
+        this.poseSprite.stop();
+        this.poseSprite.setVisible(false);
+      }
+
+      this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
+    }
+
+    this.lastPlayerX = this.player.x;
+    this.lastPlayerY = this.player.y;
+  }
+
+  keepEnemyOffPlayer(e){
+    if(!e || e.dead || !this.player) return;
+    if(e.platform !== this.platform) return;
+    if(e.grabbed || e.thrownTime > 0) return;
+
+    const dx = e.x - this.player.x;
+    const dy = e.y - this.player.y;
+
+    if(Math.abs(dx) < 34 && Math.abs(dy) < 30){
+      const pushDir = dx >= 0 ? 1 : -1;
+      e.x += pushDir * 3;
+      e.setVelocityX(pushDir * 20);
+    }
+  }
+
+  applyEnemySeparation(e){
+    if(!this.enemies || !e || e.dead) return;
+
+    this.enemies.children.each(other=>{
+      if(!other || other===e || other.dead) return;
+      if(other.platform!==e.platform) return;
+      if(other.grabbed || other.thrownTime>0) return;
+
+      const gap=e.x-other.x;
+      const absGap=Math.abs(gap);
+
+      if(absGap>0 && absGap<44){
+        const push=gap>0 ? 1.1 : -1.1;
+        e.x+=push;
+      }
+
+      if(absGap===0){
+        e.x+=Phaser.Math.Between(-2,2);
+      }
+    });
+
+    if(e.platform==="top"){
+      e.x=Phaser.Math.Clamp(e.x,190,820);
+    }else{
+      e.x=Phaser.Math.Clamp(e.x,120,860);
+    }
+  }
+
+  startEnemyAttack(e){
+    if(!e || e.dead || e.busy) return;
+    if(e.grabbed || e.thrownTime>0) return;
+
+    e.state="attack";
+    e.busy=true;
+    e.attackCooldown=Phaser.Math.Between(e.attackCooldownMin || 500,e.attackCooldownMax || 900);
+    e.setVelocityX(0);
+
+    this.safeEnemyPlay(e,"punch");
+
+    this.time.delayedCall(280,()=>{
+      if(!e || e.dead || e.state!=="attack") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+
+      if(dx<=e.attackRange+10 && dy<=45){
+        const dir=e.x<this.player.x ? 1 : -1;
+        this.damagePlayer(e.attackDamage || 8,dir);
+      }
+    });
+
+    this.time.delayedCall(560,()=>{
+      if(!e || e.dead) return;
+
+      e.busy=false;
+      e.state="idle";
+      this.safeEnemyPlay(e,"idle");
+    });
+  }
+
+  updateDoormanAI(e,delta){
+    if(!e || e.dead) return;
+
+    this.updateEnemyNameplate(e);
+
+    if(e.shadow){
+      e.shadow.x=e.x;
+      e.shadow.y=e.y+3;
+    }
+
+    e.y=e.homeY;
+    e.setDepth(e.y+2);
+
+    if(e.bossIntro || !e.bossActive || e.invulnerable){
+      e.setVelocityX(0);
+      return;
+    }
+
+    if(this.platform!==e.platform || this.playerHealth<=0){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+      return;
+    }
+
+    if(e.knockbackTime>0) return;
+    if(e.busy) return;
+
+    const dx=this.player.x-e.x;
+    const dy=this.player.y-e.y;
+    const dist=Math.abs(dx);
+    const dir=dx>0 ? 1 : -1;
+
+    e.setFlipX(dx<0);
+
+    if(Math.abs(dy)>50){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+      return;
+    }
+
+    if(this.playerBusy && dist<110 && e.guardCooldown<=0){
+      e.guardTime=520;
+      e.guardCooldown=2200;
+      e.attackCooldown=500;
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"taunt");
+      return;
+    }
+
+    if(e.guardTime>0){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"taunt");
+      return;
+    }
+
+    if(e.specialCooldown<=0 && dist<=e.specialRange && dist>65){
+      this.startDoormanSpecial(e);
+      return;
+    }
+
+    if(dist<=e.attackRange && e.attackCooldown<=0){
+      this.startDoormanPunch(e);
+      return;
+    }
+
+    if(dist<48){
+      e.setVelocityX(-dir*e.chaseSpeed*0.75);
+      this.safeEnemyPlay(e,"walk");
+      return;
+    }
+
+    if(dist>e.specialRange){
+      e.setVelocityX(dir*e.chaseSpeed);
+      this.safeEnemyPlay(e,"walk");
+      return;
+    }
+
+    e.tacticTimer-=delta;
+
+    if(e.tacticTimer<=0){
+      const roll=Phaser.Math.Between(0,2);
+
+      if(roll===0){
+        e.tacticState="hold";
+        e.tacticTimer=Phaser.Math.Between(450,850);
+      }else if(roll===1){
+        e.tacticState="step_in";
+        e.tacticTimer=Phaser.Math.Between(300,600);
+      }else{
+        e.tacticState="step_back";
+        e.tacticTimer=Phaser.Math.Between(300,600);
+      }
+    }
+
+    if(e.tacticState==="hold"){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+    }else if(e.tacticState==="step_in"){
+      e.setVelocityX(dir*e.chaseSpeed*0.45);
+      this.safeEnemyPlay(e,"walk");
+    }else if(e.tacticState==="step_back"){
+      e.setVelocityX(-dir*e.chaseSpeed*0.45);
+      this.safeEnemyPlay(e,"walk");
+    }
+
+    e.x=Phaser.Math.Clamp(e.x,120,860);
+  }
+
+  startDoormanPunch(e){
+    if(!e || e.dead || e.busy) return;
+
+    e.state="attack";
+    e.busy=true;
+    e.attackCooldown=Phaser.Math.Between(850,1250);
+    e.setVelocityX(0);
+
+    this.safeEnemyPlay(e,"punch");
+
+    this.time.delayedCall(320,()=>{
+      if(!e || e.dead || e.state!=="attack") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+
+      if(dx<=e.attackRange+12 && dy<=50){
+        const dir=e.x<this.player.x ? 1 : -1;
+        this.damagePlayer(e.attackDamage || 15,dir);
+      }
+    });
+
+    this.time.delayedCall(760,()=>{
+      if(!e || e.dead) return;
+
+      e.busy=false;
+      e.state="idle";
+      this.safeEnemyPlay(e,"idle");
+    });
+  }
+
+  startDoormanSpecial(e){
+    if(!e || e.dead || e.busy) return;
+
+    e.state="special";
+    e.busy=true;
+    e.setVelocityX(0);
+    e.specialCooldown=Phaser.Math.Between(3000,4200);
+    e.attackCooldown=1200;
+
+    this.safeEnemyPlay(e,"special");
+    this.sayDoorman(e,"Fire punch.",1100);
+
+    this.time.delayedCall(260,()=>{
+      if(!e || e.dead || e.state!=="special") return;
+      this.createDoormanFireTaunt(e);
+    });
+
+    this.time.delayedCall(430,()=>{
+      if(!e || e.dead || e.state!=="special") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+      const dir=e.x<this.player.x ? 1 : -1;
+
+      const fxX=e.x + dir*70;
+      const fxY=e.y - 65;
+
+      this.createHitFX(fxX,fxY,"hit",e.specialDamage || 20);
+
+      if(dx<=e.specialRange && dy<=55){
+        this.damagePlayer(e.specialDamage || 20,dir);
+      }
+    });
+
+    this.time.delayedCall(950,()=>{
+      if(!e || e.dead) return;
+
+      e.busy=false;
+      e.state="idle";
+      this.safeEnemyPlay(e,"idle");
+    });
+  }
+
+  spawnDoormanIntro(){
+    if(this.doormanSpawned) return;
+
+    this.doormanSpawned=true;
+    this.doormanIntroActive=true;
+
+    const boss=this.spawnEnemyType("doorman",DOORMAN_DOOR_X,DOORMAN_DOOR_Y,"middle");
+    this.doorman=boss;
+
+    boss.setFlipX(this.player.x < boss.x);
+    boss.homeY=DOORMAN_DOOR_Y;
+    boss.platform="middle";
+
+    boss.bossIntro=true;
+    boss.bossActive=false;
+    boss.invulnerable=true;
+    boss.busy=true;
+    boss.state="intro";
+    boss.setVelocityX(0);
+
+    this.zoneText.setText("SUB-BOSS: THE DOORMAN");
+
+    const title=this.makeArcadeText(480,155,"THE DOORMAN",54,"#fff45c");
+    const warning=this.makeArcadeText(480,220,"SUB-BOSS",32,"#ff4fc3");
+
+    this.sayDoorman(boss,"Nobody gets through my door.",2300);
+
+    this.safeEnemyPlay(boss,"taunt");
+    this.createDoormanFireTaunt(boss);
+
+    this.time.delayedCall(1200,()=>{
+      if(!boss || boss.dead) return;
+      this.sayDoorman(boss,"You want in? Go through me.",2300);
+      this.safeEnemyPlay(boss,"special");
+      this.createDoormanFireTaunt(boss);
+    });
+
+    this.time.delayedCall(3000,()=>{
+      if(title) title.destroy();
+      if(warning) warning.destroy();
+
+      if(!boss || boss.dead) return;
+
+      boss.bossIntro=false;
+      boss.bossActive=true;
+      boss.invulnerable=false;
+      boss.busy=false;
+      boss.state="idle";
+      boss.attackCooldown=700;
+      boss.specialCooldown=1800;
+
+      this.safeEnemyPlay(boss,"idle");
+      this.zoneText.setText("DOORMAN FIGHT");
+      this.doormanIntroActive=false;
+    });
+  }
+
+  sayDoorman(e,text,duration=1800){
+    if(!e) return;
+
+    if(e.speechBox){
+      e.speechBox.destroy();
+      e.speechBox=null;
+    }
+
+    if(e.speechText){
+      e.speechText.destroy();
+      e.speechText=null;
+    }
+
+    e.speechBox=this.add.rectangle(e.x,e.y-142,300,34,0x000000,0.82)
+      .setStrokeStyle(2,0xff4fc3,0.9)
+      .setDepth(16000);
+
+    e.speechText=this.add.text(e.x,e.y-142,text,{
+      font:"13px monospace",
+      fill:"#ffffff"
+    }).setOrigin(0.5).setDepth(16001);
+
+    this.time.delayedCall(duration,()=>{
+      if(e.speechBox){
+        e.speechBox.destroy();
+        e.speechBox=null;
+      }
+
+      if(e.speechText){
+        e.speechText.destroy();
+        e.speechText=null;
+      }
+    });
+  }
+
+  createDoormanFireTaunt(e){
+    if(!e) return;
+
+    const dir=e.flipX ? -1 : 1;
+    const fxX=e.x + dir*55;
+    const fxY=e.y - 68;
+
+    const fire=this.add.circle(fxX,fxY,22,0xff5a00,0.95)
+      .setDepth(14500)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    const core=this.add.circle(fxX,fxY,10,0xffff66,1)
+      .setDepth(14501)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets:fire,
+      scale:2.1,
+      alpha:0,
+      duration:420,
+      onComplete:()=>fire.destroy()
+    });
+
+    this.tweens.add({
+      targets:core,
+      scale:2.6,
+      alpha:0,
+      duration:360,
+      onComplete:()=>core.destroy()
+    });
+
+    for(let i=0;i<12;i++){
+      const spark=this.add.circle(fxX,fxY,Phaser.Math.Between(2,4),0xffaa22,1)
+        .setDepth(14502)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
+      const angle=Phaser.Math.FloatBetween(-0.8,0.8);
+      const dist=Phaser.Math.Between(30,70);
+
+      this.tweens.add({
+        targets:spark,
+        x:fxX + dir*Math.cos(angle)*dist,
+        y:fxY + Math.sin(angle)*dist,
+        alpha:0,
+        duration:350,
+        onComplete:()=>spark.destroy()
+      });
+    }
+
+    this.cameras.main.shake(120,0.004);
+  }
+
+  showPose(animKey,scale=PLAYER_ACTION_SCALE,yOffset=0){
+    if(!this.player || !this.poseSprite) return false;
+    if(!hasAnim(this,animKey)) return false;
+
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y+yOffset;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(scale);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,animKey);
+
+    return true;
+  }
+
+  playPlayerPose(animKey,duration=420,scale=PLAYER_ACTION_SCALE){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
+
+    const played=this.showPose(animKey,scale);
+
+    if(!played){
+      this.forcePlayerReady();
+      return;
+    }
+
+    this.time.delayedCall(duration,()=>{
+      this.forcePlayerReady();
+    });
+  }
+
+  showReaction(type="hurt",duration=350){
+    if(!this.player || !this.poseSprite) return false;
+
+    const animMap={
+      hurt:this.getPlayerAnim("hurt"),
+      knockback:this.getPlayerAnim("knockback"),
+      ko:this.getPlayerAnim("ko"),
+      getup:this.getPlayerAnim("getup")
+    };
+
+    const animKey=animMap[type];
+
+    if(!animKey || !hasAnim(this,animKey)) return false;
+
+    const nudge=REACTION_NUDGE[type] || REACTION_NUDGE.hurt;
+    const dir=this.player.flipX ? -1 : 1;
+
+    this.playerBusy=true;
+    this.isBlocking=false;
+
+    this.player.body.setVelocity(0,0);
+
+    this.poseSprite.loadTexture(this.getPlayerReactionSheet());
+    this.poseSprite.x=this.player.x+(nudge.x*dir);
+    this.poseSprite.y=this.player.y+nudge.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,nudge.originY);
+    this.poseSprite.setScale(nudge.scale);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,animKey);
+
+    if(type!=="ko"){
+      this.time.delayedCall(duration,()=>{
+        this.forcePlayerReady();
+      });
+    }
+
+    return true;
+  }
+
+  createHitFX(x,y,type="hit",damage=8){
+    let color=0xfff45c;
+
+    if(type==="block") color=0x00eaff;
+    if(type==="jump") color=0xffffff;
+
+    const flash=this.add.circle(x,y,22,color,0.95)
+      .setDepth(14000)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets:flash,
+      scale:2.4,
+      alpha:0,
+      duration:190,
+      onComplete:()=>flash.destroy()
+    });
+
+    for(let i=0;i<8;i++){
+      const spark=this.add.rectangle(x,y,10,3,color,1)
+        .setDepth(14001)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
+      const angle=Phaser.Math.FloatBetween(0,Math.PI*2);
+      const dist=Phaser.Math.Between(18,44);
+
+      spark.rotation=angle;
+
+      this.tweens.add({
+        targets:spark,
+        x:x+Math.cos(angle)*dist,
+        y:y+Math.sin(angle)*dist,
+        alpha:0,
+        duration:210,
+        onComplete:()=>spark.destroy()
+      });
+    }
+
+    if(type==="hit"){
+      const txt=this.add.text(x,y-18,"HIT",{
+        font:"16px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:4
+      }).setOrigin(0.5).setDepth(14002);
+
+      this.tweens.add({
+        targets:txt,
+        y:y-44,
+        alpha:0,
+        duration:300,
+        onComplete:()=>txt.destroy()
+      });
+    }
+
+    const shakePower=Phaser.Math.Clamp(0.003+damage*0.0003,0.004,0.012);
+    this.cameras.main.shake(90,shakePower);
+  }
+
+  damagePlayer(amount,dir){
+    if(this.playerHealth<=0) return;
+    if(this.playerInvuln>0) return;
+
+    let finalDamage=amount;
+
+    if(this.isBlocking){
+      finalDamage=2;
+    }
+
+    this.playerHealth=Math.max(0,this.playerHealth-finalDamage);
+    this.playerInvuln=650;
+
+    this.createHitFX(this.player.x,this.player.y-60,this.isBlocking ? "block" : "hit",finalDamage);
+
+    if(this.playerHealth<=0){
+      this.playerHealth=0;
+      this.playerBusy=true;
+
+      if(!this.showReaction("ko",9999)){
+        if(this.player){
+          this.player.body.setVelocity(0,0);
+          this.player.setTint(0xff4444);
+        }
+      }
+
+      return;
+    }
+
+    if(this.isBlocking){
+      if(this.player){
+        this.player.setTint(0x44ffff);
+
+        this.time.delayedCall(120,()=>{
+          if(this.player) this.player.clearTint();
+        });
+      }
+
+      return;
+    }
+
+    if(!this.showReaction("hurt",350)){
+      if(this.player){
+        this.player.body.setVelocityX(dir*90);
+        this.player.setTint(0xff4444);
+
+        this.time.delayedCall(120,()=>{
+          if(this.player) this.player.clearTint();
+        });
+      }
+    }
+  }
+
+  positionAttackSprite(type="light"){
+    if(!this.player || !this.poseSprite) return;
+
+    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
+    const dir=this.player.flipX ? -1 : 1;
+
+    this.poseSprite.loadTexture(this.getPlayerAttackSheet());
+    this.poseSprite.x=this.player.x+(nudge.x*dir);
+    this.poseSprite.y=this.player.y+nudge.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,nudge.originY);
+    this.poseSprite.setScale(nudge.scale);
+  }
+
+  updateBusyWatchdog(){
+    if(!this.player) return;
+
+    if(!this.playerBusy){
+      this.lastBusyValue=false;
+      this.busyWatchStartedAt=0;
+      return;
+    }
+
+    if(!this.lastBusyValue){
+      this.lastBusyValue=true;
+      this.busyWatchStartedAt=this.time.now;
+      return;
+    }
+
+    const stuckFor=this.time.now-this.busyWatchStartedAt;
+
+    const allowedLongBusy =
+      this.playerHealth<=0 ||
+      this.isClimbing ||
+      this.isJumping ||
+      this.grabbedEnemy ||
+      this.pauseMenuOpen ||
+      this.matchOver;
+
+    if(!allowedLongBusy && stuckFor>BUSY_WATCHDOG_MS){
+      this.forcePlayerReady();
+      this.busyWatchStartedAt=0;
+      this.lastBusyValue=false;
+    }
+  }
+
+  forcePlayerReady(){
+    if(this.playerHealth<=0) return;
+
+    if(this.grabbedEnemy && this.grabMode==="carry"){
+      this.playerBusy=false;
+      this.isBlocking=false;
+      this.isJumping=false;
+      this.isCrouching=false;
+      this.showCarryPose();
+      return;
+    }
+
+    this.isJumping=false;
+    this.isCrouching=false;
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.jumpCount=0;
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+      this.player.clearTint();
+      this.player.body.setVelocity(0,0);
+
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
+    }
+  }
+
+  startAttack(type){
+    if(!this.ensureRoundActive()) return;
+
+    if(this.grabbedEnemy) return;
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    const data=this.getAttackData(type);
+
+    if(!data) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    this.positionAttackSprite(type);
+    this.poseSprite.setVisible(true);
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,data.anim);
+
+    this.time.delayedCall(100,()=>this.createHitbox(data));
+
+    this.time.delayedCall(420,()=>{
+      this.forcePlayerReady();
+    });
+
+    this.time.delayedCall(700,()=>{
+      if(this.playerBusy) this.forcePlayerReady();
+    });
+  }
+
+  createHitbox(data){
+    const dir=this.lastDir==="side" ? (this.player.flipX ? -1 : 1) : 0;
+    const boxX=this.player.x+dir*50;
+    const boxY=this.player.y-45;
+
+    const box=this.add.rectangle(boxX,boxY,80,50,0xff0000,0).setDepth(999);
+    this.physics.add.existing(box);
+    box.body.setAllowGravity(false);
+
+    const hit=new Set();
+
+    this.physics.add.overlap(box,this.enemies,(b,e)=>{
+      if(hit.has(e) || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
+      if(e.grabbed || e.thrownTime>0) return;
+      if(e.invulnerable) return;
+
+      hit.add(e);
+      this.damageEnemy(e,data.damage,data.stagger);
+    });
+
+    this.time.delayedCall(120,()=>{
+      if(box && box.destroy) box.destroy();
+    });
+  }
+
+  quickBlock(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.startBlock();
+
+    this.time.delayedCall(450,()=>{
+      this.forcePlayerReady();
+    });
+  }
+
+  startBlock(){
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.isBlocking=true;
+    this.player.body.setVelocity(0,0);
+
+    this.positionAttackSprite("block");
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+    safePlay(this.poseSprite,this.getPlayerAnim("block"));
+
+    this.time.delayedCall(600,()=>{
+      if(this.isBlocking) this.forcePlayerReady();
+    });
+  }
+
+  makeArcadeText(x,y,text,size=64,color="#fff45c"){
+    return this.add.text(x,y,text,{
+      font:size+"px monospace",
+      fill:color,
+      stroke:"#000000",
+      strokeThickness:8,
+      shadow:{
+        offsetX:4,
+        offsetY:4,
+        color:"#ff4fc3",
+        blur:0,
+        fill:true
+      }
+    }).setOrigin(0.5).setDepth(20000);
+  }
+
+  unlockPlayerControl(){
+    this.matchStarted=true;
+    this.matchOver=false;
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.isJumping=false;
+    this.isCrouching=false;
+    this.jumpCount=0;
+    this.busyWatchStartedAt=0;
+    this.lastBusyValue=false;
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
+      this.player.body.setVelocity(0,0);
+      this.player.clearTint();
+
+      this.lastPlayerX = this.player.x;
+      this.lastPlayerY = this.player.y;
+      this.playerStuckFrames = 0;
+
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
+    }
+  }
+
+  showRuntimeError(err){
+    if(!DEBUG_RUNTIME) return;
+
+    const msg = err && err.message ? err.message : String(err);
+    window.__MP_LAST_ERROR = msg;
+    console.error(err);
+
+    if(!this.runtimeErrorText){
+      this.runtimeErrorText=this.add.text(20,145,"",{
+        font:"13px monospace",
+        fill:"#ff3333",
+        backgroundColor:"#000000",
+        wordWrap:{width:900}
+      }).setDepth(50000);
+    }
+
+    this.runtimeErrorText.setText("GAME ERROR: "+msg);
+  }
+
+  startMatchCountdown(){
+    this.matchStarted=false;
+    this.roundUnlockDone=false;
+
+    if(SKIP_COUNTDOWN_FOR_TEST){
+      this.time.delayedCall(250,()=>{
+        this.unlockPlayerControl();
+      });
+      return;
+    }
+
+    const shade=this.add.rectangle(480,270,960,540,0x000000,0.42)
+      .setDepth(19990);
+
+    const main=this.makeArcadeText(480,235,"READY",62,"#ff4fc3");
+    const sub=this.makeArcadeText(480,330,"GET SET",30,"#00eaff");
+
+    const steps=[
+      {main:"READY",sub:"GET SET",color:"#ff4fc3",size:62},
+      {main:"3",sub:"",color:"#fff45c",size:96},
+      {main:"2",sub:"",color:"#00eaff",size:96},
+      {main:"1",sub:"",color:"#ff4fc3",size:96},
+      {main:"FIGHT!",sub:"",color:"#7CFF6B",size:72}
+    ];
+
+    let i=0;
+
+    const finish=()=>{
+      if(this.roundUnlockDone) return;
+
+      this.roundUnlockDone=true;
+
+      if(shade) shade.destroy();
+      if(main) main.destroy();
+      if(sub) sub.destroy();
+
+      this.unlockPlayerControl();
+    };
+
+    const showStep=()=>{
+      if(i>=steps.length){
+        this.time.delayedCall(450,finish);
+        return;
+      }
+
+      const step=steps[i];
+
+      main.setText(step.main);
+      main.setStyle({
+        font:step.size+"px monospace",
+        fill:step.color,
+        stroke:"#000000",
+        strokeThickness:8
+      });
+
+      sub.setText(step.sub || "");
+
+      main.setScale(0.65);
+      main.setAlpha(1);
+
+      this.tweens.add({
+        targets:main,
+        scale:1.18,
+        duration:160,
+        yoyo:true
+      });
+
+      this.cameras.main.shake(60,0.002);
+
+      i++;
+      this.time.delayedCall(650,showStep);
+    };
+
+    showStep();
+
+    this.time.delayedCall(4800,finish);
+  }
+
+  checkVictory(){
+    if(!this.matchStarted || this.matchOver || this.victoryShown) return;
+    if(!this.enemies) return;
+
+    let aliveNormalEnemies=0;
+    let aliveDoorman=0;
+
+    this.enemies.children.each(e=>{
+      if(!e || e.dead || e.state==="dead" || e.health<=0) return;
+
+      if(e.enemyType==="doorman"){
+        aliveDoorman++;
+      }else{
+        aliveNormalEnemies++;
+      }
+    });
+
+    if(aliveNormalEnemies<=0 && !this.doormanSpawned){
+      if(DISABLE_DOORMAN_FOR_TEST){
+        this.showVictory();
+      }else{
+        this.spawnDoormanIntro();
+      }
+      return;
+    }
+
+    if(this.doormanSpawned && aliveDoorman<=0){
+      this.showVictory();
+    }
+  }
+
+  showVictory(){
+    if(this.victoryShown) return;
+
+    this.victoryShown=true;
+    this.matchOver=true;
+
+    this.freezeActors();
+
+    this.add.rectangle(480,270,960,540,0x000000,0.35)
+      .setDepth(19990);
+
+    const victory=this.makeArcadeText(480,230,"VICTORY",82,"#fff45c");
+    const clear=this.makeArcadeText(480,330,"STAGE CLEAR",34,"#00eaff");
+
+    this.tweens.add({
+      targets:victory,
+      alpha:{from:1,to:0.35},
+      scale:{from:1,to:1.08},
+      duration:260,
+      yoyo:true,
+      repeat:-1
+    });
+
+    this.tweens.add({
+      targets:clear,
+      alpha:{from:1,to:0.25},
+      duration:180,
+      yoyo:true,
+      repeat:-1
+    });
+
+    this.cameras.main.shake(250,0.004);
+  }
+
+  freezeActors(){
+    if(this.player && this.player.body){
+      this.player.body.setVelocity(0,0);
+    }
+
+    if(this.enemies){
+      this.enemies.children.each(e=>{
+        if(e && e.body && !e.grabbed){
+          e.setVelocity(0,0);
+        }
+      });
+    }
+  }
+
+  togglePauseMenu(){
+    if(!this.matchStarted || this.matchOver) return;
+
+    if(this.pauseMenuOpen){
+      this.closePauseMenu();
+    }else{
+      this.openPauseMenu();
+    }
+  }
+
+  openPauseMenu(){
+    if(this.pauseMenuOpen) return;
+
+    this.pauseMenuOpen=true;
+    this.pauseCursor=0;
+    this.freezeActors();
+
+    const shade=this.add.rectangle(480,270,960,540,0x000000,0.55)
+      .setDepth(30000);
+
+    const panel=this.add.rectangle(480,270,430,270,0x111111,0.92)
+      .setStrokeStyle(4,0xff4fc3)
+      .setDepth(30001);
+
+    const title=this.add.text(480,175,"PAUSED",{
+      font:"46px monospace",
+      fill:"#fff45c",
+      stroke:"#000000",
+      strokeThickness:6
+    }).setOrigin(0.5).setDepth(30002);
+
+    const continueText=this.add.text(480,260,"CONTINUE",{
+      font:"30px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:5
+    }).setOrigin(0.5).setDepth(30002).setInteractive();
+
+    const quitText=this.add.text(480,320,"QUIT TO TITLE",{
+      font:"30px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:5
+    }).setOrigin(0.5).setDepth(30002).setInteractive();
+
+    continueText.on("pointerdown",()=>{
+      this.closePauseMenu();
+    });
+
+    quitText.on("pointerdown",()=>{
+      this.scene.start("Title");
+    });
+
+    this.pauseItems=[shade,panel,title,continueText,quitText];
+  }
+
+  closePauseMenu(){
+    if(!this.pauseMenuOpen) return;
+
+    this.pauseMenuOpen=false;
+
+    if(this.pauseItems && this.pauseItems.length){
+      this.pauseItems.forEach(item=>{
+        if(item && item.destroy) item.destroy();
+      });
+    }
+
+    this.pauseItems=[];
+  }
+
+  addRain(){
+    this.rain=this.add.group();
+
+    for(let i=0;i<80;i++){
+      const r=this.add.rectangle(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(0,540),
+        2,
+        12,
+        0x77aaff,
+        0.32
+      ).setDepth(90);
+
+      r.speed=Phaser.Math.Between(5,10);
+      this.rain.add(r);
+    }
+  }
+
+  updateRain(){
+    if(!this.rain) return;
+
+    this.rain.children.iterate(r=>{
+      if(!r) return;
+
+      r.y+=r.speed;
+      r.x-=1;
+
+      if(r.y>540){
+        r.y=0;
+        r.x=Phaser.Math.Between(0,960);
+      }
+    });
+  }
+
+  addBottomFog(){
+    if(selectedLevel!=="outdoor") return;
+
+    this.bottomFog=this.add.group();
+
+    const base=this.add.rectangle(480,505,960,100,0xbfd6ff,0.075)
+      .setDepth(96);
+
+    const low=this.add.rectangle(480,528,960,52,0xffffff,0.055)
+      .setDepth(97);
+
+    this.bottomFog.add(base);
+    this.bottomFog.add(low);
+
+    for(let i=0;i<8;i++){
+      const fog=this.add.ellipse(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(470,535),
+        Phaser.Math.Between(180,340),
+        Phaser.Math.Between(28,58),
+        0xdbe7ff,
+        Phaser.Math.FloatBetween(0.035,0.075)
+      ).setDepth(98);
+
+      fog.speed=Phaser.Math.FloatBetween(0.12,0.35);
+      this.bottomFog.add(fog);
+
+      this.tweens.add({
+        targets:fog,
+        alpha:{from:fog.alpha,to:fog.alpha+0.035},
+        duration:Phaser.Math.Between(2200,4200),
+        yoyo:true,
+        repeat:-1
+      });
+    }
+  }
+
+  updateBottomFog(){
+    if(!this.bottomFog) return;
+
+    this.bottomFog.children.iterate(fog=>{
+      if(!fog || fog.speed === undefined) return;
+
+      fog.x += fog.speed;
+
+      if(fog.x > 1120){
+        fog.x = -120;
+        fog.y = Phaser.Math.Between(470,535);
+      }
+    });
+  }
+
+  addForegroundOverlays(){
+    if(selectedLevel!=="outdoor") return;
+
+    const x=292;
+    const y=411;
+    const w=64;
+    const h=38;
+    const depth=850;
+
+    if(hasTex(this,"outdoor_barricade_front")){
+      this.barricadeFront=this.add.image(x,y,"outdoor_barricade_front")
+        .setOrigin(0.5,1)
+        .setDisplaySize(w,h)
+        .setDepth(depth);
+
+      return;
+    }
+
+    const g=this.add.graphics().setDepth(depth);
+
+    g.fillStyle(0xd7a93b,1);
+    g.fillRect(x-w/2,y-h,w,h);
+
+    g.lineStyle(4,0x2b1d0f,1);
+    g.strokeRect(x-w/2,y-h,w,h);
+
+    this.barricadeFront=g;
+  }
+
+  keepForegroundInFront(){
+    if(this.barricadeFront && this.barricadeFront.setDepth){
+      this.barricadeFront.setDepth(850);
+    }
+  }
+
+  makeMobileControls(){
+    const bx=115;
+    const by=420;
+    const r=58;
+
+    this.add.circle(bx,by,r,0xffffff,0.16).setDepth(9000);
+    const knob=this.add.circle(bx,by,25,0xffffff,0.38).setDepth(9001);
+
+    let dragging=false;
+
+    const move=p=>{
+      let dx=p.x-bx;
+      let dy=p.y-by;
+      const d=Math.sqrt(dx*dx+dy*dy);
+
+      if(d>r){
+        dx=dx/d*r;
+        dy=dy/d*r;
+      }
+
+      knob.x=bx+dx;
+      knob.y=by+dy;
+
+      this.stickX=dx/r;
+      this.stickY=dy/r;
+    };
+
+    this.input.on("pointerdown",p=>{
+      if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<95){
+        dragging=true;
+        move(p);
+      }
+    });
+
+    this.input.on("pointermove",p=>{
+      if(dragging) move(p);
+    });
+
+    this.input.on("pointerup",()=>{
+      dragging=false;
+      knob.x=bx;
+      knob.y=by;
+      this.stickX=0;
+      this.stickY=0;
+    });
+
+    this.mobileButton(820,340,"X",()=>this.startAttack("light"));
+    this.mobileButton(760,410,"Y",()=>this.startContextY());
+    this.mobileButton(880,410,"A",()=>this.startContextKick());
+    this.mobileButton(820,480,"B",()=>this.startContextB());
+    this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
+
+    const menuHit=this.add.rectangle(480,505,120,38,0x000000,0.35)
+      .setInteractive()
+      .setDepth(9500);
+
+    this.add.rectangle(480,505,120,38,0xffffff,0.16)
+      .setStrokeStyle(2,0xffffff,0.45)
+      .setDepth(9501);
+
+    this.add.text(480,505,"MENU",{
+      font:"16px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(9502);
+
+    menuHit.on("pointerdown",()=>this.togglePauseMenu());
+  }
+
+  mobileButton(x,y,label,down,up=null){
+    const hit=this.add.circle(x,y,42,0x00ff00,0.01)
+      .setInteractive()
+      .setDepth(9500);
+
+    this.add.circle(x,y,34,0xffffff,0.24).setDepth(9501);
+
+    this.add.text(x,y,label,{
+      font:"18px monospace",
+      fill:"#fff"
+    }).setOrigin(0.5).setDepth(9502);
+
+    hit.on("pointerdown",()=>{
+      this.ensureRoundActive();
+
+      if(down){
+        down();
+      }
+    });
+
+    hit.on("pointerup",()=>{
+      if(up){
+        up();
+      }
+    });
+
+    hit.on("pointerout",()=>{
+      if(up){
+        up();
+      }
+    });
+  }
+}
+
+const config={
+  type:Phaser.AUTO,
+  width:W,
+  height:H,
+  backgroundColor:"#000",
+  pixelArt:true,
+  scale:{
+    mode:Phaser.Scale.FIT,
+    autoCenter:Phaser.Scale.CENTER_BOTH
+  },
+  physics:{
+    default:"arcade",
+    arcade:{
+      gravity:{y:0},
+      debug:false
     }
   },
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-  scene: [
-    TitleScene,
-    CharacterSelectScene,
-    LevelSelectScene,
-    GameScene
-  ]
+  scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
 
 new Phaser.Game(config);
-</script>
 
+</script>
 </body>
 </html>
