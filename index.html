@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 614;
+const VERSION = 615;
 const W = 960;
 const H = 540;
 
@@ -42,11 +42,10 @@ const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
 
-const ENEMY_FRAME_W = 128;
-const ENEMY_FRAME_H = 128;
-
-const FERAL_FRAME_W = 163;
-const FERAL_FRAME_H = 164;
+// Enemy sheets are now expected as preview-style 5 columns x 8 rows sheets.
+// Most of your new enemy sheets are about 816 x 1312, so 163 x 164 works better.
+const ENEMY_FRAME_W = 163;
+const ENEMY_FRAME_H = 164;
 
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
@@ -83,6 +82,10 @@ const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
+// Keep false for normal gameplay.
+// Set true only if you want to test victory without the Doorman spawning.
+const DISABLE_DOORMAN_FOR_TEST = false;
+
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
@@ -114,7 +117,7 @@ const ENEMY_TYPES = {
     prefix:"enemy",
     label:"CORPO",
     maxHealth:30,
-    scale:0.55,
+    scale:0.46,
     chaseSpeed:65,
     attackRange:72,
     stopRange:58,
@@ -130,7 +133,7 @@ const ENEMY_TYPES = {
     prefix:"wannabe",
     label:"WANNABE",
     maxHealth:24,
-    scale:0.55,
+    scale:0.46,
     chaseSpeed:78,
     attackRange:68,
     stopRange:54,
@@ -146,7 +149,7 @@ const ENEMY_TYPES = {
     prefix:"sellout",
     label:"SELLOUT",
     maxHealth:28,
-    scale:0.55,
+    scale:0.46,
     chaseSpeed:72,
     attackRange:70,
     stopRange:56,
@@ -179,7 +182,7 @@ const ENEMY_TYPES = {
     label:"DOORMAN",
     baseHealth:90,
     maxHealth:180,
-    scale:0.68,
+    scale:0.55,
     chaseSpeed:48,
     attackRange:92,
     stopRange:72,
@@ -213,13 +216,40 @@ function safePlay(sprite,key){
   sprite.play(key,true);
 }
 
+function textureHasFrame(scene,sheet,frameIndex){
+  if(!hasTex(scene,sheet)) return false;
+
+  const tex=scene.textures.get(sheet);
+
+  if(!tex) return false;
+
+  try{
+    return !!tex.get(frameIndex);
+  }catch(e){
+    return false;
+  }
+}
+
 function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
 
+  const frames=[];
+
+  for(let i=start;i<=end;i++){
+    if(textureHasFrame(scene,sheet,i)){
+      frames.push({key:sheet,frame:i});
+    }
+  }
+
+  if(frames.length<=0){
+    console.warn("Missing frames for animation:",key,sheet,start,end);
+    return;
+  }
+
   scene.anims.create({
     key:key,
-    frames:scene.anims.generateFrameNumbers(sheet,{start:start,end:end}),
+    frames:frames,
     frameRate:rate,
     repeat:repeat
   });
@@ -357,8 +387,8 @@ function loadAssets(scene){
   });
 
   scene.load.spritesheet("feral",ENEMY_BASE + "/feral.png?v=" + VERSION,{
-    frameWidth:FERAL_FRAME_W,
-    frameHeight:FERAL_FRAME_H,
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
     margin:0,
     spacing:0
   });
@@ -1786,7 +1816,8 @@ class Game extends Phaser.Scene{
 
   spawnEnemyType(type,x,y,platform="middle"){
     const def=this.getEnemyDef(type);
-    const e=this.physics.add.sprite(x,y,def.key,0);
+    const textureKey=hasTex(this,def.key) ? def.key : "feral";
+    const e=this.physics.add.sprite(x,y,textureKey,0);
 
     e.enemyType=type;
     e.enemyLabel=def.label;
@@ -3058,7 +3089,11 @@ class Game extends Phaser.Scene{
     });
 
     if(aliveNormalEnemies<=0 && !this.doormanSpawned){
-      this.spawnDoormanIntro();
+      if(DISABLE_DOORMAN_FOR_TEST){
+        this.showVictory();
+      }else{
+        this.spawnDoormanIntro();
+      }
       return;
     }
 
