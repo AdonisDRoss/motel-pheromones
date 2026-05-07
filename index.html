@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 602;
+const VERSION = 607;
 const W = 960;
 const H = 540;
 
@@ -38,6 +38,7 @@ const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
+
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
 
@@ -45,7 +46,6 @@ const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
 const PLAYER_ACTION_SCALE = 0.32;
 const PLAYER_REACTION_SCALE = 0.32;
-const ENEMY_SCALE = 0.55;
 
 const WALK_SPEED = 190;
 const RUN_SPEED = 270;
@@ -59,6 +59,7 @@ const DOUBLE_UP_WINDOW = 360;
 
 const STAIR_TRAVEL_DURATION = 720;
 const SWEEP_DAMAGE = 10;
+
 const VIBRATION_ENABLED = true;
 
 const GRAB_HOLD_TIME = 3000;
@@ -71,6 +72,9 @@ const CARRY_OFFSET_X = 58;
 
 const LIGHTNING_MIN_DELAY = 15000;
 const LIGHTNING_MAX_DELAY = 30000;
+
+const DOORMAN_DOOR_X = 505;
+const DOORMAN_DOOR_Y = 390;
 
 const ATTACK_NUDGE = {
   light:{x:-6,y:0,scale:0.32,originY:1},
@@ -92,6 +96,97 @@ const ENEMY_NAMES = [
 ];
 
 const ENEMY_AUTH_TAGS = ["GOON","PUNK","CREW","HYPE","MOSH","CORPO","SEC"];
+
+const ENEMY_TYPES = {
+  corpo_sellout:{
+    key:"corpo_sellout",
+    prefix:"enemy",
+    label:"CORPO",
+    maxHealth:30,
+    scale:0.55,
+    chaseSpeed:65,
+    attackRange:72,
+    stopRange:58,
+    attackCooldownMin:200,
+    attackCooldownMax:650,
+    attackDamage:8,
+    role:"standard",
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+
+  corpo_wannabe:{
+    key:"corpo_wannabe",
+    prefix:"wannabe",
+    label:"WANNABE",
+    maxHealth:24,
+    scale:0.55,
+    chaseSpeed:78,
+    attackRange:68,
+    stopRange:54,
+    attackCooldownMin:180,
+    attackCooldownMax:500,
+    attackDamage:7,
+    role:"fast",
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+
+  sellout:{
+    key:"sellout",
+    prefix:"sellout",
+    label:"SELLOUT",
+    maxHealth:28,
+    scale:0.55,
+    chaseSpeed:72,
+    attackRange:70,
+    stopRange:56,
+    attackCooldownMin:250,
+    attackCooldownMax:700,
+    attackDamage:8,
+    role:"balanced",
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+
+  feral:{
+    key:"feral",
+    prefix:"feral",
+    label:"FERAL",
+    maxHealth:22,
+    scale:0.55,
+    chaseSpeed:88,
+    attackRange:64,
+    stopRange:50,
+    attackCooldownMin:160,
+    attackCooldownMax:460,
+    attackDamage:7,
+    role:"fast_knife",
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
+
+  doorman:{
+    key:"doorman",
+    prefix:"doorman",
+    label:"DOORMAN",
+    baseHealth:90,
+    maxHealth:180,
+    scale:0.68,
+    chaseSpeed:48,
+    attackRange:92,
+    stopRange:72,
+    attackCooldownMin:650,
+    attackCooldownMax:1200,
+    attackDamage:15,
+    role:"subboss",
+    canBeGrabbed:false,
+    knockbackResist:0.35,
+    specialCooldown:3200,
+    specialRange:175,
+    specialDamage:20
+  }
+};
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -124,6 +219,18 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
     frameRate:rate,
     repeat:repeat
   });
+}
+
+function makeEnemyAnimSet(scene,sheet,prefix){
+  makeAnim(scene,prefix+"_idle",sheet,0,4,8,-1);
+  makeAnim(scene,prefix+"_walk",sheet,5,9,10,-1);
+  makeAnim(scene,prefix+"_punch",sheet,10,14,14,0);
+  makeAnim(scene,prefix+"_kick",sheet,15,19,12,0);
+  makeAnim(scene,prefix+"_hurt",sheet,20,24,10,0);
+  makeAnim(scene,prefix+"_knockback",sheet,25,29,8,0);
+  makeAnim(scene,prefix+"_ko",sheet,30,34,8,0);
+  makeAnim(scene,prefix+"_taunt",sheet,35,39,8,0);
+  makeAnim(scene,prefix+"_special",sheet,35,39,8,0);
 }
 
 function loadAssets(scene){
@@ -173,6 +280,34 @@ function loadAssets(scene){
     margin:0,
     spacing:0
   });
+
+  scene.load.spritesheet("corpo_wannabe",ENEMY_BASE + "/corpo_wannabe.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("sellout",ENEMY_BASE + "/sellout.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("feral",ENEMY_BASE + "/feral.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("doorman",ENEMY_BASE + "/doorman.png?v=" + VERSION,{
+    frameWidth:ENEMY_FRAME_W,
+    frameHeight:ENEMY_FRAME_H,
+    margin:0,
+    spacing:0
+  });
 }
 
 function createAllAnims(scene){
@@ -197,8 +332,6 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
   makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
   makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
-
-  // Carry uses the special/action row until you replace it with a real carry row.
   makeAnim(scene,"jt_carry","jt_actions",12,15,8,-1);
 
   makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
@@ -206,12 +339,11 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_ko","jt_reactions",8,11,6,0);
   makeAnim(scene,"jt_getup","jt_reactions",12,15,8,0);
 
-  makeAnim(scene,"enemy_idle","corpo_sellout",0,15,8,-1);
-  makeAnim(scene,"enemy_walk","corpo_sellout",16,31,10,-1);
-  makeAnim(scene,"enemy_punch","corpo_sellout",32,47,14,0);
-  makeAnim(scene,"enemy_kick","corpo_sellout",48,63,12,0);
-  makeAnim(scene,"enemy_hurt","corpo_sellout",64,79,10,0);
-  makeAnim(scene,"enemy_ko","corpo_sellout",80,95,8,0);
+  makeEnemyAnimSet(scene,"corpo_sellout","enemy");
+  makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
+  makeEnemyAnimSet(scene,"sellout","sellout");
+  makeEnemyAnimSet(scene,"feral","feral");
+  makeEnemyAnimSet(scene,"doorman","doorman");
 }
 
 class Boot extends Phaser.Scene{
@@ -369,7 +501,6 @@ class Game extends Phaser.Scene{
     this.isBlocking=false;
     this.isJumping=false;
     this.isCrouching=false;
-    this.mobileRun=false;
 
     this.grabbedEnemy=null;
     this.grabMode="none";
@@ -385,6 +516,10 @@ class Game extends Phaser.Scene{
     this.matchStarted=false;
     this.matchOver=false;
     this.victoryShown=false;
+
+    this.doormanSpawned=false;
+    this.doormanIntroActive=false;
+    this.doorman=null;
 
     this.pauseMenuOpen=false;
     this.pauseItems=[];
@@ -1027,6 +1162,31 @@ class Game extends Phaser.Scene{
     this.startAttack("heavy");
   }
 
+  startContextKick(){
+    if(this.grabbedEnemy){
+      this.startCarryEnemy();
+      return;
+    }
+
+    if(this.pauseMenuOpen) return;
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.isClimbing || this.playerHealth<=0) return;
+
+    const cHeld=this.keys && this.keys.c && this.keys.c.isDown;
+    const crouchKick=this.isDownHeld() || cHeld || this.isCrouching;
+
+    if(crouchKick){
+      if(this.playerBusy && this.isCrouching){
+        this.forcePlayerReady();
+      }
+
+      this.startSweep();
+      return;
+    }
+
+    this.startAttack("kick");
+  }
+
   startJump(){
     if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
@@ -1075,31 +1235,6 @@ class Game extends Phaser.Scene{
     this.time.delayedCall(650,()=>{
       this.isCrouching=false;
     });
-  }
-
-  startContextKick(){
-    if(this.grabbedEnemy){
-      this.startCarryEnemy();
-      return;
-    }
-
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(this.isClimbing || this.playerHealth<=0) return;
-
-    const cHeld=this.keys && this.keys.c && this.keys.c.isDown;
-    const crouchKick=this.isDownHeld() || cHeld || this.isCrouching;
-
-    if(crouchKick){
-      if(this.playerBusy && this.isCrouching){
-        this.forcePlayerReady();
-      }
-
-      this.startSweep();
-      return;
-    }
-
-    this.startAttack("kick");
   }
 
   startSweep(){
@@ -1153,7 +1288,8 @@ class Game extends Phaser.Scene{
       e.knockbackTime=520;
       e.attackCooldown=700;
 
-      e.setVelocityX((e.x<this.player.x ? -1 : 1)*160);
+      const resist=e.knockbackResist || 1;
+      e.setVelocityX((e.x<this.player.x ? -1 : 1)*160*resist);
 
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
@@ -1164,19 +1300,19 @@ class Game extends Phaser.Scene{
         e.state="dead";
         e.busy=true;
         e.setVelocityX(0);
-        safePlay(e,"enemy_ko");
+        this.safeEnemyPlay(e,"ko");
         this.setEnemyNameplateDead(e);
         return;
       }
 
-      safePlay(e,"enemy_hurt");
+      this.safeEnemyPlay(e,"hurt");
       this.updateEnemyHealthBar(e);
 
       this.time.delayedCall(420,()=>{
         if(!e.dead){
           e.busy=false;
           e.state="idle";
-          safePlay(e,"enemy_idle");
+          this.safeEnemyPlay(e,"idle");
         }
       });
     });
@@ -1199,6 +1335,7 @@ class Game extends Phaser.Scene{
 
     this.enemies.children.each(e=>{
       if(!e || e.dead || e.state==="dead") return;
+      if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
       if(e.platform!==this.platform) return;
       if(e.grabbed || e.thrownTime>0) return;
 
@@ -1216,6 +1353,7 @@ class Game extends Phaser.Scene{
     if(!target){
       this.enemies.children.each(e=>{
         if(!e || e.dead || e.state==="dead") return;
+        if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
         if(e.platform!==this.platform) return;
         if(e.grabbed || e.thrownTime>0) return;
 
@@ -1249,9 +1387,7 @@ class Game extends Phaser.Scene{
     target.attackCooldown=9999;
     target.setVelocity(0,0);
 
-    // Enemy uses KO/downed-looking sprite while grabbed.
-    safePlay(target,"enemy_ko");
-
+    this.safeEnemyPlay(target,"ko");
     this.showCarryPose();
     this.updateGrabbedEnemy();
 
@@ -1313,7 +1449,7 @@ class Game extends Phaser.Scene{
     e.setFlipX(dir<0);
     e.setDepth(e.y+3);
 
-    safePlay(e,"enemy_ko");
+    this.safeEnemyPlay(e,"ko");
     this.showCarryPose();
 
     if(e.shadow){
@@ -1387,7 +1523,7 @@ class Game extends Phaser.Scene{
     this.createHitFX(e.x,e.y-55,"hit",THROW_DAMAGE);
 
     e.setVelocityX(dir*THROW_SPEED);
-    safePlay(e,"enemy_hurt");
+    this.safeEnemyPlay(e,"hurt");
     this.updateEnemyHealthBar(e);
 
     if(e.health<=0){
@@ -1397,7 +1533,7 @@ class Game extends Phaser.Scene{
       e.busy=true;
       e.thrownTime=0;
       e.setVelocityX(0);
-      safePlay(e,"enemy_ko");
+      this.safeEnemyPlay(e,"ko");
       this.setEnemyNameplateDead(e);
       return;
     }
@@ -1408,7 +1544,7 @@ class Game extends Phaser.Scene{
         e.state="idle";
         e.thrownTime=0;
         e.setVelocityX(0);
-        safePlay(e,"enemy_idle");
+        this.safeEnemyPlay(e,"idle");
       }
     });
   }
@@ -1431,7 +1567,7 @@ class Game extends Phaser.Scene{
     e.knockbackTime=250;
     e.setVelocityX(dir*90);
 
-    safePlay(e,"enemy_idle");
+    this.safeEnemyPlay(e,"idle");
 
     this.playerBusy=false;
 
@@ -1491,7 +1627,8 @@ class Game extends Phaser.Scene{
           other.attackCooldown=800;
 
           const knockDir=other.x<e.x ? -1 : 1;
-          other.setVelocityX(knockDir*180);
+          const resist=other.knockbackResist || 1;
+          other.setVelocityX(knockDir*180*resist);
 
           this.createHitFX(other.x,other.y-55,"hit",THROW_COLLISION_DAMAGE);
 
@@ -1501,19 +1638,19 @@ class Game extends Phaser.Scene{
             other.state="dead";
             other.busy=true;
             other.setVelocityX(0);
-            safePlay(other,"enemy_ko");
+            this.safeEnemyPlay(other,"ko");
             this.setEnemyNameplateDead(other);
             return;
           }
 
-          safePlay(other,"enemy_hurt");
+          this.safeEnemyPlay(other,"hurt");
           this.updateEnemyHealthBar(other);
 
           this.time.delayedCall(500,()=>{
             if(!other.dead){
               other.busy=false;
               other.state="idle";
-              safePlay(other,"enemy_idle");
+              this.safeEnemyPlay(other,"idle");
             }
           });
         }
@@ -1523,44 +1660,94 @@ class Game extends Phaser.Scene{
         e.busy=false;
         e.state="idle";
         e.setVelocityX(0);
-        safePlay(e,"enemy_idle");
+        this.safeEnemyPlay(e,"idle");
       }
     });
+  }
+
+  getEnemyDef(type){
+    return ENEMY_TYPES[type] || ENEMY_TYPES.corpo_sellout;
+  }
+
+  getEnemyAnim(e,action){
+    const def=this.getEnemyDef(e.enemyType);
+    const prefix=def.prefix;
+
+    const map={
+      idle:prefix+"_idle",
+      walk:prefix+"_walk",
+      punch:prefix+"_punch",
+      kick:prefix+"_kick",
+      hurt:prefix+"_hurt",
+      knockback:prefix+"_knockback",
+      ko:prefix+"_ko",
+      taunt:prefix+"_taunt",
+      special:prefix+"_special"
+    };
+
+    return map[action] || map.idle;
+  }
+
+  safeEnemyPlay(e,action){
+    if(!e || e.dead) return;
+    const anim=this.getEnemyAnim(e,action);
+    safePlay(e,anim);
   }
 
   createEnemies(){
     this.enemies=this.physics.add.group();
 
-    this.spawnEnemy(235,505,"bottom");
-    this.spawnEnemy(520,250,"top");
-    this.spawnEnemy(640,390,"middle");
-    this.spawnEnemy(850,390,"middle");
+    this.spawnEnemyType("corpo_wannabe",235,505,"bottom");
+    this.spawnEnemyType("sellout",520,250,"top");
+    this.spawnEnemyType("feral",640,390,"middle");
+    this.spawnEnemyType("corpo_sellout",850,390,"middle");
   }
 
-  spawnEnemy(x,y,platform="middle"){
-    const e=this.physics.add.sprite(x,y,"corpo_sellout",0);
+  spawnEnemyType(type,x,y,platform="middle"){
+    const def=this.getEnemyDef(type);
+    const e=this.physics.add.sprite(x,y,def.key,0);
+
+    e.enemyType=type;
+    e.enemyLabel=def.label;
 
     e.setOrigin(0.5,1);
-    e.setScale(ENEMY_SCALE);
+    e.setScale(def.scale);
     e.setTint(0xffffff);
     e.setDepth(y+2);
     e.body.setAllowGravity(false);
     e.body.setVelocity(0,0);
     e.setCollideWorldBounds(true);
 
-    e.maxHealth=30;
-    e.health=30;
+    e.baseHealth=def.baseHealth || def.maxHealth;
+    e.maxHealth=def.maxHealth;
+    e.health=def.maxHealth;
+
     e.dead=false;
     e.busy=false;
-
     e.platform=platform;
     e.homeY=y;
 
     e.state="idle";
-    e.attackCooldown=Phaser.Math.Between(200,650);
-    e.attackRange=72;
-    e.stopRange=58;
-    e.chaseSpeed=65;
+    e.attackCooldown=Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax);
+    e.attackRange=def.attackRange;
+    e.stopRange=def.stopRange;
+    e.chaseSpeed=def.chaseSpeed;
+    e.attackDamage=def.attackDamage;
+    e.canBeGrabbed=def.canBeGrabbed !== false;
+    e.knockbackResist=def.knockbackResist || 1;
+
+    e.bossActive=false;
+    e.bossIntro=false;
+    e.invulnerable=false;
+    e.guardCooldown=0;
+    e.guardTime=0;
+    e.tacticTimer=0;
+    e.tacticState="hold";
+
+    e.specialCooldown=def.specialCooldown || 0;
+    e.specialRange=def.specialRange || 0;
+    e.specialDamage=def.specialDamage || 0;
+
     e.knockbackTime=0;
     e.grabbed=false;
     e.thrownTime=0;
@@ -1568,12 +1755,14 @@ class Game extends Phaser.Scene{
 
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
 
-    safePlay(e,"enemy_idle");
+    this.safeEnemyPlay(e,"idle");
 
     this.createEnemyNameplate(e);
     this.createEnemyHealthBar(e);
 
     this.enemies.add(e);
+
+    return e;
   }
 
   pickRandomEnemyName(){
@@ -1585,10 +1774,15 @@ class Game extends Phaser.Scene{
   }
 
   createEnemyNameplate(e){
-    e.enemyName=this.pickRandomEnemyName();
-    e.authTag=this.pickRandomEnemyAuth();
+    if(e.enemyType==="doorman"){
+      e.enemyName="THE DOORMAN";
+      e.authTag="SUB-BOSS";
+    }else{
+      e.enemyName=this.pickRandomEnemyName();
+      e.authTag=this.pickRandomEnemyAuth();
+    }
 
-    e.authBadge=this.add.rectangle(e.x,e.y-106,42,14,0x000000,0.78)
+    e.authBadge=this.add.rectangle(e.x,e.y-106,64,14,0x000000,0.78)
       .setStrokeStyle(1,0x00eaff,0.9)
       .setDepth(1000);
 
@@ -1606,12 +1800,14 @@ class Game extends Phaser.Scene{
   }
 
   createEnemyHealthBar(e){
-    e.hpBack=this.add.rectangle(e.x-24,e.y-76,48,7,0x000000,0.9)
-      .setOrigin(0,0.5)
+    const barW=e.enemyType==="doorman" ? 84 : 48;
+
+    e.hpBack=this.add.rectangle(e.x,e.y-76,barW,7,0x000000,0.9)
+      .setOrigin(0.5,0.5)
       .setStrokeStyle(1,0xffffff,0.8)
       .setDepth(1000);
 
-    e.hpFill=this.add.rectangle(e.x-22,e.y-76,44,5,0x00ff44,1)
+    e.hpFill=this.add.rectangle(e.x-(barW-4)/2,e.y-76,barW-4,5,0x00ff44,1)
       .setOrigin(0,0.5)
       .setDepth(1001);
 
@@ -1622,23 +1818,52 @@ class Game extends Phaser.Scene{
     if(!e || !e.hpFill || !e.hpBack) return;
 
     const max=e.maxHealth || 30;
-    const ratio=Phaser.Math.Clamp(e.health/max,0,1);
+    const fillRatio=Phaser.Math.Clamp(e.health/max,0,1);
 
     let color=0x00ff44;
 
-    if(ratio<=0.15){
-      color=0xff2222;
-    }else if(ratio<=0.5){
-      color=0xffa000;
+    if(e.enemyType==="doorman"){
+      const base=e.baseHealth || 90;
+      const bossPercent=e.health/base;
+
+      if(bossPercent>=1.5){
+        color=0xffe600;
+      }else if(bossPercent>=1.0){
+        color=0x2299ff;
+      }else if(bossPercent>=0.5){
+        color=0x00ff44;
+      }else if(bossPercent>=0.15){
+        color=0xffa000;
+      }else{
+        color=0xff2222;
+      }
+    }else{
+      if(fillRatio<=0.15){
+        color=0xff2222;
+      }else if(fillRatio<=0.5){
+        color=0xffa000;
+      }else{
+        color=0x00ff44;
+      }
     }
 
-    e.hpBack.x=e.x-24;
+    const barW=e.enemyType==="doorman" ? 84 : 48;
+    const fillW=barW-4;
+
+    e.hpBack.setDisplaySize(barW,7);
+    e.hpBack.x=e.x;
     e.hpBack.y=e.y-76;
 
-    e.hpFill.x=e.x-22;
+    e.hpFill.x=e.x-fillW/2;
     e.hpFill.y=e.y-76;
-    e.hpFill.setScale(ratio,1);
-    e.hpFill.setFillStyle(color,1);
+
+    if(fillRatio<=0){
+      e.hpFill.setVisible(false);
+    }else{
+      e.hpFill.setVisible(true);
+      e.hpFill.setDisplaySize(fillW*fillRatio,5);
+      e.hpFill.setFillStyle(color,1);
+    }
   }
 
   updateEnemyNameplate(e){
@@ -1657,6 +1882,16 @@ class Game extends Phaser.Scene{
     if(e.nameText){
       e.nameText.x=e.x;
       e.nameText.y=e.y-91;
+    }
+
+    if(e.speechBox){
+      e.speechBox.x=e.x;
+      e.speechBox.y=e.y-142;
+    }
+
+    if(e.speechText){
+      e.speechText.x=e.x;
+      e.speechText.y=e.y-142;
     }
 
     this.updateEnemyHealthBar(e);
@@ -1679,7 +1914,7 @@ class Game extends Phaser.Scene{
     }
 
     if(e.hpFill){
-      e.hpFill.setScale(0,1);
+      e.hpFill.setVisible(false);
     }
   }
 
@@ -1702,11 +1937,30 @@ class Game extends Phaser.Scene{
         return;
       }
 
-      if(e.attackCooldown>0) e.attackCooldown-=delta;
-      if(e.knockbackTime>0) e.knockbackTime-=delta;
+      if(e.attackCooldown>0){
+        e.attackCooldown-=delta;
+        if(e.attackCooldown<0) e.attackCooldown=0;
+      }
 
-      if(e.attackCooldown<0) e.attackCooldown=0;
-      if(e.knockbackTime<0) e.knockbackTime=0;
+      if(e.knockbackTime>0){
+        e.knockbackTime-=delta;
+        if(e.knockbackTime<0) e.knockbackTime=0;
+      }
+
+      if(e.specialCooldown>0){
+        e.specialCooldown-=delta;
+        if(e.specialCooldown<0) e.specialCooldown=0;
+      }
+
+      if(e.guardCooldown>0){
+        e.guardCooldown-=delta;
+        if(e.guardCooldown<0) e.guardCooldown=0;
+      }
+
+      if(e.guardTime>0){
+        e.guardTime-=delta;
+        if(e.guardTime<0) e.guardTime=0;
+      }
 
       if(e.dead || e.state==="dead"){
         e.dead=true;
@@ -1738,10 +1992,15 @@ class Game extends Phaser.Scene{
       if(e.knockbackTime>0) return;
       if(e.busy) return;
 
+      if(e.enemyType==="doorman"){
+        this.updateDoormanAI(e,delta);
+        return;
+      }
+
       if(this.platform!==e.platform || this.playerHealth<=0){
         e.state="idle";
         e.setVelocityX(0);
-        safePlay(e,"enemy_idle");
+        this.safeEnemyPlay(e,"idle");
         return;
       }
 
@@ -1754,7 +2013,7 @@ class Game extends Phaser.Scene{
       if(Math.abs(dy)>45){
         e.state="idle";
         e.setVelocityX(0);
-        safePlay(e,"enemy_idle");
+        this.safeEnemyPlay(e,"idle");
         return;
       }
 
@@ -1767,11 +2026,11 @@ class Game extends Phaser.Scene{
         e.state="chase";
         const chaseDir=dx>0 ? 1 : -1;
         e.setVelocityX(chaseDir*e.chaseSpeed);
-        safePlay(e,"enemy_walk");
+        this.safeEnemyPlay(e,"walk");
       }else{
         e.state="idle";
         e.setVelocityX(0);
-        safePlay(e,"enemy_idle");
+        this.safeEnemyPlay(e,"idle");
       }
     });
   }
@@ -1810,10 +2069,10 @@ class Game extends Phaser.Scene{
 
     e.state="attack";
     e.busy=true;
-    e.attackCooldown=900;
+    e.attackCooldown=Phaser.Math.Between(e.attackCooldownMin || 500,e.attackCooldownMax || 900);
     e.setVelocityX(0);
 
-    safePlay(e,"enemy_punch");
+    this.safeEnemyPlay(e,"punch");
 
     this.time.delayedCall(280,()=>{
       if(!e || e.dead || e.state!=="attack") return;
@@ -1823,7 +2082,7 @@ class Game extends Phaser.Scene{
 
       if(dx<=e.attackRange+10 && dy<=45){
         const dir=e.x<this.player.x ? 1 : -1;
-        this.damagePlayer(8,dir);
+        this.damagePlayer(e.attackDamage || 8,dir);
       }
     });
 
@@ -1832,8 +2091,335 @@ class Game extends Phaser.Scene{
 
       e.busy=false;
       e.state="idle";
-      safePlay(e,"enemy_idle");
+      this.safeEnemyPlay(e,"idle");
     });
+  }
+
+  updateDoormanAI(e,delta){
+    if(!e || e.dead) return;
+
+    this.updateEnemyNameplate(e);
+
+    if(e.shadow){
+      e.shadow.x=e.x;
+      e.shadow.y=e.y+3;
+    }
+
+    e.y=e.homeY;
+    e.setDepth(e.y+2);
+
+    if(e.bossIntro || !e.bossActive || e.invulnerable){
+      e.setVelocityX(0);
+      return;
+    }
+
+    if(this.platform!==e.platform || this.playerHealth<=0){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+      return;
+    }
+
+    if(e.knockbackTime>0) return;
+    if(e.busy) return;
+
+    const dx=this.player.x-e.x;
+    const dy=this.player.y-e.y;
+    const dist=Math.abs(dx);
+    const dir=dx>0 ? 1 : -1;
+
+    e.setFlipX(dx<0);
+
+    if(Math.abs(dy)>50){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+      return;
+    }
+
+    if(this.playerBusy && dist<110 && e.guardCooldown<=0){
+      e.guardTime=520;
+      e.guardCooldown=2200;
+      e.attackCooldown=500;
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"taunt");
+      return;
+    }
+
+    if(e.guardTime>0){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"taunt");
+      return;
+    }
+
+    if(e.specialCooldown<=0 && dist<=e.specialRange && dist>65){
+      this.startDoormanSpecial(e);
+      return;
+    }
+
+    if(dist<=e.attackRange && e.attackCooldown<=0){
+      this.startDoormanPunch(e);
+      return;
+    }
+
+    if(dist<48){
+      e.setVelocityX(-dir*e.chaseSpeed*0.75);
+      this.safeEnemyPlay(e,"walk");
+      return;
+    }
+
+    if(dist>e.specialRange){
+      e.setVelocityX(dir*e.chaseSpeed);
+      this.safeEnemyPlay(e,"walk");
+      return;
+    }
+
+    e.tacticTimer-=delta;
+
+    if(e.tacticTimer<=0){
+      const roll=Phaser.Math.Between(0,2);
+
+      if(roll===0){
+        e.tacticState="hold";
+        e.tacticTimer=Phaser.Math.Between(450,850);
+      }else if(roll===1){
+        e.tacticState="step_in";
+        e.tacticTimer=Phaser.Math.Between(300,600);
+      }else{
+        e.tacticState="step_back";
+        e.tacticTimer=Phaser.Math.Between(300,600);
+      }
+    }
+
+    if(e.tacticState==="hold"){
+      e.setVelocityX(0);
+      this.safeEnemyPlay(e,"idle");
+    }else if(e.tacticState==="step_in"){
+      e.setVelocityX(dir*e.chaseSpeed*0.45);
+      this.safeEnemyPlay(e,"walk");
+    }else if(e.tacticState==="step_back"){
+      e.setVelocityX(-dir*e.chaseSpeed*0.45);
+      this.safeEnemyPlay(e,"walk");
+    }
+
+    e.x=Phaser.Math.Clamp(e.x,120,860);
+  }
+
+  startDoormanPunch(e){
+    if(!e || e.dead || e.busy) return;
+
+    e.state="attack";
+    e.busy=true;
+    e.attackCooldown=Phaser.Math.Between(850,1250);
+    e.setVelocityX(0);
+
+    this.safeEnemyPlay(e,"punch");
+
+    this.time.delayedCall(320,()=>{
+      if(!e || e.dead || e.state!=="attack") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+
+      if(dx<=e.attackRange+12 && dy<=50){
+        const dir=e.x<this.player.x ? 1 : -1;
+        this.damagePlayer(e.attackDamage || 15,dir);
+      }
+    });
+
+    this.time.delayedCall(760,()=>{
+      if(!e || e.dead) return;
+
+      e.busy=false;
+      e.state="idle";
+      this.safeEnemyPlay(e,"idle");
+    });
+  }
+
+  startDoormanSpecial(e){
+    if(!e || e.dead || e.busy) return;
+
+    e.state="special";
+    e.busy=true;
+    e.setVelocityX(0);
+    e.specialCooldown=Phaser.Math.Between(3000,4200);
+    e.attackCooldown=1200;
+
+    this.safeEnemyPlay(e,"special");
+    this.sayDoorman(e,"Fire punch.",1100);
+
+    this.time.delayedCall(260,()=>{
+      if(!e || e.dead || e.state!=="special") return;
+      this.createDoormanFireTaunt(e);
+    });
+
+    this.time.delayedCall(430,()=>{
+      if(!e || e.dead || e.state!=="special") return;
+
+      const dx=Math.abs(this.player.x-e.x);
+      const dy=Math.abs(this.player.y-e.y);
+      const dir=e.x<this.player.x ? 1 : -1;
+
+      const fxX=e.x + dir*70;
+      const fxY=e.y - 65;
+
+      this.createHitFX(fxX,fxY,"hit",e.specialDamage || 20);
+
+      if(dx<=e.specialRange && dy<=55){
+        this.damagePlayer(e.specialDamage || 20,dir);
+      }
+    });
+
+    this.time.delayedCall(950,()=>{
+      if(!e || e.dead) return;
+
+      e.busy=false;
+      e.state="idle";
+      this.safeEnemyPlay(e,"idle");
+    });
+  }
+
+  spawnDoormanIntro(){
+    if(this.doormanSpawned) return;
+
+    this.doormanSpawned=true;
+    this.doormanIntroActive=true;
+
+    const boss=this.spawnEnemyType("doorman",DOORMAN_DOOR_X,DOORMAN_DOOR_Y,"middle");
+    this.doorman=boss;
+
+    boss.setFlipX(this.player.x < boss.x);
+    boss.homeY=DOORMAN_DOOR_Y;
+    boss.platform="middle";
+
+    boss.bossIntro=true;
+    boss.bossActive=false;
+    boss.invulnerable=true;
+    boss.busy=true;
+    boss.state="intro";
+    boss.setVelocityX(0);
+
+    this.zoneText.setText("SUB-BOSS: THE DOORMAN");
+
+    const title=this.makeArcadeText(480,155,"THE DOORMAN",54,"#fff45c");
+    const warning=this.makeArcadeText(480,220,"SUB-BOSS",32,"#ff4fc3");
+
+    this.sayDoorman(boss,"Nobody gets through my door.",2300);
+
+    this.safeEnemyPlay(boss,"taunt");
+    this.createDoormanFireTaunt(boss);
+
+    this.time.delayedCall(1200,()=>{
+      if(!boss || boss.dead) return;
+      this.sayDoorman(boss,"You want in? Go through me.",2300);
+      this.safeEnemyPlay(boss,"special");
+      this.createDoormanFireTaunt(boss);
+    });
+
+    this.time.delayedCall(3000,()=>{
+      if(title) title.destroy();
+      if(warning) warning.destroy();
+
+      if(!boss || boss.dead) return;
+
+      boss.bossIntro=false;
+      boss.bossActive=true;
+      boss.invulnerable=false;
+      boss.busy=false;
+      boss.state="idle";
+      boss.attackCooldown=700;
+      boss.specialCooldown=1800;
+
+      this.safeEnemyPlay(boss,"idle");
+      this.zoneText.setText("DOORMAN FIGHT");
+      this.doormanIntroActive=false;
+    });
+  }
+
+  sayDoorman(e,text,duration=1800){
+    if(!e) return;
+
+    if(e.speechBox){
+      e.speechBox.destroy();
+      e.speechBox=null;
+    }
+
+    if(e.speechText){
+      e.speechText.destroy();
+      e.speechText=null;
+    }
+
+    e.speechBox=this.add.rectangle(e.x,e.y-142,300,34,0x000000,0.82)
+      .setStrokeStyle(2,0xff4fc3,0.9)
+      .setDepth(16000);
+
+    e.speechText=this.add.text(e.x,e.y-142,text,{
+      font:"13px monospace",
+      fill:"#ffffff"
+    }).setOrigin(0.5).setDepth(16001);
+
+    this.time.delayedCall(duration,()=>{
+      if(e.speechBox){
+        e.speechBox.destroy();
+        e.speechBox=null;
+      }
+
+      if(e.speechText){
+        e.speechText.destroy();
+        e.speechText=null;
+      }
+    });
+  }
+
+  createDoormanFireTaunt(e){
+    if(!e) return;
+
+    const dir=e.flipX ? -1 : 1;
+    const fxX=e.x + dir*55;
+    const fxY=e.y - 68;
+
+    const fire=this.add.circle(fxX,fxY,22,0xff5a00,0.95)
+      .setDepth(14500)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    const core=this.add.circle(fxX,fxY,10,0xffff66,1)
+      .setDepth(14501)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets:fire,
+      scale:2.1,
+      alpha:0,
+      duration:420,
+      onComplete:()=>fire.destroy()
+    });
+
+    this.tweens.add({
+      targets:core,
+      scale:2.6,
+      alpha:0,
+      duration:360,
+      onComplete:()=>core.destroy()
+    });
+
+    for(let i=0;i<12;i++){
+      const spark=this.add.circle(fxX,fxY,Phaser.Math.Between(2,4),0xffaa22,1)
+        .setDepth(14502)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
+      const angle=Phaser.Math.FloatBetween(-0.8,0.8);
+      const dist=Phaser.Math.Between(30,70);
+
+      this.tweens.add({
+        targets:spark,
+        x:fxX + dir*Math.cos(angle)*dist,
+        y:fxY + Math.sin(angle)*dist,
+        alpha:0,
+        duration:350,
+        onComplete:()=>spark.destroy()
+      });
+    }
+
+    this.cameras.main.shake(120,0.004);
+    this.vibrateForDamage(18,"hit");
   }
 
   showPose(animKey,scale=PLAYER_ACTION_SCALE,yOffset=0){
@@ -1919,15 +2505,25 @@ class Game extends Phaser.Scene{
     if(!VIBRATION_ENABLED) return;
     if(typeof navigator==="undefined" || !navigator.vibrate) return;
 
-    const power=Phaser.Math.Clamp(Math.round(20+damage*6),30,150);
+    const power=Phaser.Math.Clamp(Math.round(20+damage*6),30,160);
 
     if(type==="block"){
       navigator.vibrate([20,25,20]);
       return;
     }
 
-    if(damage>=14){
-      navigator.vibrate([35,25,power]);
+    if(type==="jump"){
+      navigator.vibrate(20);
+      return;
+    }
+
+    if(damage>=18){
+      navigator.vibrate([45,35,130]);
+      return;
+    }
+
+    if(damage>=12){
+      navigator.vibrate([35,25,90]);
       return;
     }
 
@@ -2143,6 +2739,7 @@ class Game extends Phaser.Scene{
       if(hit.has(e) || e.dead || e.state==="dead") return;
       if(e.platform!==this.platform) return;
       if(e.grabbed || e.thrownTime>0) return;
+      if(e.invulnerable) return;
 
       hit.add(e);
 
@@ -2154,7 +2751,8 @@ class Game extends Phaser.Scene{
       e.knockbackTime=300;
       e.attackCooldown=500;
 
-      e.setVelocityX((e.x<this.player.x ? -1 : 1)*120);
+      const resist=e.knockbackResist || 1;
+      e.setVelocityX((e.x<this.player.x ? -1 : 1)*120*resist);
 
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
@@ -2165,19 +2763,19 @@ class Game extends Phaser.Scene{
         e.state="dead";
         e.busy=true;
         e.setVelocityX(0);
-        safePlay(e,"enemy_ko");
+        this.safeEnemyPlay(e,"ko");
         this.setEnemyNameplateDead(e);
         return;
       }
 
-      safePlay(e,"enemy_hurt");
+      this.safeEnemyPlay(e,"hurt");
       this.updateEnemyHealthBar(e);
 
       this.time.delayedCall(300,()=>{
         if(!e.dead){
           e.busy=false;
           e.state="idle";
-          safePlay(e,"enemy_idle");
+          this.safeEnemyPlay(e,"idle");
         }
       });
     });
@@ -2354,15 +2952,25 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver || this.victoryShown) return;
     if(!this.enemies) return;
 
-    let alive=0;
+    let aliveNormalEnemies=0;
+    let aliveDoorman=0;
 
     this.enemies.children.each(e=>{
-      if(e && !e.dead && e.state!=="dead" && e.health>0){
-        alive++;
+      if(!e || e.dead || e.state==="dead" || e.health<=0) return;
+
+      if(e.enemyType==="doorman"){
+        aliveDoorman++;
+      }else{
+        aliveNormalEnemies++;
       }
     });
 
-    if(alive<=0){
+    if(aliveNormalEnemies<=0 && !this.doormanSpawned){
+      this.spawnDoormanIntro();
+      return;
+    }
+
+    if(this.doormanSpawned && aliveDoorman<=0){
       this.showVictory();
     }
   }
