@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 587;
+const VERSION = 589;
 const W = 960;
 const H = 540;
 
@@ -49,6 +49,13 @@ const ATTACK_NUDGE = {
   heavy: {x: -8, y: 0, scale: 0.32, originY: 1},
   kick:  {x: -4, y: 0, scale: 0.32, originY: 1},
   block: {x:  0, y: 0, scale: 0.26, originY: 1}
+};
+
+const REACTION_NUDGE = {
+  hurt:      {x: 0, y: 0, scale: 0.32, originY: 1},
+  knockback: {x: 0, y: 0, scale: 0.32, originY: 1},
+  ko:        {x: 0, y: 0, scale: 0.32, originY: 1},
+  getup:     {x: 0, y: 0, scale: 0.32, originY: 1}
 };
 
 let selectedFighter = "JT";
@@ -398,6 +405,11 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-T",()=>this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-V",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-I",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
+
+    this.input.keyboard.on("keydown-H",()=>this.showReaction("hurt",350));
+    this.input.keyboard.on("keydown-N",()=>this.showReaction("knockback",500));
+    this.input.keyboard.on("keydown-M",()=>this.showReaction("ko",9999));
+    this.input.keyboard.on("keydown-R",()=>this.showReaction("getup",600));
   }
 
   makeKeyboard(){
@@ -768,6 +780,8 @@ class Game extends Phaser.Scene{
     target.attackCooldown=900;
     target.health-=14;
 
+    this.createHitFX(target.x,target.y-55,"hit");
+
     target.setVelocityX(dir*220);
     safePlay(target,"enemy_hurt");
 
@@ -1021,6 +1035,81 @@ class Game extends Phaser.Scene{
     });
   }
 
+  showReaction(type="hurt",duration=350){
+    if(!this.player || !this.poseSprite) return false;
+
+    const animMap={
+      hurt:"jt_hurt",
+      knockback:"jt_knockback",
+      ko:"jt_ko",
+      getup:"jt_getup"
+    };
+
+    const animKey=animMap[type];
+
+    if(!animKey || !hasAnim(this,animKey)) return false;
+
+    const nudge=REACTION_NUDGE[type] || REACTION_NUDGE.hurt;
+    const dir=this.player.flipX ? -1 : 1;
+
+    this.playerBusy=true;
+    this.isBlocking=false;
+
+    this.player.body.setVelocity(0,0);
+
+    this.poseSprite.x=this.player.x + (nudge.x * dir);
+    this.poseSprite.y=this.player.y + nudge.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,nudge.originY);
+    this.poseSprite.setScale(nudge.scale);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,animKey);
+
+    if(type!=="ko"){
+      this.time.delayedCall(duration,()=>{
+        this.forcePlayerReady();
+      });
+    }
+
+    return true;
+  }
+
+  createHitFX(x,y,type="hit"){
+    const color=type==="block" ? 0x00eaff : 0xfff45c;
+
+    const flash=this.add.circle(x,y,18,color,0.85).setDepth(9999);
+
+    this.tweens.add({
+      targets:flash,
+      scale:2.2,
+      alpha:0,
+      duration:160,
+      onComplete:()=>flash.destroy()
+    });
+
+    for(let i=0;i<8;i++){
+      const spark=this.add.rectangle(x,y,10,3,color,1).setDepth(9999);
+      const angle=Phaser.Math.FloatBetween(0,Math.PI*2);
+      const dist=Phaser.Math.Between(20,46);
+
+      spark.rotation=angle;
+
+      this.tweens.add({
+        targets:spark,
+        x:x+Math.cos(angle)*dist,
+        y:y+Math.sin(angle)*dist,
+        alpha:0,
+        duration:180,
+        onComplete:()=>spark.destroy()
+      });
+    }
+
+    this.cameras.main.shake(80,0.004);
+  }
+
   damagePlayer(amount,dir){
     if(this.playerHealth<=0) return;
     if(this.playerInvuln>0) return;
@@ -1034,43 +1123,56 @@ class Game extends Phaser.Scene{
     this.playerHealth=Math.max(0,this.playerHealth-finalDamage);
     this.playerInvuln=650;
 
-    if(this.player){
-      this.player.body.setVelocityX(dir*90);
-      this.player.setTint(0xff4444);
-
-      this.time.delayedCall(120,()=>{
-        if(this.player) this.player.clearTint();
-      });
-    }
+    this.createHitFX(this.player.x,this.player.y-60,this.isBlocking ? "block" : "hit");
 
     if(this.playerHealth<=0){
       this.playerHealth=0;
       this.playerBusy=true;
 
-      if(this.player){
-        this.player.body.setVelocity(0,0);
-        this.player.setTint(0xff4444);
-      }
-
-      if(this.poseSprite){
-        this.poseSprite.stop();
-        this.poseSprite.setVisible(false);
+      if(!this.showReaction("ko",9999)){
+        if(this.player){
+          this.player.body.setVelocity(0,0);
+          this.player.setTint(0xff4444);
+        }
       }
 
       return;
+    }
+
+    if(this.isBlocking){
+      if(this.player){
+        this.player.setTint(0x44ffff);
+
+        this.time.delayedCall(120,()=>{
+          if(this.player) this.player.clearTint();
+        });
+      }
+
+      return;
+    }
+
+    if(!this.showReaction("hurt",350)){
+      if(this.player){
+        this.player.body.setVelocityX(dir*90);
+        this.player.setTint(0xff4444);
+
+        this.time.delayedCall(120,()=>{
+          if(this.player) this.player.clearTint();
+        });
+      }
     }
   }
 
   positionAttackSprite(type="light"){
     if(!this.player || !this.poseSprite) return;
 
-    const nudge = ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
-    const dir = this.player.flipX ? -1 : 1;
+    const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
+    const dir=this.player.flipX ? -1 : 1;
 
-    this.poseSprite.x = this.player.x + (nudge.x * dir);
-    this.poseSprite.y = this.player.y + nudge.y;
-    this.poseSprite.flipX = this.player.flipX;
-    this.poseSprite.setOrigin(0.5, nudge.originY);
+    this.poseSprite.x=this.player.x + (nudge.x * dir);
+    this.poseSprite.y=this.player.y + nudge.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,nudge.originY);
     this.poseSprite.setScale(nudge.scale);
   }
 
@@ -1144,6 +1246,8 @@ class Game extends Phaser.Scene{
       hit.add(e);
 
       e.health-=data[1];
+      this.createHitFX(e.x,e.y-55,"hit");
+
       e.busy=true;
       e.state="hurt";
       e.knockbackTime=300;
