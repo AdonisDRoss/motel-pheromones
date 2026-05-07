@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 622;
+const VERSION = 623;
 const W = 960;
 const H = 540;
 
@@ -99,7 +99,7 @@ const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
 const DISABLE_DOORMAN_FOR_TEST = false;
-const ENEMY_AI_ENABLED = true;
+const ENEMY_AI_ENABLED = false;
 const DEBUG_RUNTIME = true;
 const DEBUG_INPUT = true;
 const SKIP_COUNTDOWN_FOR_TEST = true;
@@ -147,7 +147,6 @@ const ENEMY_TYPES = {
     canBeGrabbed:true,
     knockbackResist:1
   },
-
   corpo_wannabe:{
     key:"corpo_wannabe",
     prefix:"wannabe",
@@ -163,7 +162,6 @@ const ENEMY_TYPES = {
     canBeGrabbed:true,
     knockbackResist:1
   },
-
   sellout:{
     key:"sellout",
     prefix:"sellout",
@@ -179,7 +177,6 @@ const ENEMY_TYPES = {
     canBeGrabbed:true,
     knockbackResist:1
   },
-
   feral:{
     key:"feral",
     prefix:"feral",
@@ -195,7 +192,6 @@ const ENEMY_TYPES = {
     canBeGrabbed:true,
     knockbackResist:1
   },
-
   doorman:{
     key:"doorman",
     prefix:"doorman",
@@ -743,6 +739,7 @@ class Game extends Phaser.Scene{
     this.runtimeErrorText=null;
     this.busyWatchStartedAt=0;
     this.lastBusyValue=false;
+    this.frameDelta=16.67;
 
     this.addRain();
     this.addBottomFog();
@@ -858,8 +855,9 @@ class Game extends Phaser.Scene{
     });
   }
 
-  update(){
-    const delta=this.game.loop.delta;
+  update(time,delta){
+    delta=Math.min(delta || 16.67,33.33);
+    this.frameDelta=delta;
 
     this.updateRain();
     this.updateBottomFog();
@@ -912,15 +910,17 @@ class Game extends Phaser.Scene{
       this.shadow.y=this.player.y+5;
     }
 
-    if(DEBUG_INPUT && this.debugInputText){
+    if(DEBUG_INPUT && this.debugInputText && this.player){
       this.debugInputText.setText(
         "STARTED: "+this.matchStarted+
         " | BUSY: "+this.playerBusy+
         " | BUSYMS: "+(this.busyWatchStartedAt ? Math.floor(this.time.now-this.busyWatchStartedAt) : 0)+
         " | CLIMB: "+this.isClimbing+
         " | PLATFORM: "+this.platform+
-        " | X: "+this.moveX.toFixed(2)+
-        " | Y: "+this.moveY.toFixed(2)+
+        " | INPUT X: "+this.moveX.toFixed(2)+
+        " | INPUT Y: "+this.moveY.toFixed(2)+
+        " | PX: "+Math.floor(this.player.x)+
+        " | PY: "+Math.floor(this.player.y)+
         " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)
       );
     }
@@ -1048,7 +1048,7 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    const dt=this.game.loop.delta/1000;
+    const dt=(this.frameDelta || 16.67)/1000;
 
     const stickPower=Math.min(1,Math.hypot(this.stickX,this.stickY));
     const usingStick=stickPower>STICK_DEADZONE;
@@ -1107,6 +1107,12 @@ class Game extends Phaser.Scene{
     this.applyPlatformBounds();
 
     const moving=Math.abs(vx)>0.05 || Math.abs(vy)>0.05;
+
+    if(!Number.isFinite(this.player.x) || !Number.isFinite(this.player.y)){
+      this.player.x=470;
+      this.player.y=390;
+    }
+
     this.playMoveAnim(moving,running);
   }
 
@@ -2189,7 +2195,7 @@ class Game extends Phaser.Scene{
   updateEnemyAI(){
     if(!this.enemies) return;
 
-    const delta=this.game.loop.delta;
+    const delta=this.frameDelta || 16.67;
 
     this.enemies.children.each(e=>{
       if(!e) return;
