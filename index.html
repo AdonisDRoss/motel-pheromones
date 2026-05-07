@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 601;
+const VERSION = 602;
 const W = 960;
 const H = 540;
 
@@ -53,9 +53,9 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 
-const JUMP_HEIGHT = 62;
-const JUMP_TIME = 340;
-const DOUBLE_UP_WINDOW = 320;
+const JUMP_HEIGHT = 68;
+const JUMP_TIME = 360;
+const DOUBLE_UP_WINDOW = 360;
 
 const STAIR_TRAVEL_DURATION = 720;
 const SWEEP_DAMAGE = 10;
@@ -197,6 +197,9 @@ function createAllAnims(scene){
   makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
   makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
   makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
+
+  // Carry uses the special/action row until you replace it with a real carry row.
+  makeAnim(scene,"jt_carry","jt_actions",12,15,8,-1);
 
   makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
   makeAnim(scene,"jt_knockback","jt_reactions",4,7,8,0);
@@ -391,11 +394,12 @@ class Game extends Phaser.Scene{
     this.addRain();
     this.addFog();
 
-    this.lightningOverlay=this.add.rectangle(480,270,960,540,0xddeeff,0)
+    this.lightningOverlay=this.add.rectangle(480,270,960,540,0xffffff,0)
       .setDepth(15000)
       .setBlendMode(Phaser.BlendModes.ADD);
 
     this.startLightningLoop();
+    this.time.delayedCall(1800,()=>this.triggerLightning());
 
     this.add.text(20,20,"CHAR: "+selectedFighter,{
       font:"16px monospace",
@@ -454,10 +458,10 @@ class Game extends Phaser.Scene{
     this.startMatchCountdown();
 
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
-    this.input.keyboard.on("keydown-K",()=>this.startAttack("heavy"));
+    this.input.keyboard.on("keydown-K",()=>this.startContextY());
     this.input.keyboard.on("keydown-U",()=>this.startContextKick());
     this.input.keyboard.on("keydown-L",()=>this.startContextB());
-    this.input.keyboard.on("keydown-SPACE",()=>this.startAttack("heavy"));
+    this.input.keyboard.on("keydown-SPACE",()=>this.startContextY());
 
     this.input.keyboard.on("keydown-E",()=>this.startGrab());
     this.input.keyboard.on("keydown-G",()=>this.startGrab());
@@ -509,7 +513,6 @@ class Game extends Phaser.Scene{
     this.readInput();
 
     if(!this.pauseMenuOpen && this.matchStarted && !this.matchOver){
-      this.updateGrabbedEnemy();
       this.updateThrownEnemies(delta);
       this.checkDoubleUpJump();
       this.checkDirectCrouch();
@@ -529,6 +532,7 @@ class Game extends Phaser.Scene{
         this.updateMovement();
       }
 
+      this.updateGrabbedEnemy();
       this.updateEnemyAI();
       this.checkVictory();
     }
@@ -714,6 +718,11 @@ class Game extends Phaser.Scene{
   playMoveAnim(moving,running){
     if(this.playerBusy) return;
 
+    if(this.grabbedEnemy && this.grabMode==="carry"){
+      this.showCarryPose();
+      return;
+    }
+
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
       else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
@@ -773,8 +782,8 @@ class Game extends Phaser.Scene{
     const alpha=0;
 
     this.ladders=[
-      {name:"left",x:332,y:355,w:64,h:235,topY:250,middleY:390},
-      {name:"right",x:806,y:355,w:64,h:235,topY:250,middleY:390}
+      {name:"left",x:332,y:355,w:90,h:250,topY:250,middleY:390},
+      {name:"right",x:806,y:355,w:90,h:250,topY:250,middleY:390}
     ];
 
     this.stairs=[
@@ -807,18 +816,16 @@ class Game extends Phaser.Scene{
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     const nearLadder=this.ladders.find(l=>{
-      return Math.abs(this.player.x-l.x)<=28 &&
-        this.player.y>=l.topY-2 &&
-        this.player.y<=l.middleY+2;
+      return Math.abs(this.player.x-l.x)<=60;
     });
 
     if(nearLadder){
-      if(this.platform==="middle" && this.moveY<-0.45){
+      if(this.platform==="middle" && this.moveY<-0.35){
         this.startClimbing(nearLadder,"up");
         return;
       }
 
-      if(this.platform==="top" && this.moveY>0.45){
+      if(this.platform==="top" && this.moveY>0.35){
         this.startClimbing(nearLadder,"down");
         return;
       }
@@ -847,7 +854,13 @@ class Game extends Phaser.Scene{
     this.player.body.setVelocity(0,0);
 
     this.player.x=ladder.x;
-    this.player.y=Phaser.Math.Clamp(this.player.y,ladder.topY,ladder.middleY);
+
+    if(direction==="down"){
+      this.player.y=ladder.topY;
+    }else{
+      this.player.y=ladder.middleY;
+    }
+
     this.player.setVisible(false);
 
     this.poseSprite.x=this.player.x;
@@ -878,7 +891,7 @@ class Game extends Phaser.Scene{
 
     safePlay(this.poseSprite,"jt_climb");
 
-    if(this.player.y<=l.topY+2 && this.moveY<-0.45){
+    if(this.player.y<=l.topY+2 && this.moveY<-0.35){
       this.isClimbing=false;
       this.platform="top";
       this.player.y=l.topY;
@@ -889,7 +902,7 @@ class Game extends Phaser.Scene{
       return;
     }
 
-    if(this.player.y>=l.middleY-2 && this.moveY>0.45){
+    if(this.player.y>=l.middleY-2 && this.moveY>0.35){
       this.isClimbing=false;
       this.platform="middle";
       this.player.y=l.middleY;
@@ -973,7 +986,6 @@ class Game extends Phaser.Scene{
 
   startContextB(){
     if(this.grabbedEnemy){
-      this.throwGrabbedEnemy();
       return;
     }
 
@@ -1004,6 +1016,15 @@ class Game extends Phaser.Scene{
     }
 
     this.quickBlock();
+  }
+
+  startContextY(){
+    if(this.grabbedEnemy){
+      this.throwGrabbedEnemy();
+      return;
+    }
+
+    this.startAttack("heavy");
   }
 
   startJump(){
@@ -1038,6 +1059,8 @@ class Game extends Phaser.Scene{
         this.forcePlayerReady();
       }
     });
+
+    this.createHitFX(this.player.x,this.player.y-45,"jump",4);
   }
 
   startCrouch(){
@@ -1142,17 +1165,12 @@ class Game extends Phaser.Scene{
         e.busy=true;
         e.setVelocityX(0);
         safePlay(e,"enemy_ko");
-
-        if(e.hpText) e.hpText.setText("KO");
         this.setEnemyNameplateDead(e);
         return;
       }
 
       safePlay(e,"enemy_hurt");
-
-      if(e.hpText){
-        e.hpText.setText("HP "+e.health);
-      }
+      this.updateEnemyHealthBar(e);
 
       this.time.delayedCall(420,()=>{
         if(!e.dead){
@@ -1231,10 +1249,10 @@ class Game extends Phaser.Scene{
     target.attackCooldown=9999;
     target.setVelocity(0,0);
 
-    if(hasAnim(this,"jt_special")){
-      this.showPose("jt_special",PLAYER_ACTION_SCALE);
-    }
+    // Enemy uses KO/downed-looking sprite while grabbed.
+    safePlay(target,"enemy_ko");
 
+    this.showCarryPose();
     this.updateGrabbedEnemy();
 
     this.grabHoldEvent=this.time.delayedCall(GRAB_HOLD_TIME,()=>{
@@ -1242,6 +1260,21 @@ class Game extends Phaser.Scene{
         this.enemyBreakGrab();
       }
     });
+  }
+
+  showCarryPose(){
+    if(!this.player || !this.poseSprite) return;
+
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=this.player.flipX;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(true);
+
+    this.player.setVisible(false);
+
+    safePlay(this.poseSprite,"jt_carry");
   }
 
   clearGrabTimers(){
@@ -1278,6 +1311,10 @@ class Game extends Phaser.Scene{
 
     e.setVelocity(0,0);
     e.setFlipX(dir<0);
+    e.setDepth(e.y+3);
+
+    safePlay(e,"enemy_ko");
+    this.showCarryPose();
 
     if(e.shadow){
       e.shadow.x=e.x;
@@ -1298,15 +1335,7 @@ class Game extends Phaser.Scene{
     this.grabMode="carry";
     this.playerBusy=false;
 
-    if(this.poseSprite){
-      this.poseSprite.stop();
-      this.poseSprite.setVisible(false);
-    }
-
-    if(this.player){
-      this.player.setVisible(true);
-      safePlay(this.player,"jt_idle_side");
-    }
+    this.showCarryPose();
 
     this.carryBreakEvent=this.time.delayedCall(CARRY_BREAK_TIME,()=>{
       if(this.grabbedEnemy && this.grabMode==="carry"){
@@ -1359,10 +1388,7 @@ class Game extends Phaser.Scene{
 
     e.setVelocityX(dir*THROW_SPEED);
     safePlay(e,"enemy_hurt");
-
-    if(e.hpText){
-      e.hpText.setText("HP "+Math.max(0,e.health));
-    }
+    this.updateEnemyHealthBar(e);
 
     if(e.health<=0){
       e.health=0;
@@ -1372,8 +1398,6 @@ class Game extends Phaser.Scene{
       e.thrownTime=0;
       e.setVelocityX(0);
       safePlay(e,"enemy_ko");
-
-      if(e.hpText) e.hpText.setText("KO");
       this.setEnemyNameplateDead(e);
       return;
     }
@@ -1478,17 +1502,12 @@ class Game extends Phaser.Scene{
             other.busy=true;
             other.setVelocityX(0);
             safePlay(other,"enemy_ko");
-
-            if(other.hpText) other.hpText.setText("KO");
             this.setEnemyNameplateDead(other);
             return;
           }
 
           safePlay(other,"enemy_hurt");
-
-          if(other.hpText){
-            other.hpText.setText("HP "+other.health);
-          }
+          this.updateEnemyHealthBar(other);
 
           this.time.delayedCall(500,()=>{
             if(!other.dead){
@@ -1529,6 +1548,7 @@ class Game extends Phaser.Scene{
     e.body.setVelocity(0,0);
     e.setCollideWorldBounds(true);
 
+    e.maxHealth=30;
     e.health=30;
     e.dead=false;
     e.busy=false;
@@ -1551,12 +1571,7 @@ class Game extends Phaser.Scene{
     safePlay(e,"enemy_idle");
 
     this.createEnemyNameplate(e);
-
-    e.hpText=this.add.text(x,y-76,"HP 30",{
-      font:"10px monospace",
-      fill:"#ffffff",
-      backgroundColor:"#000000"
-    }).setOrigin(0.5).setDepth(1000);
+    this.createEnemyHealthBar(e);
 
     this.enemies.add(e);
   }
@@ -1590,6 +1605,42 @@ class Game extends Phaser.Scene{
     }).setOrigin(0.5).setDepth(1001);
   }
 
+  createEnemyHealthBar(e){
+    e.hpBack=this.add.rectangle(e.x-24,e.y-76,48,7,0x000000,0.9)
+      .setOrigin(0,0.5)
+      .setStrokeStyle(1,0xffffff,0.8)
+      .setDepth(1000);
+
+    e.hpFill=this.add.rectangle(e.x-22,e.y-76,44,5,0x00ff44,1)
+      .setOrigin(0,0.5)
+      .setDepth(1001);
+
+    this.updateEnemyHealthBar(e);
+  }
+
+  updateEnemyHealthBar(e){
+    if(!e || !e.hpFill || !e.hpBack) return;
+
+    const max=e.maxHealth || 30;
+    const ratio=Phaser.Math.Clamp(e.health/max,0,1);
+
+    let color=0x00ff44;
+
+    if(ratio<=0.15){
+      color=0xff2222;
+    }else if(ratio<=0.5){
+      color=0xffa000;
+    }
+
+    e.hpBack.x=e.x-24;
+    e.hpBack.y=e.y-76;
+
+    e.hpFill.x=e.x-22;
+    e.hpFill.y=e.y-76;
+    e.hpFill.setScale(ratio,1);
+    e.hpFill.setFillStyle(color,1);
+  }
+
   updateEnemyNameplate(e){
     if(!e) return;
 
@@ -1608,10 +1659,7 @@ class Game extends Phaser.Scene{
       e.nameText.y=e.y-91;
     }
 
-    if(e.hpText){
-      e.hpText.x=e.x;
-      e.hpText.y=e.y-76;
-    }
+    this.updateEnemyHealthBar(e);
   }
 
   setEnemyNameplateDead(e){
@@ -1628,6 +1676,10 @@ class Game extends Phaser.Scene{
 
     if(e.nameText){
       e.nameText.setFill("#777777");
+    }
+
+    if(e.hpFill){
+      e.hpFill.setScale(0,1);
     }
   }
 
@@ -1883,24 +1935,32 @@ class Game extends Phaser.Scene{
   }
 
   createHitFX(x,y,type="hit",damage=8){
-    const color=type==="block" ? 0x00eaff : 0xfff45c;
+    let color=0xfff45c;
+
+    if(type==="block") color=0x00eaff;
+    if(type==="jump") color=0xffffff;
 
     this.vibrateForDamage(damage,type);
 
-    const flash=this.add.circle(x,y,18,color,0.85).setDepth(9999);
+    const flash=this.add.circle(x,y,22,color,0.95)
+      .setDepth(14000)
+      .setBlendMode(Phaser.BlendModes.ADD);
 
     this.tweens.add({
       targets:flash,
-      scale:2.2,
+      scale:2.4,
       alpha:0,
-      duration:160,
+      duration:190,
       onComplete:()=>flash.destroy()
     });
 
-    for(let i=0;i<8;i++){
-      const spark=this.add.rectangle(x,y,10,3,color,1).setDepth(9999);
+    for(let i=0;i<12;i++){
+      const spark=this.add.rectangle(x,y,12,3,color,1)
+        .setDepth(14001)
+        .setBlendMode(Phaser.BlendModes.ADD);
+
       const angle=Phaser.Math.FloatBetween(0,Math.PI*2);
-      const dist=Phaser.Math.Between(20,46);
+      const dist=Phaser.Math.Between(22,54);
 
       spark.rotation=angle;
 
@@ -1909,13 +1969,30 @@ class Game extends Phaser.Scene{
         x:x+Math.cos(angle)*dist,
         y:y+Math.sin(angle)*dist,
         alpha:0,
-        duration:180,
+        duration:210,
         onComplete:()=>spark.destroy()
       });
     }
 
-    const shakePower=Phaser.Math.Clamp(0.002+damage*0.00022,0.003,0.009);
-    this.cameras.main.shake(80,shakePower);
+    if(type==="hit"){
+      const txt=this.add.text(x,y-18,"HIT",{
+        font:"16px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:4
+      }).setOrigin(0.5).setDepth(14002);
+
+      this.tweens.add({
+        targets:txt,
+        y:y-44,
+        alpha:0,
+        duration:300,
+        onComplete:()=>txt.destroy()
+      });
+    }
+
+    const shakePower=Phaser.Math.Clamp(0.003+damage*0.0003,0.004,0.012);
+    this.cameras.main.shake(90,shakePower);
   }
 
   damagePlayer(amount,dir){
@@ -1986,6 +2063,15 @@ class Game extends Phaser.Scene{
 
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
+
+    if(this.grabbedEnemy && this.grabMode==="carry"){
+      this.playerBusy=false;
+      this.isBlocking=false;
+      this.isJumping=false;
+      this.isCrouching=false;
+      this.showCarryPose();
+      return;
+    }
 
     this.isJumping=false;
     this.isCrouching=false;
@@ -2080,17 +2166,12 @@ class Game extends Phaser.Scene{
         e.busy=true;
         e.setVelocityX(0);
         safePlay(e,"enemy_ko");
-
-        if(e.hpText) e.hpText.setText("KO");
         this.setEnemyNameplateDead(e);
         return;
       }
 
       safePlay(e,"enemy_hurt");
-
-      if(e.hpText){
-        e.hpText.setText("HP "+e.health);
-      }
+      this.updateEnemyHealthBar(e);
 
       this.time.delayedCall(300,()=>{
         if(!e.dead){
@@ -2460,22 +2541,26 @@ class Game extends Phaser.Scene{
     if(!this.lightningOverlay) return;
     if(this.pauseMenuOpen) return;
 
-    const flashes=Phaser.Math.Between(2,4);
+    const flashes=Phaser.Math.Between(3,5);
     let delay=0;
 
     for(let i=0;i<flashes;i++){
       this.time.delayedCall(delay,()=>{
-        this.lightningOverlay.setAlpha(Phaser.Math.FloatBetween(0.35,0.75));
-        this.cameras.main.shake(80,0.002);
+        if(this.lightningOverlay){
+          this.lightningOverlay.setAlpha(Phaser.Math.FloatBetween(0.55,0.95));
+        }
 
-        this.time.delayedCall(Phaser.Math.Between(45,90),()=>{
+        this.cameras.main.flash(80,255,255,255,false);
+        this.cameras.main.shake(100,0.003);
+
+        this.time.delayedCall(Phaser.Math.Between(55,110),()=>{
           if(this.lightningOverlay){
             this.lightningOverlay.setAlpha(0);
           }
         });
       });
 
-      delay+=Phaser.Math.Between(90,180);
+      delay+=Phaser.Math.Between(100,210);
     }
   }
 
@@ -2572,7 +2657,7 @@ class Game extends Phaser.Scene{
     });
 
     this.mobileButton(820,340,"X",()=>this.startAttack("light"));
-    this.mobileButton(760,410,"Y",()=>this.startAttack("heavy"));
+    this.mobileButton(760,410,"Y",()=>this.startContextY());
     this.mobileButton(880,410,"A",()=>this.startContextKick());
     this.mobileButton(820,480,"B",()=>this.startContextB());
     this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
