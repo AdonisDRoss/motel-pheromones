@@ -26,16 +26,19 @@ canvas{
 <body>
 <script>
 
-const VERSION = 607;
+const VERSION = 612;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
+
 const ATTACK_FRAME_W = 288;
 const ATTACK_FRAME_H = 232;
+
 const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
+
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
 
@@ -70,11 +73,16 @@ const THROW_SPEED = 430;
 const GRAB_OFFSET_X = 42;
 const CARRY_OFFSET_X = 58;
 
-const LIGHTNING_MIN_DELAY = 15000;
-const LIGHTNING_MAX_DELAY = 30000;
-
 const DOORMAN_DOOR_X = 505;
 const DOORMAN_DOOR_Y = 390;
+
+const JT_BASE = "assets/sprites/player/jt";
+const HEW_BASE = "assets/sprites/player/hew";
+const ENEMY_BASE = "assets/sprites/enemies";
+
+let selectedFighter = "JT";
+let selectedLevel = "outdoor";
+let selectedLevelName = "OUTDOOR";
 
 const ATTACK_NUDGE = {
   light:{x:-6,y:0,scale:0.32,originY:1},
@@ -110,7 +118,6 @@ const ENEMY_TYPES = {
     attackCooldownMin:200,
     attackCooldownMax:650,
     attackDamage:8,
-    role:"standard",
     canBeGrabbed:true,
     knockbackResist:1
   },
@@ -127,7 +134,6 @@ const ENEMY_TYPES = {
     attackCooldownMin:180,
     attackCooldownMax:500,
     attackDamage:7,
-    role:"fast",
     canBeGrabbed:true,
     knockbackResist:1
   },
@@ -144,7 +150,6 @@ const ENEMY_TYPES = {
     attackCooldownMin:250,
     attackCooldownMax:700,
     attackDamage:8,
-    role:"balanced",
     canBeGrabbed:true,
     knockbackResist:1
   },
@@ -161,7 +166,6 @@ const ENEMY_TYPES = {
     attackCooldownMin:160,
     attackCooldownMax:460,
     attackDamage:7,
-    role:"fast_knife",
     canBeGrabbed:true,
     knockbackResist:1
   },
@@ -179,7 +183,6 @@ const ENEMY_TYPES = {
     attackCooldownMin:650,
     attackCooldownMax:1200,
     attackDamage:15,
-    role:"subboss",
     canBeGrabbed:false,
     knockbackResist:0.35,
     specialCooldown:3200,
@@ -188,15 +191,13 @@ const ENEMY_TYPES = {
   }
 };
 
-let selectedFighter = "JT";
-let selectedLevel = "outdoor";
-let selectedLevelName = "OUTDOOR";
+function hasTex(scene,key){
+  return scene.textures.exists(key);
+}
 
-const JT_BASE = "assets/sprites/player/jt";
-const ENEMY_BASE = "assets/sprites/enemies";
-
-function hasTex(scene,key){ return scene.textures.exists(key); }
-function hasAnim(scene,key){ return scene.anims.exists(key); }
+function hasAnim(scene,key){
+  return scene.anims.exists(key);
+}
 
 function safePlay(sprite,key){
   if(!sprite || !sprite.scene) return;
@@ -233,6 +234,36 @@ function makeEnemyAnimSet(scene,sheet,prefix){
   makeAnim(scene,prefix+"_special",sheet,35,39,8,0);
 }
 
+function makePlayerAnimSet(scene,prefix){
+  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);
+  makeAnim(scene,prefix+"_idle_up",prefix+"_movement",5,9,6,-1);
+  makeAnim(scene,prefix+"_idle_side",prefix+"_movement",10,14,6,-1);
+
+  makeAnim(scene,prefix+"_walk_down",prefix+"_movement",15,19,8,-1);
+  makeAnim(scene,prefix+"_walk_up",prefix+"_movement",15,19,8,-1);
+  makeAnim(scene,prefix+"_walk_side",prefix+"_movement",15,19,8,-1);
+
+  makeAnim(scene,prefix+"_run_down",prefix+"_movement",20,24,12,-1);
+  makeAnim(scene,prefix+"_run_up",prefix+"_movement",20,24,12,-1);
+  makeAnim(scene,prefix+"_run_side",prefix+"_movement",20,24,12,-1);
+
+  makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,14,0);
+  makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,12,0);
+  makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,13,0);
+  makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+
+  makeAnim(scene,prefix+"_climb",prefix+"_actions",0,3,8,-1);
+  makeAnim(scene,prefix+"_crouch",prefix+"_actions",4,7,8,-1);
+  makeAnim(scene,prefix+"_taunt",prefix+"_actions",8,11,8,0);
+  makeAnim(scene,prefix+"_special",prefix+"_actions",12,15,10,0);
+  makeAnim(scene,prefix+"_carry",prefix+"_actions",12,15,8,-1);
+
+  makeAnim(scene,prefix+"_hurt",prefix+"_reactions",0,3,8,0);
+  makeAnim(scene,prefix+"_knockback",prefix+"_reactions",4,7,8,0);
+  makeAnim(scene,prefix+"_ko",prefix+"_reactions",8,11,6,0);
+  makeAnim(scene,prefix+"_getup",prefix+"_reactions",12,15,8,0);
+}
+
 function loadAssets(scene){
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
@@ -243,7 +274,6 @@ function loadAssets(scene){
   scene.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
-
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
 
   scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
@@ -268,6 +298,34 @@ function loadAssets(scene){
   });
 
   scene.load.spritesheet("jt_reactions",JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
+    frameWidth:REACTION_FRAME_W,
+    frameHeight:REACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{
+    frameWidth:MOVE_FRAME_W,
+    frameHeight:MOVE_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_attacks",HEW_BASE + "/attacks/hew_attacks.png?v=" + VERSION,{
+    frameWidth:ATTACK_FRAME_W,
+    frameHeight:ATTACK_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_actions",HEW_BASE + "/actions/hew_actions.png?v=" + VERSION,{
+    frameWidth:ACTION_FRAME_W,
+    frameHeight:ACTION_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_reactions",HEW_BASE + "/reactions/hew_reactions.png?v=" + VERSION,{
     frameWidth:REACTION_FRAME_W,
     frameHeight:REACTION_FRAME_H,
     margin:0,
@@ -311,33 +369,8 @@ function loadAssets(scene){
 }
 
 function createAllAnims(scene){
-  makeAnim(scene,"jt_idle_down","jt_movement",0,4,6,-1);
-  makeAnim(scene,"jt_idle_up","jt_movement",5,9,6,-1);
-  makeAnim(scene,"jt_idle_side","jt_movement",10,14,6,-1);
-
-  makeAnim(scene,"jt_walk_down","jt_movement",15,19,8,-1);
-  makeAnim(scene,"jt_walk_up","jt_movement",15,19,8,-1);
-  makeAnim(scene,"jt_walk_side","jt_movement",15,19,8,-1);
-
-  makeAnim(scene,"jt_run_down","jt_movement",20,24,12,-1);
-  makeAnim(scene,"jt_run_up","jt_movement",20,24,12,-1);
-  makeAnim(scene,"jt_run_side","jt_movement",20,24,12,-1);
-
-  makeAnim(scene,"jt_attack_light","jt_attacks",0,3,14,0);
-  makeAnim(scene,"jt_attack_heavy","jt_attacks",4,7,12,0);
-  makeAnim(scene,"jt_kick","jt_attacks",8,11,13,0);
-  makeAnim(scene,"jt_block","jt_attacks",12,15,8,-1);
-
-  makeAnim(scene,"jt_climb","jt_actions",0,3,8,-1);
-  makeAnim(scene,"jt_crouch","jt_actions",4,7,8,-1);
-  makeAnim(scene,"jt_taunt","jt_actions",8,11,8,0);
-  makeAnim(scene,"jt_special","jt_actions",12,15,10,0);
-  makeAnim(scene,"jt_carry","jt_actions",12,15,8,-1);
-
-  makeAnim(scene,"jt_hurt","jt_reactions",0,3,8,0);
-  makeAnim(scene,"jt_knockback","jt_reactions",4,7,8,0);
-  makeAnim(scene,"jt_ko","jt_reactions",8,11,6,0);
-  makeAnim(scene,"jt_getup","jt_reactions",12,15,8,0);
+  makePlayerAnimSet(scene,"jt");
+  makePlayerAnimSet(scene,"hew");
 
   makeEnemyAnimSet(scene,"corpo_sellout","enemy");
   makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
@@ -347,7 +380,9 @@ function createAllAnims(scene){
 }
 
 class Boot extends Phaser.Scene{
-  constructor(){ super("Boot"); }
+  constructor(){
+    super("Boot");
+  }
 
   preload(){
     loadAssets(this);
@@ -360,7 +395,9 @@ class Boot extends Phaser.Scene{
 }
 
 class Title extends Phaser.Scene{
-  constructor(){ super("Title"); }
+  constructor(){
+    super("Title");
+  }
 
   create(){
     if(hasTex(this,"title")){
@@ -387,7 +424,9 @@ class Title extends Phaser.Scene{
 }
 
 class CharacterSelect extends Phaser.Scene{
-  constructor(){ super("CharacterSelect"); }
+  constructor(){
+    super("CharacterSelect");
+  }
 
   create(){
     if(hasTex(this,"charSelect")){
@@ -401,32 +440,62 @@ class CharacterSelect extends Phaser.Scene{
     }
 
     const fighters=[
-      {name:"DOTTIE",x:260,y:300,w:170,h:260},
-      {name:"GIGI",x:480,y:300,w:170,h:260},
-      {name:"JT",x:700,y:300,w:170,h:260}
+      {name:"DOTTIE",x:260,y:300,w:170,h:260,unlocked:false},
+      {name:"JT",x:480,y:300,w:170,h:260,unlocked:true},
+      {name:"HEW",x:700,y:300,w:170,h:260,unlocked:true,collectible:true}
     ];
 
-    const outline=this.add.rectangle(700,300,170,260,0xff4fc3,0)
+    const outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
 
+    this.add.text(480,505,"HEW IS A COLLECTIBLE CHARACTER",{
+      font:"16px monospace",
+      fill:"#fff45c",
+      backgroundColor:"#000000"
+    }).setOrigin(0.5).setDepth(60);
+
     this.time.delayedCall(250,()=>{
       fighters.forEach(f=>{
-        this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
+        const hit=this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
           .setInteractive()
-          .setDepth(40)
-          .on("pointerdown",()=>{
-            selectedFighter=f.name;
-            outline.setPosition(f.x,f.y);
-            this.time.delayedCall(180,()=>this.scene.start("LevelSelect"));
+          .setDepth(40);
+
+        if(!f.unlocked){
+          this.add.text(f.x,f.y,"LOCKED",{
+            font:"18px monospace",
+            fill:"#ff2222",
+            backgroundColor:"#000000"
+          }).setOrigin(0.5).setDepth(61);
+        }
+
+        if(f.collectible){
+          this.add.text(f.x,f.y-150,"COLLECTIBLE",{
+            font:"14px monospace",
+            fill:"#00eaff",
+            backgroundColor:"#000000"
+          }).setOrigin(0.5).setDepth(61);
+        }
+
+        hit.on("pointerdown",()=>{
+          if(!f.unlocked) return;
+
+          selectedFighter=f.name;
+          outline.setPosition(f.x,f.y);
+
+          this.time.delayedCall(180,()=>{
+            this.scene.start("LevelSelect");
           });
+        });
       });
     });
   }
 }
 
 class LevelSelect extends Phaser.Scene{
-  constructor(){ super("LevelSelect"); }
+  constructor(){
+    super("LevelSelect");
+  }
 
   create(){
     if(hasTex(this,"levelSelect")){
@@ -467,7 +536,10 @@ class LevelSelect extends Phaser.Scene{
             outline.setPosition(l.x,l.y);
             outline.setSize(l.w,l.h);
             status.setText("LOADING: "+l.name);
-            this.time.delayedCall(250,()=>this.scene.start("Game"));
+
+            this.time.delayedCall(250,()=>{
+              this.scene.start("Game");
+            });
           });
       });
     });
@@ -475,7 +547,57 @@ class LevelSelect extends Phaser.Scene{
 }
 
 class Game extends Phaser.Scene{
-  constructor(){ super("Game"); }
+  constructor(){
+    super("Game");
+  }
+
+  getPlayerPrefix(){
+    return selectedFighter==="HEW" ? "hew" : "jt";
+  }
+
+  getPlayerMoveSheet(){
+    return this.getPlayerPrefix()+"_movement";
+  }
+
+  getPlayerAttackSheet(){
+    return this.getPlayerPrefix()+"_attacks";
+  }
+
+  getPlayerActionSheet(){
+    return this.getPlayerPrefix()+"_actions";
+  }
+
+  getPlayerReactionSheet(){
+    return this.getPlayerPrefix()+"_reactions";
+  }
+
+  getPlayerAnim(action){
+    return this.getPlayerPrefix()+"_"+action;
+  }
+
+  getPlayerSpeedMod(){
+    return selectedFighter==="HEW" ? 0.94 : 1;
+  }
+
+  getPlayerDamageMod(){
+    return selectedFighter==="HEW" ? 1.05 : 1;
+  }
+
+  getAttackData(type){
+    const base={
+      light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false},
+      heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false},
+      kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false}
+    }[type];
+
+    if(!base) return null;
+
+    return {
+      anim:base.anim,
+      damage:Number((base.damage*this.getPlayerDamageMod()).toFixed(1)),
+      stagger:selectedFighter==="HEW" && type==="heavy"
+    };
+  }
 
   create(){
     this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
@@ -527,14 +649,7 @@ class Game extends Phaser.Scene{
     this.pauseOptions=[];
 
     this.addRain();
-    this.addFog();
-
-    this.lightningOverlay=this.add.rectangle(480,270,960,540,0xffffff,0)
-      .setDepth(15000)
-      .setBlendMode(Phaser.BlendModes.ADD);
-
-    this.startLightningLoop();
-    this.time.delayedCall(1800,()=>this.triggerLightning());
+    this.addBottomFog();
 
     this.add.text(20,20,"CHAR: "+selectedFighter,{
       font:"16px monospace",
@@ -565,16 +680,17 @@ class Game extends Phaser.Scene{
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
 
-    this.player=this.physics.add.sprite(470,390,"jt_movement");
+    this.player=this.physics.add.sprite(470,390,this.getPlayerMoveSheet());
     this.player.setOrigin(0.5,1);
     this.player.setScale(PLAYER_MOVE_SCALE);
     this.player.setDepth(200);
     this.player.setCollideWorldBounds(true);
     this.player.body.setAllowGravity(false);
     this.player.body.setVelocity(0,0);
-    safePlay(this.player,"jt_idle_down");
 
-    this.poseSprite=this.add.sprite(470,390,"jt_attacks");
+    safePlay(this.player,this.getPlayerAnim("idle_down"));
+
+    this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
     this.poseSprite.setOrigin(0.5,1);
     this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
     this.poseSprite.setDepth(201);
@@ -586,10 +702,9 @@ class Game extends Phaser.Scene{
 
     this.input.topOnly=false;
     this.input.addPointer(6);
+
     this.makeMobileControls();
-
     this.addForegroundOverlays();
-
     this.startMatchCountdown();
 
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
@@ -602,9 +717,9 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-G",()=>this.startGrab());
 
     this.input.keyboard.on("keydown-C",()=>this.startCrouch());
-    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE));
-    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
-    this.input.keyboard.on("keydown-I",()=>this.playPlayerPose("jt_special",750,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-I",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
 
     this.input.keyboard.on("keydown-H",()=>this.showReaction("hurt",350));
     this.input.keyboard.on("keydown-N",()=>this.showReaction("knockback",500));
@@ -645,6 +760,7 @@ class Game extends Phaser.Scene{
     const delta=this.game.loop.delta;
 
     this.updateRain();
+    this.updateBottomFog();
     this.readInput();
 
     if(!this.pauseMenuOpen && this.matchStarted && !this.matchOver){
@@ -672,7 +788,9 @@ class Game extends Phaser.Scene{
       this.checkVictory();
     }
 
-    this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
+    if(this.comboText){
+      this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
+    }
 
     if(this.playerHealthText){
       this.playerHealthText.setText("HP: "+this.playerHealth);
@@ -721,6 +839,10 @@ class Game extends Phaser.Scene{
     }
 
     return y;
+  }
+
+  getFacingDir(){
+    return this.player && this.player.flipX ? -1 : 1;
   }
 
   isForwardHeld(){
@@ -783,6 +905,7 @@ class Game extends Phaser.Scene{
     if(this.downCrouchHeld) return;
 
     const activeStairs=this.stairs && this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
+
     if(activeStairs && this.platform==="middle"){
       this.downCrouchHeld=true;
       return;
@@ -829,6 +952,8 @@ class Game extends Phaser.Scene{
       speed=RUN_SPEED;
     }
 
+    speed *= this.getPlayerSpeedMod();
+
     const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
 
     this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
@@ -859,58 +984,15 @@ class Game extends Phaser.Scene{
     }
 
     if(!moving){
-      if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
-      else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
-      else safePlay(this.player,"jt_idle_down");
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
       return;
     }
 
-    if(this.lastDir==="up") safePlay(this.player,running ? "jt_run_up" : "jt_walk_up");
-    else if(this.lastDir==="side") safePlay(this.player,running ? "jt_run_side" : "jt_walk_side");
-    else safePlay(this.player,running ? "jt_run_down" : "jt_walk_down");
-  }
-
-  addForegroundOverlays(){
-    if(selectedLevel!=="outdoor") return;
-
-    const x=292;
-    const y=411;
-    const w=64;
-    const h=38;
-    const depth=850;
-
-    if(hasTex(this,"outdoor_barricade_front")){
-      this.barricadeFront=this.add.image(x,y,"outdoor_barricade_front")
-        .setOrigin(0.5,1)
-        .setDisplaySize(w,h)
-        .setDepth(depth);
-
-      return;
-    }
-
-    const g=this.add.graphics().setDepth(depth);
-
-    g.fillStyle(0xd7a93b,1);
-    g.fillRect(x-w/2,y-h,w,h);
-
-    g.lineStyle(4,0x2b1d0f,1);
-    g.strokeRect(x-w/2,y-h,w,h);
-
-    g.lineStyle(4,0x2b1d0f,1);
-    g.beginPath();
-    g.moveTo(x-w/2+6,y-6);
-    g.lineTo(x+w/2-6,y-h+6);
-    g.moveTo(x-w/2+14,y-6);
-    g.lineTo(x+w/2-14,y-h+6);
-    g.strokePath();
-
-    this.barricadeFront=g;
-  }
-
-  keepForegroundInFront(){
-    if(this.barricadeFront && this.barricadeFront.setDepth){
-      this.barricadeFront.setDepth(850);
-    }
+    if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim(running ? "run_up" : "walk_up"));
+    else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim(running ? "run_side" : "walk_side"));
+    else safePlay(this.player,this.getPlayerAnim(running ? "run_down" : "walk_down"));
   }
 
   createPlatformZones(){
@@ -937,6 +1019,7 @@ class Game extends Phaser.Scene{
 
   isPlayerInZone(zone,padX=0,padY=0){
     const b=zone.getBounds();
+
     const r=new Phaser.Geom.Rectangle(
       b.x-padX,
       b.y-padY,
@@ -976,7 +1059,6 @@ class Game extends Phaser.Scene{
 
       if(this.platform==="bottom" && this.moveY<-0.45){
         this.startStairTravel(activeStairs,"up");
-        return;
       }
     }
   }
@@ -998,6 +1080,7 @@ class Game extends Phaser.Scene{
 
     this.player.setVisible(false);
 
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
     this.poseSprite.x=this.player.x;
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=false;
@@ -1005,7 +1088,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setScale(PLAYER_ACTION_SCALE);
     this.poseSprite.setVisible(true);
 
-    safePlay(this.poseSprite,"jt_climb");
+    safePlay(this.poseSprite,this.getPlayerAnim("climb"));
     this.zoneText.setText("CLIMBING LADDER");
   }
 
@@ -1024,7 +1107,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setScale(PLAYER_ACTION_SCALE);
     this.poseSprite.setVisible(true);
 
-    safePlay(this.poseSprite,"jt_climb");
+    safePlay(this.poseSprite,this.getPlayerAnim("climb"));
 
     if(this.player.y<=l.topY+2 && this.moveY<-0.35){
       this.isClimbing=false;
@@ -1045,7 +1128,6 @@ class Game extends Phaser.Scene{
       this.currentLadder=null;
       this.zoneText.setText("MIDDLE PLATFORM");
       this.forcePlayerReady();
-      return;
     }
   }
 
@@ -1062,14 +1144,15 @@ class Game extends Phaser.Scene{
     const toX=direction==="down" ? stair.bottomX : stair.middleX;
     const toY=direction==="down" ? stair.bottomY : stair.middleY;
 
+    this.lastDir="side";
+
     if(stair.name==="leftStairs"){
       this.player.setFlipX(direction==="down");
     }else{
       this.player.setFlipX(direction!=="down");
     }
 
-    this.lastDir="side";
-    safePlay(this.player,"jt_walk_side");
+    safePlay(this.player,this.getPlayerAnim("walk_side"));
 
     this.tweens.addCounter({
       from:0,
@@ -1115,10 +1198,6 @@ class Game extends Phaser.Scene{
     }
   }
 
-  getFacingDir(){
-    return this.player && this.player.flipX ? -1 : 1;
-  }
-
   startContextB(){
     if(this.grabbedEnemy){
       return;
@@ -1136,7 +1215,7 @@ class Game extends Phaser.Scene{
     }
 
     if(this.isBackHeld()){
-      this.playPlayerPose("jt_taunt",700,PLAYER_ACTION_SCALE);
+      this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE);
       return;
     }
 
@@ -1230,7 +1309,7 @@ class Game extends Phaser.Scene{
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.isCrouching=true;
-    this.playPlayerPose("jt_crouch",650,PLAYER_ACTION_SCALE);
+    this.playPlayerPose(this.getPlayerAnim("crouch"),650,PLAYER_ACTION_SCALE);
 
     this.time.delayedCall(650,()=>{
       this.isCrouching=false;
@@ -1250,7 +1329,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setVisible(true);
     this.player.setVisible(false);
 
-    safePlay(this.poseSprite,"jt_kick");
+    safePlay(this.poseSprite,this.getPlayerAnim("kick"));
 
     this.time.delayedCall(90,()=>this.createSweepHitbox());
 
@@ -1267,6 +1346,7 @@ class Game extends Phaser.Scene{
     const dir=this.getFacingDir();
     const boxX=this.player.x+dir*48;
     const boxY=this.player.y-25;
+    const sweepDamage=Number((SWEEP_DAMAGE*this.getPlayerDamageMod()).toFixed(1));
 
     const box=this.add.rectangle(boxX,boxY,96,34,0xff0000,0).setDepth(999);
     this.physics.add.existing(box);
@@ -1280,8 +1360,8 @@ class Game extends Phaser.Scene{
 
       hit.add(e);
 
-      e.health-=SWEEP_DAMAGE;
-      this.createHitFX(e.x,e.y-35,"hit",SWEEP_DAMAGE);
+      e.health-=sweepDamage;
+      this.createHitFX(e.x,e.y-35,"hit",sweepDamage);
 
       e.busy=true;
       e.state="hurt";
@@ -1295,13 +1375,7 @@ class Game extends Phaser.Scene{
       this.rhythm=Math.min(10,this.rhythm+1);
 
       if(e.health<=0){
-        e.health=0;
-        e.dead=true;
-        e.state="dead";
-        e.busy=true;
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"ko");
-        this.setEnemyNameplateDead(e);
+        this.killEnemy(e);
         return;
       }
 
@@ -1378,6 +1452,7 @@ class Game extends Phaser.Scene{
     this.isBlocking=false;
     this.isCrouching=false;
     this.isJumping=false;
+
     this.player.body.setVelocity(0,0);
 
     target.grabbed=true;
@@ -1401,6 +1476,7 @@ class Game extends Phaser.Scene{
   showCarryPose(){
     if(!this.player || !this.poseSprite) return;
 
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
     this.poseSprite.x=this.player.x;
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=this.player.flipX;
@@ -1410,7 +1486,7 @@ class Game extends Phaser.Scene{
 
     this.player.setVisible(false);
 
-    safePlay(this.poseSprite,"jt_carry");
+    safePlay(this.poseSprite,this.getPlayerAnim("carry"));
   }
 
   clearGrabTimers(){
@@ -1505,7 +1581,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
-      safePlay(this.player,"jt_idle_side");
+      safePlay(this.player,this.getPlayerAnim("idle_side"));
     }
 
     e.grabbed=false;
@@ -1527,14 +1603,8 @@ class Game extends Phaser.Scene{
     this.updateEnemyHealthBar(e);
 
     if(e.health<=0){
-      e.health=0;
-      e.dead=true;
-      e.state="dead";
-      e.busy=true;
+      this.killEnemy(e);
       e.thrownTime=0;
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"ko");
-      this.setEnemyNameplateDead(e);
       return;
     }
 
@@ -1578,7 +1648,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
-      safePlay(this.player,"jt_idle_side");
+      safePlay(this.player,this.getPlayerAnim("idle_side"));
     }
   }
 
@@ -1633,13 +1703,7 @@ class Game extends Phaser.Scene{
           this.createHitFX(other.x,other.y-55,"hit",THROW_COLLISION_DAMAGE);
 
           if(other.health<=0){
-            other.health=0;
-            other.dead=true;
-            other.state="dead";
-            other.busy=true;
-            other.setVelocityX(0);
-            this.safeEnemyPlay(other,"ko");
-            this.setEnemyNameplateDead(other);
+            this.killEnemy(other);
             return;
           }
 
@@ -1729,6 +1793,8 @@ class Game extends Phaser.Scene{
 
     e.state="idle";
     e.attackCooldown=Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax);
+    e.attackCooldownMin=def.attackCooldownMin;
+    e.attackCooldownMax=def.attackCooldownMax;
     e.attackRange=def.attackRange;
     e.stopRange=def.stopRange;
     e.chaseSpeed=def.chaseSpeed;
@@ -1756,7 +1822,6 @@ class Game extends Phaser.Scene{
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
 
     this.safeEnemyPlay(e,"idle");
-
     this.createEnemyNameplate(e);
     this.createEnemyHealthBar(e);
 
@@ -1916,6 +1981,19 @@ class Game extends Phaser.Scene{
     if(e.hpFill){
       e.hpFill.setVisible(false);
     }
+  }
+
+  killEnemy(e){
+    if(!e) return;
+
+    e.health=0;
+    e.dead=true;
+    e.state="dead";
+    e.busy=true;
+    e.setVelocityX(0);
+
+    this.safeEnemyPlay(e,"ko");
+    this.setEnemyNameplateDead(e);
   }
 
   updateEnemyAI(){
@@ -2434,6 +2512,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setVisible(true);
 
     this.player.setVisible(false);
+
     safePlay(this.poseSprite,animKey);
 
     return true;
@@ -2446,6 +2525,8 @@ class Game extends Phaser.Scene{
 
     this.playerBusy=true;
     this.player.body.setVelocity(0,0);
+
+    this.poseSprite.loadTexture(this.getPlayerActionSheet());
 
     const played=this.showPose(animKey,scale);
 
@@ -2463,10 +2544,10 @@ class Game extends Phaser.Scene{
     if(!this.player || !this.poseSprite) return false;
 
     const animMap={
-      hurt:"jt_hurt",
-      knockback:"jt_knockback",
-      ko:"jt_ko",
-      getup:"jt_getup"
+      hurt:this.getPlayerAnim("hurt"),
+      knockback:this.getPlayerAnim("knockback"),
+      ko:this.getPlayerAnim("ko"),
+      getup:this.getPlayerAnim("getup")
     };
 
     const animKey=animMap[type];
@@ -2481,6 +2562,7 @@ class Game extends Phaser.Scene{
 
     this.player.body.setVelocity(0,0);
 
+    this.poseSprite.loadTexture(this.getPlayerReactionSheet());
     this.poseSprite.x=this.player.x+(nudge.x*dir);
     this.poseSprite.y=this.player.y+nudge.y;
     this.poseSprite.flipX=this.player.flipX;
@@ -2650,6 +2732,7 @@ class Game extends Phaser.Scene{
     const nudge=ATTACK_NUDGE[type] || ATTACK_NUDGE.light;
     const dir=this.player.flipX ? -1 : 1;
 
+    this.poseSprite.loadTexture(this.getPlayerAttackSheet());
     this.poseSprite.x=this.player.x+(nudge.x*dir);
     this.poseSprite.y=this.player.y+nudge.y;
     this.poseSprite.flipX=this.player.flipX;
@@ -2684,9 +2767,9 @@ class Game extends Phaser.Scene{
       this.player.clearTint();
       this.player.body.setVelocity(0,0);
 
-      if(this.lastDir==="up") safePlay(this.player,"jt_idle_up");
-      else if(this.lastDir==="side") safePlay(this.player,"jt_idle_side");
-      else safePlay(this.player,"jt_idle_down");
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
     }
   }
 
@@ -2696,11 +2779,7 @@ class Game extends Phaser.Scene{
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
-    const data={
-      light:["jt_attack_light",8],
-      heavy:["jt_attack_heavy",16],
-      kick:["jt_kick",11]
-    }[type];
+    const data=this.getAttackData(type);
 
     if(!data) return;
 
@@ -2711,7 +2790,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setVisible(true);
     this.player.setVisible(false);
 
-    safePlay(this.poseSprite,data[0]);
+    safePlay(this.poseSprite,data.anim);
 
     this.time.delayedCall(100,()=>this.createHitbox(data));
 
@@ -2743,35 +2822,31 @@ class Game extends Phaser.Scene{
 
       hit.add(e);
 
-      e.health-=data[1];
-      this.createHitFX(e.x,e.y-55,"hit",data[1]);
+      e.health-=data.damage;
+      this.createHitFX(e.x,e.y-55,"hit",data.damage);
 
       e.busy=true;
-      e.state="hurt";
-      e.knockbackTime=300;
-      e.attackCooldown=500;
+      e.state=data.stagger ? "stagger" : "hurt";
+      e.knockbackTime=data.stagger ? 650 : 300;
+      e.attackCooldown=data.stagger ? 1100 : 500;
 
       const resist=e.knockbackResist || 1;
-      e.setVelocityX((e.x<this.player.x ? -1 : 1)*120*resist);
+      const knockPower=data.stagger ? 190 : 120;
+
+      e.setVelocityX((e.x<this.player.x ? -1 : 1)*knockPower*resist);
 
       this.combo++;
       this.rhythm=Math.min(10,this.rhythm+1);
 
       if(e.health<=0){
-        e.health=0;
-        e.dead=true;
-        e.state="dead";
-        e.busy=true;
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"ko");
-        this.setEnemyNameplateDead(e);
+        this.killEnemy(e);
         return;
       }
 
-      this.safeEnemyPlay(e,"hurt");
+      this.safeEnemyPlay(e,data.stagger ? "knockback" : "hurt");
       this.updateEnemyHealthBar(e);
 
-      this.time.delayedCall(300,()=>{
+      this.time.delayedCall(data.stagger ? 650 : 300,()=>{
         if(!e.dead){
           e.busy=false;
           e.state="idle";
@@ -2810,7 +2885,7 @@ class Game extends Phaser.Scene{
     this.poseSprite.setVisible(true);
 
     this.player.setVisible(false);
-    safePlay(this.poseSprite,"jt_block");
+    safePlay(this.poseSprite,this.getPlayerAnim("block"));
 
     this.time.delayedCall(600,()=>{
       if(this.isBlocking) this.forcePlayerReady();
@@ -3132,46 +3207,6 @@ class Game extends Phaser.Scene{
     this.scene.start("Title");
   }
 
-  startLightningLoop(){
-    this.scheduleNextLightning();
-  }
-
-  scheduleNextLightning(){
-    const delay=Phaser.Math.Between(LIGHTNING_MIN_DELAY,LIGHTNING_MAX_DELAY);
-
-    this.time.delayedCall(delay,()=>{
-      this.triggerLightning();
-      this.scheduleNextLightning();
-    });
-  }
-
-  triggerLightning(){
-    if(!this.lightningOverlay) return;
-    if(this.pauseMenuOpen) return;
-
-    const flashes=Phaser.Math.Between(3,5);
-    let delay=0;
-
-    for(let i=0;i<flashes;i++){
-      this.time.delayedCall(delay,()=>{
-        if(this.lightningOverlay){
-          this.lightningOverlay.setAlpha(Phaser.Math.FloatBetween(0.55,0.95));
-        }
-
-        this.cameras.main.flash(80,255,255,255,false);
-        this.cameras.main.shake(100,0.003);
-
-        this.time.delayedCall(Phaser.Math.Between(55,110),()=>{
-          if(this.lightningOverlay){
-            this.lightningOverlay.setAlpha(0);
-          }
-        });
-      });
-
-      delay+=Phaser.Math.Between(100,210);
-    }
-  }
-
   addRain(){
     this.rain=this.add.group();
 
@@ -3206,16 +3241,99 @@ class Game extends Phaser.Scene{
     });
   }
 
-  addFog(){
-    this.fog=this.add.rectangle(480,500,960,200,0x000000,0.16).setDepth(95);
+  addBottomFog(){
+    if(selectedLevel!=="outdoor") return;
 
-    this.tweens.add({
-      targets:this.fog,
-      alpha:{from:0.12,to:0.22},
-      duration:3000,
-      yoyo:true,
-      repeat:-1
+    this.bottomFog=this.add.group();
+
+    const base=this.add.rectangle(480,505,960,100,0xbfd6ff,0.075)
+      .setDepth(96);
+
+    const low=this.add.rectangle(480,528,960,52,0xffffff,0.055)
+      .setDepth(97);
+
+    this.bottomFog.add(base);
+    this.bottomFog.add(low);
+
+    for(let i=0;i<8;i++){
+      const fog=this.add.ellipse(
+        Phaser.Math.Between(0,960),
+        Phaser.Math.Between(470,535),
+        Phaser.Math.Between(180,340),
+        Phaser.Math.Between(28,58),
+        0xdbe7ff,
+        Phaser.Math.FloatBetween(0.035,0.075)
+      ).setDepth(98);
+
+      fog.speed=Phaser.Math.FloatBetween(0.12,0.35);
+      this.bottomFog.add(fog);
+
+      this.tweens.add({
+        targets:fog,
+        alpha:{from:fog.alpha,to:fog.alpha+0.035},
+        duration:Phaser.Math.Between(2200,4200),
+        yoyo:true,
+        repeat:-1
+      });
+    }
+  }
+
+  updateBottomFog(){
+    if(!this.bottomFog) return;
+
+    this.bottomFog.children.iterate(fog=>{
+      if(!fog || fog.speed === undefined) return;
+
+      fog.x += fog.speed;
+
+      if(fog.x > 1120){
+        fog.x = -120;
+        fog.y = Phaser.Math.Between(470,535);
+      }
     });
+  }
+
+  addForegroundOverlays(){
+    if(selectedLevel!=="outdoor") return;
+
+    const x=292;
+    const y=411;
+    const w=64;
+    const h=38;
+    const depth=850;
+
+    if(hasTex(this,"outdoor_barricade_front")){
+      this.barricadeFront=this.add.image(x,y,"outdoor_barricade_front")
+        .setOrigin(0.5,1)
+        .setDisplaySize(w,h)
+        .setDepth(depth);
+
+      return;
+    }
+
+    const g=this.add.graphics().setDepth(depth);
+
+    g.fillStyle(0xd7a93b,1);
+    g.fillRect(x-w/2,y-h,w,h);
+
+    g.lineStyle(4,0x2b1d0f,1);
+    g.strokeRect(x-w/2,y-h,w,h);
+
+    g.lineStyle(4,0x2b1d0f,1);
+    g.beginPath();
+    g.moveTo(x-w/2+6,y-6);
+    g.lineTo(x+w/2-6,y-h+6);
+    g.moveTo(x-w/2+14,y-6);
+    g.lineTo(x+w/2-14,y-h+6);
+    g.strokePath();
+
+    this.barricadeFront=g;
+  }
+
+  keepForegroundInFront(){
+    if(this.barricadeFront && this.barricadeFront.setDepth){
+      this.barricadeFront.setDepth(850);
+    }
   }
 
   makeMobileControls(){
