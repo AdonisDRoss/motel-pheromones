@@ -44,10 +44,10 @@ const REACTION_FRAME_H = 236;
 
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
+
 const FERAL_FRAME_W = 163;
 const FERAL_FRAME_H = 164;
 
-  
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
 const PLAYER_ACTION_SCALE = 0.32;
@@ -158,20 +158,20 @@ const ENEMY_TYPES = {
   },
 
   feral:{
-  key:"feral",
-  prefix:"feral",
-  label:"FERAL",
-  maxHealth:22,
-  scale:0.46,
-  chaseSpeed:88,
-  attackRange:64,
-  stopRange:50,
-  attackCooldownMin:160,
-  attackCooldownMax:460,
-  attackDamage:7,
-  canBeGrabbed:true,
-  knockbackResist:1
-},
+    key:"feral",
+    prefix:"feral",
+    label:"FERAL",
+    maxHealth:22,
+    scale:0.46,
+    chaseSpeed:88,
+    attackRange:64,
+    stopRange:50,
+    attackCooldownMin:160,
+    attackCooldownMax:460,
+    attackDamage:7,
+    canBeGrabbed:true,
+    knockbackResist:1
+  },
 
   doorman:{
     key:"doorman",
@@ -357,8 +357,8 @@ function loadAssets(scene){
   });
 
   scene.load.spritesheet("feral",ENEMY_BASE + "/feral.png?v=" + VERSION,{
-    frameWidth:ENEMY_FRAME_W,
-    frameHeight:ENEMY_FRAME_H,
+    frameWidth:FERAL_FRAME_W,
+    frameHeight:FERAL_FRAME_H,
     margin:0,
     spacing:0
   });
@@ -558,24 +558,38 @@ class Game extends Phaser.Scene{
     return selectedFighter==="HEW" ? "hew" : "jt";
   }
 
+  getSafeTextureKey(key,fallback){
+    return hasTex(this,key) ? key : fallback;
+  }
+
+  getSafeAnimKey(key,fallback){
+    return hasAnim(this,key) ? key : fallback;
+  }
+
   getPlayerMoveSheet(){
-    return this.getPlayerPrefix()+"_movement";
+    const key=this.getPlayerPrefix()+"_movement";
+    return this.getSafeTextureKey(key,"jt_movement");
   }
 
   getPlayerAttackSheet(){
-    return this.getPlayerPrefix()+"_attacks";
+    const key=this.getPlayerPrefix()+"_attacks";
+    return this.getSafeTextureKey(key,"jt_attacks");
   }
 
   getPlayerActionSheet(){
-    return this.getPlayerPrefix()+"_actions";
+    const key=this.getPlayerPrefix()+"_actions";
+    return this.getSafeTextureKey(key,"jt_actions");
   }
 
   getPlayerReactionSheet(){
-    return this.getPlayerPrefix()+"_reactions";
+    const key=this.getPlayerPrefix()+"_reactions";
+    return this.getSafeTextureKey(key,"jt_reactions");
   }
 
   getPlayerAnim(action){
-    return this.getPlayerPrefix()+"_"+action;
+    const key=this.getPlayerPrefix()+"_"+action;
+    const fallback="jt_"+action;
+    return this.getSafeAnimKey(key,fallback);
   }
 
   getPlayerSpeedMod(){
