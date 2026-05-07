@@ -17,13 +17,11 @@ html,body{
   position:fixed;
   inset:0;
 }
-
 body{
   display:flex;
   align-items:center;
   justify-content:center;
 }
-
 canvas{
   display:block;
   image-rendering:pixelated;
@@ -40,7 +38,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 650;
+const VERSION = 653;
 const W = 960;
 const H = 540;
 
@@ -81,7 +79,6 @@ const STAIR_TRAVEL_DURATION = 720;
 
 const JUMP_HEIGHT = 68;
 const JUMP_TIME = 420;
-const DOUBLE_UP_WINDOW = 360;
 const MAX_JUMPS = 2;
 const CROUCH_JUMP_BOOST = 1.15;
 const DOUBLE_JUMP_HEIGHT_MULT = 0.85;
@@ -99,6 +96,7 @@ const DOORMAN_DOOR_X = 505;
 const DOORMAN_DOOR_Y = 390;
 
 const DEBUG_INPUT = true;
+const FORCE_CROUCH_FALLBACK = true;
 const DISABLE_DOORMAN_FOR_TEST = false;
 
 const JT_BASE = "assets/sprites/player/jt";
@@ -672,7 +670,6 @@ class Game extends Phaser.Scene{
     this.moveY=0;
     this.lastDir="down";
 
-    this.lastUpTapTime=0;
     this.upTapHeld=false;
     this.downCrouchHeld=false;
 
@@ -764,7 +761,6 @@ class Game extends Phaser.Scene{
     this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
     this.poseSprite.setDepth(201);
     this.poseSprite.setVisible(false);
-
     this.poseSprite.loadTexture = this.poseSprite.setTexture.bind(this.poseSprite);
 
     this.createPlatformZones();
@@ -973,21 +969,14 @@ class Game extends Phaser.Scene{
   }
 
   checkDoubleUpJump(){
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(this.isClimbing || this.playerHealth<=0) return;
-    if(!this.isJumping) return;
-    if(this.jumpCount>=this.maxJumps) return;
+    if(!this.isJumping){
+      this.upTapHeld=false;
+      return;
+    }
 
     const keyUpHeld=this.keys && (this.keys.up.isDown || this.keys.w.isDown);
     const stickUpHeld=this.stickY < -0.65;
     const upHeld=keyUpHeld || stickUpHeld;
-
-    if(upHeld && !this.upTapHeld){
-      this.upTapHeld=true;
-      this.startJump(true);
-      return;
-    }
 
     if(!upHeld){
       this.upTapHeld=false;
@@ -1318,6 +1307,11 @@ class Game extends Phaser.Scene{
 
     this.readInput();
 
+    if(this.isJumping){
+      this.startJump(true);
+      return;
+    }
+
     if(this.isUpHeld()){
       this.startJump(true);
       return;
@@ -1413,7 +1407,6 @@ class Game extends Phaser.Scene{
       this.jumpCount=0;
       this.jumpGroundY=wasCrouching ? crouchGroundY : this.player.y;
       this.player.y=this.jumpGroundY;
-      this.upTapHeld=this.isUpHeld();
     }
 
     this.jumpCount++;
@@ -1499,14 +1492,16 @@ class Game extends Phaser.Scene{
     this.isCrouching=true;
     this.isBlocking=false;
 
-    const crouchAnim=this.getPlayerAnim("crouch");
-    const actionSheet=this.getPlayerActionSheet();
-
     let played=false;
 
-    if(hasAnim(this,crouchAnim) && hasTex(this,actionSheet)){
-      this.poseSprite.setTexture(actionSheet);
-      played=this.showPose(crouchAnim,PLAYER_ACTION_SCALE);
+    if(!FORCE_CROUCH_FALLBACK){
+      const crouchAnim=this.getPlayerAnim("crouch");
+      const actionSheet=this.getPlayerActionSheet();
+
+      if(hasAnim(this,crouchAnim) && hasTex(this,actionSheet)){
+        this.poseSprite.setTexture(actionSheet);
+        played=this.showPose(crouchAnim,PLAYER_ACTION_SCALE);
+      }
     }
 
     if(!played){
@@ -1516,11 +1511,11 @@ class Game extends Phaser.Scene{
       }
 
       this.player.setVisible(true);
-      this.player.setScale(PLAYER_MOVE_SCALE * 0.92, PLAYER_MOVE_SCALE * 0.72);
-      this.player.setTint(0x66ccff);
-
       this.crouchBaseY=this.player.y;
-      this.player.y=this.crouchBaseY+10;
+
+      this.player.setScale(PLAYER_MOVE_SCALE * 1.02, PLAYER_MOVE_SCALE * 0.58);
+      this.player.y=this.crouchBaseY+18;
+      this.player.setTint(0x66ccff);
     }
 
     if(this.crouchEvent){
@@ -1536,6 +1531,7 @@ class Game extends Phaser.Scene{
           this.crouchBaseY=null;
         }
 
+        this.player.setScale(PLAYER_MOVE_SCALE);
         this.player.clearTint();
         this.forcePlayerReady();
       }
