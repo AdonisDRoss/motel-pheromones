@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 616;
+const VERSION = 618;
 const W = 960;
 const H = 540;
 
@@ -81,8 +81,11 @@ const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
 const DISABLE_DOORMAN_FOR_TEST = false;
-const ENEMY_AI_ENABLED = true;
+const ENEMY_AI_ENABLED = false;
 const DEBUG_RUNTIME = true;
+const DEBUG_INPUT = true;
+const SKIP_COUNTDOWN_FOR_TEST = true;
+const SIMPLE_DIRECT_MOVEMENT = true;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -725,6 +728,12 @@ class Game extends Phaser.Scene{
       backgroundColor:"#000000"
     }).setDepth(1000);
 
+    this.debugInputText=this.add.text(20,120,"",{
+      font:"13px monospace",
+      fill:"#7CFF6B",
+      backgroundColor:"#000000"
+    }).setDepth(50000);
+
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
 
@@ -857,6 +866,16 @@ class Game extends Phaser.Scene{
       this.shadow.y=this.player.y+5;
     }
 
+    if(DEBUG_INPUT && this.debugInputText){
+      this.debugInputText.setText(
+        "STARTED: "+this.matchStarted+
+        " | BUSY: "+this.playerBusy+
+        " | X: "+this.moveX.toFixed(2)+
+        " | Y: "+this.moveY.toFixed(2)+
+        " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)
+      );
+    }
+
     this.keepForegroundInFront();
   }
 
@@ -977,6 +996,8 @@ class Game extends Phaser.Scene{
       return;
     }
 
+    const dt=this.game.loop.delta/1000;
+
     const stickPower=Math.min(1,Math.hypot(this.stickX,this.stickY));
     const usingStick=stickPower>STICK_DEADZONE;
     const keyboardRunning=(this.keys && this.keys.shift.isDown);
@@ -1008,12 +1029,17 @@ class Game extends Phaser.Scene{
       speed=RUN_SPEED;
     }
 
-    speed *= this.getPlayerSpeedMod();
+    speed*=this.getPlayerSpeedMod();
 
     const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
 
-    this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
-    this.player.body.velocity.y=0;
+    if(SIMPLE_DIRECT_MOVEMENT){
+      this.player.body.setVelocity(0,0);
+      this.player.x+=vx*speed*dt;
+    }else{
+      this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
+      this.player.body.velocity.y=0;
+    }
 
     if(Math.abs(vx)>0.1){
       this.lastDir="side";
@@ -1254,7 +1280,17 @@ class Game extends Phaser.Scene{
     }
   }
 
+  ensureRoundActive(){
+    if(!this.matchStarted && !this.matchOver){
+      this.unlockPlayerControl();
+    }
+
+    return this.matchStarted && !this.matchOver && this.playerHealth > 0;
+  }
+
   startContextB(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy){
       return;
     }
@@ -1289,6 +1325,8 @@ class Game extends Phaser.Scene{
   }
 
   startContextY(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy){
       this.throwGrabbedEnemy();
       return;
@@ -1298,6 +1336,8 @@ class Game extends Phaser.Scene{
   }
 
   startContextKick(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy){
       this.startCarryEnemy();
       return;
@@ -1323,6 +1363,8 @@ class Game extends Phaser.Scene{
   }
 
   startJump(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
@@ -1359,6 +1401,8 @@ class Game extends Phaser.Scene{
   }
 
   startCrouch(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
@@ -1453,6 +1497,8 @@ class Game extends Phaser.Scene{
   }
 
   startGrab(){
+    if(!this.ensureRoundActive()) return;
+
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -2831,6 +2877,8 @@ class Game extends Phaser.Scene{
   }
 
   startAttack(type){
+    if(!this.ensureRoundActive()) return;
+
     if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
@@ -2997,7 +3045,7 @@ class Game extends Phaser.Scene{
     console.error(err);
 
     if(!this.runtimeErrorText){
-      this.runtimeErrorText=this.add.text(20,130,"",{
+      this.runtimeErrorText=this.add.text(20,145,"",{
         font:"13px monospace",
         fill:"#ff3333",
         backgroundColor:"#000000",
@@ -3011,6 +3059,13 @@ class Game extends Phaser.Scene{
   startMatchCountdown(){
     this.matchStarted=false;
     this.roundUnlockDone=false;
+
+    if(SKIP_COUNTDOWN_FOR_TEST){
+      this.time.delayedCall(250,()=>{
+        this.unlockPlayerControl();
+      });
+      return;
+    }
 
     this.countdownShade=this.add.rectangle(480,270,960,540,0x000000,0.42)
       .setDepth(19990);
@@ -3516,9 +3571,25 @@ class Game extends Phaser.Scene{
       fill:"#fff"
     }).setOrigin(0.5).setDepth(9502);
 
-    hit.on("pointerdown",()=>{ if(down) down(); });
-    hit.on("pointerup",()=>{ if(up) up(); });
-    hit.on("pointerout",()=>{ if(up) up(); });
+    hit.on("pointerdown",()=>{
+      this.ensureRoundActive();
+
+      if(down){
+        down();
+      }
+    });
+
+    hit.on("pointerup",()=>{
+      if(up){
+        up();
+      }
+    });
+
+    hit.on("pointerout",()=>{
+      if(up){
+        up();
+      }
+    });
   }
 }
 
