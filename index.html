@@ -33,7 +33,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 640;
+const VERSION = 641;
 const W = 960;
 const H = 540;
 
@@ -2069,6 +2069,30 @@ class Game extends Phaser.Scene{
     });
   }
 
+  getPrimaryPressureEnemy(){
+    let primary=null;
+    let best=99999;
+
+    this.enemies.forEach(e=>{
+      if(!e || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
+      if(e.grabbed || e.thrownTime>0) return;
+      if(e.enemyType==="doorman") return;
+
+      const dy=Math.abs(e.y-this.player.y);
+      if(dy>45) return;
+
+      const dist=Math.abs(e.x-this.player.x);
+
+      if(dist<best){
+        best=dist;
+        primary=e;
+      }
+    });
+
+    return primary;
+  }
+
   updateEnemyAI(delta){
     const dt=delta/1000;
 
@@ -2108,6 +2132,7 @@ class Game extends Phaser.Scene{
       this.applyEnemySeparation(e);
       this.repelEnemyFromPlayer(e);
 
+      e.vx=Phaser.Math.Clamp(e.vx,-160,160);
       e.x+=e.vx*dt;
 
       if(e.platform==="top"){
@@ -2147,7 +2172,21 @@ class Game extends Phaser.Scene{
       }
 
       if(dist<=e.attackRange && e.attackCooldown<=0){
-        this.startEnemyAttack(e);
+        const closeAttackers=this.enemies.filter(other=>{
+          if(!other || other===e || other.dead) return false;
+          if(other.platform!==e.platform) return false;
+          if(other.state!=="attack") return false;
+          return Math.abs(other.x-this.player.x)<95 && Math.abs(other.y-this.player.y)<45;
+        });
+
+        if(closeAttackers.length===0){
+          this.startEnemyAttack(e);
+          return;
+        }
+
+        e.vx=(e.x<this.player.x ? -1 : 1)*70;
+        e.attackCooldown=500;
+        this.safeEnemyPlay(e,"walk");
         return;
       }
 
@@ -2173,17 +2212,39 @@ class Game extends Phaser.Scene{
     const dx=e.x-this.player.x;
     const dy=e.y-this.player.y;
 
-    if(Math.abs(dx)>58 || Math.abs(dy)>36) return;
+    if(Math.abs(dy)>40) return;
+
+    const tooClose=Math.abs(dx)<82;
+
+    if(!tooClose) return;
+
+    const primary=this.getPrimaryPressureEnemy();
+
+    if(primary===e){
+      if(Math.abs(dx)<38){
+        const softDir=dx>=0 ? 1 : -1;
+        e.x+=softDir*3;
+      }
+      return;
+    }
 
     let pushDir=dx>=0 ? 1 : -1;
 
-    if(Math.abs(this.moveX)>0.2){
+    if(Math.abs(this.moveX)>0.15){
       pushDir=this.moveX>0 ? 1 : -1;
     }
 
-    e.x+=pushDir*8;
-    e.vx=pushDir*50;
-    e.attackCooldown=Math.max(e.attackCooldown || 0,280);
+    e.x+=pushDir*14;
+    e.vx=pushDir*85;
+    e.attackCooldown=Math.max(e.attackCooldown || 0,420);
+
+    if(e.platform==="top"){
+      e.x=Phaser.Math.Clamp(e.x,190,820);
+    }else{
+      e.x=Phaser.Math.Clamp(e.x,120,860);
+    }
+
+    this.safeEnemyPlay(e,"walk");
   }
 
   applyEnemySeparation(e){
@@ -2196,15 +2257,27 @@ class Game extends Phaser.Scene{
 
       const gap=e.x-other.x;
       const absGap=Math.abs(gap);
+      const sameLane=Math.abs(e.y-other.y)<35;
 
-      if(absGap>0 && absGap<44){
-        e.x+=gap>0 ? 1.2 : -1.2;
+      if(!sameLane) return;
+
+      if(absGap>0 && absGap<72){
+        e.x+=gap>0 ? 3.5 : -3.5;
+        e.vx+=gap>0 ? 35 : -35;
       }
 
       if(absGap===0){
-        e.x+=Phaser.Math.Between(-2,2);
+        e.x+=Phaser.Math.Between(-8,8);
       }
     });
+
+    e.vx=Phaser.Math.Clamp(e.vx,-160,160);
+
+    if(e.platform==="top"){
+      e.x=Phaser.Math.Clamp(e.x,190,820);
+    }else{
+      e.x=Phaser.Math.Clamp(e.x,120,860);
+    }
   }
 
   startEnemyAttack(e){
