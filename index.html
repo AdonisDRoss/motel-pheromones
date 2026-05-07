@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 589;
+const VERSION = 591;
 const W = 960;
 const H = 540;
 
@@ -43,6 +43,7 @@ const WALK_SPEED = 190;
 const RUN_SPEED = 270;
 const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
+const DOUBLE_UP_WINDOW = 320;
 
 const ATTACK_NUDGE = {
   light: {x: -6, y: 0, scale: 0.32, originY: 1},
@@ -314,9 +315,12 @@ class Game extends Phaser.Scene{
       .setDisplaySize(960,540)
       .setDepth(0);
 
+    this.addForegroundOverlays();
+
     this.platform="middle";
     this.isClimbing=false;
     this.currentLadder=null;
+    this.climbDirection="up";
     this.climbSpeed=120;
 
     this.stickX=0;
@@ -324,6 +328,9 @@ class Game extends Phaser.Scene{
     this.moveX=0;
     this.moveY=0;
     this.lastDir="down";
+
+    this.lastUpTapTime=0;
+    this.upTapHeld=false;
 
     this.playerBusy=false;
     this.isBlocking=false;
@@ -334,6 +341,11 @@ class Game extends Phaser.Scene{
 
     this.playerHealth=100;
     this.playerInvuln=0;
+
+    this.matchStarted=false;
+    this.matchOver=false;
+    this.victoryShown=false;
+    this.countdownActive=true;
 
     this.addRain();
     this.addFog();
@@ -392,6 +404,8 @@ class Game extends Phaser.Scene{
     this.input.addPointer(6);
     this.makeMobileControls();
 
+    this.startMatchCountdown();
+
     this.input.keyboard.on("keydown-J",()=>this.startAttack("light"));
     this.input.keyboard.on("keydown-K",()=>this.startAttack("heavy"));
     this.input.keyboard.on("keydown-U",()=>this.startAttack("kick"));
@@ -431,19 +445,33 @@ class Game extends Phaser.Scene{
 
     this.updateRain();
     this.readInput();
+    this.checkDoubleUpJump();
 
     if(this.playerInvuln>0){
       this.playerInvuln-=delta;
       if(this.playerInvuln<0) this.playerInvuln=0;
     }
 
-    if(this.isClimbing){
-      this.updateClimbing();
-    }else{
-      this.updateMovement();
-    }
+    if(!this.matchStarted || this.matchOver){
+      if(this.player && this.player.body){
+        this.player.body.setVelocity(0,0);
+      }
 
-    this.updateEnemyAI();
+      if(this.enemies){
+        this.enemies.children.each(e=>{
+          if(e && e.body) e.setVelocity(0,0);
+        });
+      }
+    }else{
+      if(this.isClimbing){
+        this.updateClimbing();
+      }else{
+        this.updateMovement();
+      }
+
+      this.updateEnemyAI();
+      this.checkVictory();
+    }
 
     this.comboText.setText("COMBO: "+this.combo+"  RHYTHM: "+this.rhythm);
 
@@ -451,8 +479,10 @@ class Game extends Phaser.Scene{
       this.playerHealthText.setText("HP: "+this.playerHealth);
     }
 
-    this.shadow.x=this.player.x;
-    this.shadow.y=this.player.y+5;
+    if(this.shadow && this.player){
+      this.shadow.x=this.player.x;
+      this.shadow.y=this.player.y+5;
+    }
   }
 
   readInput(){
@@ -468,6 +498,33 @@ class Game extends Phaser.Scene{
 
     this.moveX=Math.abs(this.stickX)>0.05 ? this.stickX : keyX;
     this.moveY=Math.abs(this.stickY)>0.05 ? this.stickY : keyY;
+  }
+
+  checkDoubleUpJump(){
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    const keyUpHeld =
+      this.keys &&
+      (this.keys.up.isDown || this.keys.w.isDown);
+
+    const stickUpHeld = this.stickY < -0.65;
+    const upHeld = keyUpHeld || stickUpHeld;
+
+    if(upHeld && !this.upTapHeld){
+      const now = this.time.now;
+
+      if(now - this.lastUpTapTime <= DOUBLE_UP_WINDOW){
+        this.lastUpTapTime = 0;
+        this.upTapHeld = true;
+        this.startJump();
+        return;
+      }
+
+      this.lastUpTapTime = now;
+    }
+
+    this.upTapHeld = upHeld;
   }
 
   updateMovement(){
@@ -543,51 +600,136 @@ class Game extends Phaser.Scene{
     else safePlay(this.player,running ? "jt_run_down" : "jt_walk_down");
   }
 
+  addForegroundOverlays(){
+    if(selectedLevel !== "outdoor" || !hasTex(this,"outdoor")) return;
+
+    const cropX=285;
+    const cropY=348;
+    const cropW=90;
+    const cropH=48;
+
+    this.barricadeOverlay=this.add.image(cropX+cropW/2,cropY+cropH/2,"outdoor")
+      .setOrigin(0.5)
+      .setDepth(260);
+
+    this.barricadeOverlay.setCrop(cropX,cropY,cropW,cropH);
+  }
+
   createPlatformZones(){
     const alpha=0;
 
     this.ladders=[
-      {name:"left",x:250,y:360,w:70,h:230,topY:250,middleY:390},
-      {name:"right",x:775,y:360,w:70,h:230,topY:250,middleY:390}
+      {
+        name:"leftLadder",
+        x:250,
+        y:355,
+        w:34,
+        h:185,
+        topY:250,
+        middleY:390
+      },
+      {
+        name:"rightLadder",
+        x:775,
+        y:355,
+        w:34,
+        h:185,
+        topY:250,
+        middleY:390
+      }
+    ];
+
+    this.stairs=[
+      {
+        name:"leftStairs",
+        x:118,
+        y:452,
+        w:120,
+        h:120,
+        middleX:150,
+        middleY:390,
+        bottomX:120,
+        bottomY:505
+      },
+      {
+        name:"rightStairs",
+        x:846,
+        y:452,
+        w:120,
+        h:120,
+        middleX:816,
+        middleY:390,
+        bottomX:860,
+        bottomY:505
+      }
     ];
 
     this.ladders.forEach(l=>{
       l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
     });
+
+    this.stairs.forEach(s=>{
+      s.zone=this.add.rectangle(s.x,s.y,s.w,s.h,0xff00ff,alpha).setDepth(10);
+    });
+  }
+
+  isPlayerInZone(zone,padX=0,padY=0){
+    const b=zone.getBounds();
+    const r=new Phaser.Geom.Rectangle(
+      b.x-padX,
+      b.y-padY,
+      b.width+padX*2,
+      b.height+padY*2
+    );
+
+    return Phaser.Geom.Rectangle.Contains(r,this.player.x,this.player.y);
   }
 
   handlePlatformTransitions(){
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
     const nearLadder=this.ladders.find(l=>{
-      return Phaser.Geom.Rectangle.Contains(l.zone.getBounds(),this.player.x,this.player.y-60);
+      return Math.abs(this.player.x-l.x)<=18 &&
+        this.player.y>=l.topY-2 &&
+        this.player.y<=l.middleY+2;
     });
 
-    const nearStairs=Math.abs(this.player.x-500)<150;
+    if(nearLadder){
+      if(this.platform==="middle" && this.moveY<-0.45){
+        this.startClimbing(nearLadder,"up");
+        return;
+      }
 
-    if(!this.isClimbing && nearLadder && Math.abs(this.moveY)>0.45){
-      this.startClimbing(nearLadder);
+      if(this.platform==="top" && this.moveY>0.45){
+        this.startClimbing(nearLadder,"down");
+        return;
+      }
     }
 
-    if(!this.isClimbing && this.platform==="middle" && this.moveY>0.45 && nearStairs){
-      this.platform="bottom";
-      this.player.y=505;
-      this.zoneText.setText("BOTTOM LEVEL");
-    }
+    const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
 
-    if(!this.isClimbing && this.platform==="bottom" && this.moveY<-0.45 && nearStairs){
-      this.platform="middle";
-      this.player.y=390;
-      this.zoneText.setText("MIDDLE PLATFORM");
+    if(activeStairs){
+      if(this.platform==="middle" && this.moveY>0.45){
+        this.startStairTravel(activeStairs,"down");
+        return;
+      }
+
+      if(this.platform==="bottom" && this.moveY<-0.45){
+        this.startStairTravel(activeStairs,"up");
+        return;
+      }
     }
   }
 
-  startClimbing(ladder){
+  startClimbing(ladder,direction="up"){
     this.isClimbing=true;
     this.currentLadder=ladder;
+    this.climbDirection=direction;
+
     this.playerBusy=false;
-
     this.player.body.setVelocity(0,0);
-    this.player.x=ladder.x;
 
+    this.player.x=ladder.x;
     this.player.setVisible(false);
 
     this.poseSprite.x=this.player.x;
@@ -598,7 +740,6 @@ class Game extends Phaser.Scene{
     this.poseSprite.setVisible(true);
 
     safePlay(this.poseSprite,"jt_climb");
-
     this.zoneText.setText("CLIMBING LADDER");
   }
 
@@ -606,26 +747,25 @@ class Game extends Phaser.Scene{
     const l=this.currentLadder;
     if(!l) return;
 
-    this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.35);
+    this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
     this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
     this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
 
-    if(this.poseSprite){
-      this.poseSprite.x=this.player.x;
-      this.poseSprite.y=this.player.y;
-      this.poseSprite.flipX=false;
-      this.poseSprite.setOrigin(0.5,1);
-      this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-      this.poseSprite.setVisible(true);
-      safePlay(this.poseSprite,"jt_climb");
-    }
+    this.poseSprite.x=this.player.x;
+    this.poseSprite.y=this.player.y;
+    this.poseSprite.flipX=false;
+    this.poseSprite.setOrigin(0.5,1);
+    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setVisible(true);
+
+    safePlay(this.poseSprite,"jt_climb");
 
     if(this.player.y<=l.topY+2 && this.moveY<-0.45){
       this.isClimbing=false;
       this.platform="top";
       this.player.y=l.topY;
-      this.zoneText.setText("TOP PLATFORM");
       this.currentLadder=null;
+      this.zoneText.setText("TOP PLATFORM");
       this.forcePlayerReady();
       return;
     }
@@ -634,21 +774,59 @@ class Game extends Phaser.Scene{
       this.isClimbing=false;
       this.platform="middle";
       this.player.y=l.middleY;
-      this.zoneText.setText("MIDDLE PLATFORM");
       this.currentLadder=null;
+      this.zoneText.setText("MIDDLE PLATFORM");
       this.forcePlayerReady();
       return;
+    }
+  }
+
+  startStairTravel(stair,direction="down"){
+    if(!this.matchStarted || this.matchOver) return;
+    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+
+    this.playerBusy=true;
+    this.player.body.setVelocity(0,0);
+
+    const fromX=this.player.x;
+    const fromY=this.player.y;
+
+    const toX=direction==="down" ? stair.bottomX : stair.middleX;
+    const toY=direction==="down" ? stair.bottomY : stair.middleY;
+
+    if(stair.name==="leftStairs"){
+      this.player.setFlipX(direction==="down");
+    }else{
+      this.player.setFlipX(direction!=="down");
     }
 
-    if(Math.abs(this.moveX)>0.65){
-      this.isClimbing=false;
-      this.platform="middle";
-      this.player.y=l.middleY;
-      this.zoneText.setText("MIDDLE PLATFORM");
-      this.currentLadder=null;
-      this.forcePlayerReady();
-      return;
-    }
+    this.lastDir="side";
+    safePlay(this.player,"jt_walk_side");
+
+    this.tweens.addCounter({
+      from:0,
+      to:1,
+      duration:240,
+      onUpdate:tween=>{
+        const t=tween.getValue();
+        this.player.x=Phaser.Math.Linear(fromX,toX,t);
+        this.player.y=Phaser.Math.Linear(fromY,toY,t);
+      },
+      onComplete:()=>{
+        this.player.x=toX;
+        this.player.y=toY;
+
+        if(direction==="down"){
+          this.platform="bottom";
+          this.zoneText.setText("BOTTOM LEVEL");
+        }else{
+          this.platform="middle";
+          this.zoneText.setText("MIDDLE PLATFORM");
+        }
+
+        this.forcePlayerReady();
+      }
+    });
   }
 
   applyPlatformBounds(){
@@ -691,6 +869,7 @@ class Game extends Phaser.Scene{
   }
 
   startContextB(){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.readInput();
@@ -719,6 +898,7 @@ class Game extends Phaser.Scene{
   }
 
   startJump(){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -740,6 +920,7 @@ class Game extends Phaser.Scene{
   }
 
   startGrab(){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
     if(!this.enemies) return;
 
@@ -748,6 +929,7 @@ class Game extends Phaser.Scene{
 
     this.enemies.children.each(e=>{
       if(!e || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
 
       const dx=Math.abs(this.player.x-e.x);
       const dy=Math.abs(this.player.y-e.y);
@@ -820,17 +1002,20 @@ class Game extends Phaser.Scene{
 
   createEnemies(){
     this.enemies=this.physics.add.group();
-    this.spawnEnemy(640,390);
-    this.spawnEnemy(830,390);
+
+    this.spawnEnemy(235,505,"bottom");
+    this.spawnEnemy(520,250,"top");
+    this.spawnEnemy(640,390,"middle");
+    this.spawnEnemy(850,390,"middle");
   }
 
-  spawnEnemy(x,y){
+  spawnEnemy(x,y,platform="middle"){
     const e=this.physics.add.sprite(x,y,"corpo_sellout",0);
 
     e.setOrigin(0.5,1);
     e.setScale(ENEMY_SCALE);
     e.setTint(0xffffff);
-    e.setDepth(210);
+    e.setDepth(y+2);
     e.body.setAllowGravity(false);
     e.body.setVelocity(0,0);
     e.setCollideWorldBounds(true);
@@ -838,6 +1023,9 @@ class Game extends Phaser.Scene{
     e.health=30;
     e.dead=false;
     e.busy=false;
+
+    e.platform=platform;
+    e.homeY=y;
 
     e.state="idle";
     e.attackCooldown=Phaser.Math.Between(200,650);
@@ -891,7 +1079,7 @@ class Game extends Phaser.Scene{
         return;
       }
 
-      e.y=390;
+      e.y=e.homeY;
       e.setDepth(e.y+2);
 
       if(e.hpText){
@@ -909,7 +1097,7 @@ class Game extends Phaser.Scene{
       if(e.knockbackTime>0) return;
       if(e.busy) return;
 
-      if(this.platform!=="middle" || this.playerHealth<=0){
+      if(this.platform!==e.platform || this.playerHealth<=0){
         e.state="idle";
         e.setVelocityX(0);
         safePlay(e,"enemy_idle");
@@ -952,6 +1140,7 @@ class Game extends Phaser.Scene{
 
     this.enemies.children.each(other=>{
       if(!other || other===e || other.dead) return;
+      if(other.platform!==e.platform) return;
 
       const gap=e.x-other.x;
       const absGap=Math.abs(gap);
@@ -966,7 +1155,11 @@ class Game extends Phaser.Scene{
       }
     });
 
-    e.x=Phaser.Math.Clamp(e.x,120,860);
+    if(e.platform==="top"){
+      e.x=Phaser.Math.Clamp(e.x,190,820);
+    }else{
+      e.x=Phaser.Math.Clamp(e.x,120,860);
+    }
   }
 
   startEnemyAttack(e){
@@ -1018,6 +1211,7 @@ class Game extends Phaser.Scene{
   }
 
   playPlayerPose(animKey,duration=420,scale=PLAYER_ACTION_SCALE){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -1199,6 +1393,7 @@ class Game extends Phaser.Scene{
   }
 
   startAttack(type){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     const data={
@@ -1242,6 +1437,7 @@ class Game extends Phaser.Scene{
 
     this.physics.add.overlap(box,this.enemies,(b,e)=>{
       if(hit.has(e) || e.dead || e.state==="dead") return;
+      if(e.platform!==this.platform) return;
 
       hit.add(e);
 
@@ -1291,6 +1487,7 @@ class Game extends Phaser.Scene{
   }
 
   quickBlock(){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.startBlock();
@@ -1301,6 +1498,7 @@ class Game extends Phaser.Scene{
   }
 
   startBlock(){
+    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -1321,6 +1519,164 @@ class Game extends Phaser.Scene{
   endBlock(){
     if(!this.isBlocking) return;
     this.forcePlayerReady();
+  }
+
+  makeArcadeText(x,y,text,size=64,color="#fff45c"){
+    return this.add.text(x,y,text,{
+      font:size+"px monospace",
+      fill:color,
+      stroke:"#000000",
+      strokeThickness:8,
+      shadow:{
+        offsetX:4,
+        offsetY:4,
+        color:"#ff4fc3",
+        blur:0,
+        fill:true
+      }
+    }).setOrigin(0.5).setDepth(20000);
+  }
+
+  startMatchCountdown(){
+    this.matchStarted=false;
+    this.countdownActive=true;
+
+    this.countdownShade=this.add.rectangle(480,270,960,540,0x000000,0.42)
+      .setDepth(19990);
+
+    const ready=this.makeArcadeText(480,185,"READY",56,"#ff4fc3");
+    const number=this.makeArcadeText(480,285,"3",96,"#fff45c");
+    const flashText=this.makeArcadeText(480,390,"GET SET",32,"#00eaff");
+
+    this.tweens.add({
+      targets:ready,
+      alpha:{from:1,to:0.2},
+      duration:180,
+      yoyo:true,
+      repeat:-1
+    });
+
+    this.tweens.add({
+      targets:flashText,
+      alpha:{from:1,to:0.1},
+      duration:120,
+      yoyo:true,
+      repeat:-1
+    });
+
+    const steps=[
+      {t:"3",color:"#fff45c"},
+      {t:"2",color:"#00eaff"},
+      {t:"1",color:"#ff4fc3"},
+      {t:"FIGHT!",color:"#7CFF6B"}
+    ];
+
+    let i=0;
+
+    const showStep=()=>{
+      const step=steps[i];
+
+      number.setText(step.t);
+      number.setStyle({
+        font:(step.t==="FIGHT!" ? "72px monospace" : "96px monospace"),
+        fill:step.color,
+        stroke:"#000000",
+        strokeThickness:8
+      });
+
+      number.setScale(0.5);
+      number.setAlpha(1);
+
+      this.tweens.add({
+        targets:number,
+        scale:1.25,
+        duration:170,
+        yoyo:true
+      });
+
+      this.cameras.main.shake(70,0.002);
+
+      i++;
+
+      if(i<steps.length){
+        this.time.delayedCall(700,showStep);
+      }else{
+        this.time.delayedCall(650,()=>{
+          ready.destroy();
+          number.destroy();
+          flashText.destroy();
+
+          if(this.countdownShade){
+            this.countdownShade.destroy();
+            this.countdownShade=null;
+          }
+
+          this.countdownActive=false;
+          this.matchStarted=true;
+        });
+      }
+    };
+
+    showStep();
+  }
+
+  showVictory(){
+    if(this.victoryShown) return;
+
+    this.victoryShown=true;
+    this.matchOver=true;
+
+    if(this.player && this.player.body){
+      this.player.body.setVelocity(0,0);
+    }
+
+    if(this.enemies){
+      this.enemies.children.each(e=>{
+        if(e && e.body) e.setVelocity(0,0);
+      });
+    }
+
+    this.add.rectangle(480,270,960,540,0x000000,0.35)
+      .setDepth(19990);
+
+    const victory=this.makeArcadeText(480,230,"VICTORY",82,"#fff45c");
+    const clear=this.makeArcadeText(480,330,"STAGE CLEAR",34,"#00eaff");
+
+    this.tweens.add({
+      targets:victory,
+      alpha:{from:1,to:0.35},
+      scale:{from:1,to:1.08},
+      duration:260,
+      yoyo:true,
+      repeat:-1
+    });
+
+    this.tweens.add({
+      targets:clear,
+      alpha:{from:1,to:0.25},
+      duration:180,
+      yoyo:true,
+      repeat:-1
+    });
+
+    this.cameras.main.shake(250,0.004);
+  }
+
+  checkVictory(){
+    if(!this.matchStarted || this.matchOver || this.victoryShown) return;
+    if(!this.enemies) return;
+
+    let alive=0;
+
+    this.enemies.children.each(e=>{
+      if(e && !e.dead && e.state!=="dead" && e.health>0){
+        alive++;
+      }
+    });
+
+    if(alive<=0){
+      this.showVictory();
+    }
   }
 
   addRain(){
