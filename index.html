@@ -26,12 +26,15 @@ canvas{
 <body>
 <script>
 
-const VERSION = 620;
+const VERSION = 622;
 const W = 960;
 const H = 540;
 
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
+
+const MOVE2_FRAME_W = 324;
+const MOVE2_FRAME_H = 243;
 
 const ATTACK_FRAME_W = 288;
 const ATTACK_FRAME_H = 232;
@@ -46,6 +49,7 @@ const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 
 const PLAYER_MOVE_SCALE = 0.44;
+const PLAYER_MOVE2_SCALE = 0.31;
 const PLAYER_ATTACK_SCALE = 0.32;
 const PLAYER_ACTION_SCALE = 0.32;
 const PLAYER_REACTION_SCALE = 0.32;
@@ -56,6 +60,12 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 
+const PLATFORM_BOUNDS = {
+  top:{minX:190,maxX:820,minY:238,maxY:268},
+  middle:{minX:120,maxX:860,minY:365,maxY:420},
+  bottom:{minX:120,maxX:860,minY:485,maxY:520}
+};
+
 const LADDER_ACTIVATE_X_RANGE = 34;
 const LADDER_ACTIVATE_Y_RANGE = 120;
 const LADDER_VERTICAL_INPUT = 0.65;
@@ -65,7 +75,7 @@ const STAIR_VERTICAL_INPUT = 0.65;
 const STAIR_MAX_SIDE_INPUT = 0.45;
 
 const JUMP_HEIGHT = 68;
-const JUMP_TIME = 360;
+const JUMP_TIME = 420;
 const DOUBLE_UP_WINDOW = 360;
 
 const STAIR_TRAVEL_DURATION = 720;
@@ -89,7 +99,7 @@ const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
 const DISABLE_DOORMAN_FOR_TEST = false;
-const ENEMY_AI_ENABLED = false;
+const ENEMY_AI_ENABLED = true;
 const DEBUG_RUNTIME = true;
 const DEBUG_INPUT = true;
 const SKIP_COUNTDOWN_FOR_TEST = true;
@@ -290,6 +300,11 @@ function makePlayerAnimSet(scene,prefix){
   makeAnim(scene,prefix+"_run_up",prefix+"_movement",20,24,12,-1);
   makeAnim(scene,prefix+"_run_side",prefix+"_movement",20,24,12,-1);
 
+  makeAnim(scene,prefix+"_jump",prefix+"_movement2",0,4,10,0);
+  makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
+  makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
+  makeAnim(scene,prefix+"_combo_2",prefix+"_movement2",15,19,12,0);
+
   makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,14,0);
   makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,12,0);
   makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,13,0);
@@ -326,6 +341,13 @@ function loadAssets(scene){
     spacing:0
   });
 
+  scene.load.spritesheet("jt_movement2",JT_BASE + "/movement2.png?v=" + VERSION,{
+    frameWidth:MOVE2_FRAME_W,
+    frameHeight:MOVE2_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
   scene.load.spritesheet("jt_attacks",JT_BASE + "/attacks/jt_attacks.png?v=" + VERSION,{
     frameWidth:ATTACK_FRAME_W,
     frameHeight:ATTACK_FRAME_H,
@@ -350,6 +372,13 @@ function loadAssets(scene){
   scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
     frameHeight:MOVE_FRAME_H,
+    margin:0,
+    spacing:0
+  });
+
+  scene.load.spritesheet("hew_movement2",HEW_BASE + "/movement2.png?v=" + VERSION,{
+    frameWidth:MOVE2_FRAME_W,
+    frameHeight:MOVE2_FRAME_H,
     margin:0,
     spacing:0
   });
@@ -609,6 +638,11 @@ class Game extends Phaser.Scene{
   getPlayerMoveSheet(){
     const key=this.getPlayerPrefix()+"_movement";
     return this.getSafeTextureKey(key,"jt_movement");
+  }
+
+  getPlayerMovement2Sheet(){
+    const key=this.getPlayerPrefix()+"_movement2";
+    return this.getSafeTextureKey(key,"jt_movement2");
   }
 
   getPlayerAttackSheet(){
@@ -1002,7 +1036,10 @@ class Game extends Phaser.Scene{
     }
 
     this.downCrouchHeld=true;
-    this.startCrouch();
+
+    if(Math.abs(this.moveX) < 0.15 && this.moveY > 0.75){
+      this.startCrouch();
+    }
   }
 
   updateMovement(){
@@ -1050,10 +1087,11 @@ class Game extends Phaser.Scene{
 
     if(SIMPLE_DIRECT_MOVEMENT){
       this.player.body.setVelocity(0,0);
-      this.player.x+=vx*speed*dt;
+      this.player.x += vx * speed * dt;
+      this.player.y += vy * speed * 0.55 * dt;
     }else{
-      this.player.body.velocity.x=Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
-      this.player.body.velocity.y=0;
+      this.player.body.velocity.x = Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
+      this.player.body.velocity.y = Phaser.Math.Linear(this.player.body.velocity.y,vy*speed*0.55,0.22);
     }
 
     if(Math.abs(vx)>0.1){
@@ -1079,6 +1117,8 @@ class Game extends Phaser.Scene{
       this.showCarryPose();
       return;
     }
+
+    this.player.setScale(PLAYER_MOVE_SCALE);
 
     if(!moving){
       if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
@@ -1181,9 +1221,9 @@ class Game extends Phaser.Scene{
     this.player.x=ladder.x;
 
     if(direction==="down"){
-      this.player.y=ladder.topY;
+      this.player.y=PLATFORM_BOUNDS.top.maxY;
     }else{
-      this.player.y=ladder.middleY;
+      this.player.y=PLATFORM_BOUNDS.middle.minY;
     }
 
     const climbAnim=this.getPlayerAnim("climb");
@@ -1239,7 +1279,7 @@ class Game extends Phaser.Scene{
     if(this.player.y<=l.topY+2 && this.moveY<-0.35){
       this.isClimbing=false;
       this.platform="top";
-      this.player.y=l.topY;
+      this.player.y=PLATFORM_BOUNDS.top.maxY;
       this.player.x=l.x;
       this.currentLadder=null;
       this.zoneText.setText("TOP PLATFORM");
@@ -1250,7 +1290,7 @@ class Game extends Phaser.Scene{
     if(this.player.y>=l.middleY-2 && this.moveY>0.35){
       this.isClimbing=false;
       this.platform="middle";
-      this.player.y=l.middleY;
+      this.player.y=PLATFORM_BOUNDS.middle.minY;
       this.player.x=l.x;
       this.currentLadder=null;
       this.zoneText.setText("MIDDLE PLATFORM");
@@ -1309,20 +1349,10 @@ class Game extends Phaser.Scene{
   }
 
   applyPlatformBounds(){
-    if(this.platform==="bottom"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=505;
-    }
+    const bounds = PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
 
-    if(this.platform==="middle"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,120,860);
-      this.player.y=390;
-    }
-
-    if(this.platform==="top"){
-      this.player.x=Phaser.Math.Clamp(this.player.x,190,820);
-      this.player.y=250;
-    }
+    this.player.x = Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
+    this.player.y = Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
   }
 
   ensureRoundActive(){
@@ -1427,6 +1457,15 @@ class Game extends Phaser.Scene{
 
     this.player.setVisible(true);
 
+    const jumpAnim=this.getPlayerAnim("jump");
+
+    if(hasAnim(this,jumpAnim)){
+      this.player.setScale(PLAYER_MOVE2_SCALE);
+      safePlay(this.player,jumpAnim);
+    }else{
+      this.player.setScale(PLAYER_MOVE_SCALE);
+    }
+
     const startY=this.player.y;
 
     this.tweens.add({
@@ -1437,6 +1476,7 @@ class Game extends Phaser.Scene{
       ease:"Sine.easeOut",
       onComplete:()=>{
         this.player.y=startY;
+        this.player.setScale(PLAYER_MOVE_SCALE);
         this.isJumping=false;
         this.forcePlayerReady();
       }
@@ -1728,6 +1768,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
       safePlay(this.player,this.getPlayerAnim("idle_side"));
     }
 
@@ -1795,6 +1836,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
       safePlay(this.player,this.getPlayerAnim("idle_side"));
     }
   }
@@ -2944,6 +2986,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
       this.player.clearTint();
       this.player.body.setVelocity(0,0);
 
@@ -3107,6 +3150,7 @@ class Game extends Phaser.Scene{
 
     if(this.player){
       this.player.setVisible(true);
+      this.player.setScale(PLAYER_MOVE_SCALE);
       this.player.body.setVelocity(0,0);
       this.player.clearTint();
 
