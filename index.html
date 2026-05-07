@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 615;
+const VERSION = 616;
 const W = 960;
 const H = 540;
 
@@ -42,8 +42,6 @@ const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
 
-// Enemy sheets are now expected as preview-style 5 columns x 8 rows sheets.
-// Most of your new enemy sheets are about 816 x 1312, so 163 x 164 works better.
 const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 
@@ -82,9 +80,9 @@ const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
-// Keep false for normal gameplay.
-// Set true only if you want to test victory without the Doorman spawning.
 const DISABLE_DOORMAN_FOR_TEST = false;
+const ENEMY_AI_ENABLED = true;
+const DEBUG_RUNTIME = true;
 
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -685,6 +683,7 @@ class Game extends Phaser.Scene{
     this.matchStarted=false;
     this.matchOver=false;
     this.victoryShown=false;
+    this.roundUnlockDone=false;
 
     this.doormanSpawned=false;
     this.doormanIntroActive=false;
@@ -694,6 +693,8 @@ class Game extends Phaser.Scene{
     this.pauseItems=[];
     this.pauseCursor=0;
     this.pauseOptions=[];
+
+    this.runtimeErrorText=null;
 
     this.addRain();
     this.addBottomFog();
@@ -831,7 +832,15 @@ class Game extends Phaser.Scene{
       }
 
       this.updateGrabbedEnemy();
-      this.updateEnemyAI();
+
+      if(ENEMY_AI_ENABLED){
+        try{
+          this.updateEnemyAI();
+        }catch(err){
+          this.showRuntimeError(err);
+        }
+      }
+
       this.checkVictory();
     }
 
@@ -2956,85 +2965,124 @@ class Game extends Phaser.Scene{
     }).setOrigin(0.5).setDepth(20000);
   }
 
+  unlockPlayerControl(){
+    this.matchStarted=true;
+    this.matchOver=false;
+    this.playerBusy=false;
+    this.isBlocking=false;
+    this.isJumping=false;
+    this.isCrouching=false;
+
+    if(this.poseSprite){
+      this.poseSprite.stop();
+      this.poseSprite.setVisible(false);
+    }
+
+    if(this.player){
+      this.player.setVisible(true);
+      this.player.body.setVelocity(0,0);
+      this.player.clearTint();
+
+      if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
+      else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
+      else safePlay(this.player,this.getPlayerAnim("idle_down"));
+    }
+  }
+
+  showRuntimeError(err){
+    if(!DEBUG_RUNTIME) return;
+
+    const msg = err && err.message ? err.message : String(err);
+
+    console.error(err);
+
+    if(!this.runtimeErrorText){
+      this.runtimeErrorText=this.add.text(20,130,"",{
+        font:"13px monospace",
+        fill:"#ff3333",
+        backgroundColor:"#000000",
+        wordWrap:{width:900}
+      }).setDepth(50000);
+    }
+
+    this.runtimeErrorText.setText("GAME ERROR: "+msg);
+  }
+
   startMatchCountdown(){
     this.matchStarted=false;
+    this.roundUnlockDone=false;
 
     this.countdownShade=this.add.rectangle(480,270,960,540,0x000000,0.42)
       .setDepth(19990);
 
-    const ready=this.makeArcadeText(480,185,"READY",56,"#ff4fc3");
-    const number=this.makeArcadeText(480,285,"3",96,"#fff45c");
-    const flashText=this.makeArcadeText(480,390,"GET SET",32,"#00eaff");
+    const main=this.makeArcadeText(480,250,"READY",64,"#ff4fc3");
+    const sub=this.makeArcadeText(480,340,"GET SET",32,"#00eaff");
 
-    this.tweens.add({
-      targets:ready,
-      alpha:{from:1,to:0.2},
-      duration:180,
-      yoyo:true,
-      repeat:-1
-    });
+    const cleanup=()=>{
+      if(this.countdownShade){
+        this.countdownShade.destroy();
+        this.countdownShade=null;
+      }
 
-    this.tweens.add({
-      targets:flashText,
-      alpha:{from:1,to:0.1},
-      duration:120,
-      yoyo:true,
-      repeat:-1
-    });
+      if(main) main.destroy();
+      if(sub) sub.destroy();
+    };
+
+    const finishCountdown=()=>{
+      if(this.roundUnlockDone) return;
+
+      this.roundUnlockDone=true;
+      cleanup();
+      this.unlockPlayerControl();
+    };
 
     const steps=[
-      {t:"3",color:"#fff45c"},
-      {t:"2",color:"#00eaff"},
-      {t:"1",color:"#ff4fc3"},
-      {t:"FIGHT!",color:"#7CFF6B"}
+      {main:"READY",sub:"GET SET",color:"#ff4fc3",size:64},
+      {main:"3",sub:"",color:"#fff45c",size:96},
+      {main:"2",sub:"",color:"#00eaff",size:96},
+      {main:"1",sub:"",color:"#ff4fc3",size:96},
+      {main:"FIGHT!",sub:"",color:"#7CFF6B",size:72}
     ];
 
     let i=0;
 
     const showStep=()=>{
+      if(i>=steps.length){
+        this.time.delayedCall(500,finishCountdown);
+        return;
+      }
+
       const step=steps[i];
 
-      number.setText(step.t);
-      number.setStyle({
-        font:(step.t==="FIGHT!" ? "72px monospace" : "96px monospace"),
+      main.setText(step.main);
+      main.setStyle({
+        font:step.size+"px monospace",
         fill:step.color,
         stroke:"#000000",
         strokeThickness:8
       });
 
-      number.setScale(0.5);
-      number.setAlpha(1);
+      sub.setText(step.sub || "");
+
+      main.setScale(0.6);
+      main.setAlpha(1);
 
       this.tweens.add({
-        targets:number,
-        scale:1.25,
-        duration:170,
+        targets:main,
+        scale:1.15,
+        duration:160,
         yoyo:true
       });
 
       this.cameras.main.shake(70,0.002);
 
       i++;
-
-      if(i<steps.length){
-        this.time.delayedCall(700,showStep);
-      }else{
-        this.time.delayedCall(650,()=>{
-          ready.destroy();
-          number.destroy();
-          flashText.destroy();
-
-          if(this.countdownShade){
-            this.countdownShade.destroy();
-            this.countdownShade=null;
-          }
-
-          this.matchStarted=true;
-        });
-      }
+      this.time.delayedCall(650,showStep);
     };
 
     showStep();
+
+    this.time.delayedCall(4500,finishCountdown);
   }
 
   showVictory(){
