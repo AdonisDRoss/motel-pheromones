@@ -26,7 +26,14 @@ canvas{
 <body>
 <script>
 
-const VERSION = 623;
+window.__MP_LAST_ERROR = "";
+
+window.addEventListener("error",function(e){
+  window.__MP_LAST_ERROR = e.message || String(e);
+  console.error("Motel runtime error:",e);
+});
+
+const VERSION = 625;
 const W = 960;
 const H = 540;
 
@@ -66,40 +73,18 @@ const PLATFORM_BOUNDS = {
   bottom:{minX:120,maxX:860,minY:485,maxY:520}
 };
 
-const LADDER_ACTIVATE_X_RANGE = 34;
-const LADDER_ACTIVATE_Y_RANGE = 120;
-const LADDER_VERTICAL_INPUT = 0.65;
-const LADDER_MAX_SIDE_INPUT = 0.35;
-
-const STAIR_VERTICAL_INPUT = 0.65;
-const STAIR_MAX_SIDE_INPUT = 0.45;
-
 const JUMP_HEIGHT = 68;
 const JUMP_TIME = 420;
 const DOUBLE_UP_WINDOW = 360;
-
-const STAIR_TRAVEL_DURATION = 720;
 const SWEEP_DAMAGE = 10;
-
-const VIBRATION_ENABLED = true;
-
-const GRAB_HOLD_TIME = 3000;
-const CARRY_BREAK_TIME = 5000;
-const THROW_DAMAGE = 16;
-const THROW_COLLISION_DAMAGE = 12;
-const THROW_SPEED = 430;
-const GRAB_OFFSET_X = 42;
-const CARRY_OFFSET_X = 58;
-
-const DOORMAN_DOOR_X = 505;
-const DOORMAN_DOOR_Y = 390;
 
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
 
-const DISABLE_DOORMAN_FOR_TEST = false;
 const ENEMY_AI_ENABLED = false;
+const PLATFORM_TRANSITIONS_ENABLED = false;
+const DISABLE_DOORMAN_FOR_TEST = true;
 const DEBUG_RUNTIME = true;
 const DEBUG_INPUT = true;
 const SKIP_COUNTDOWN_FOR_TEST = true;
@@ -711,11 +696,6 @@ class Game extends Phaser.Scene{
     this.isJumping=false;
     this.isCrouching=false;
 
-    this.grabbedEnemy=null;
-    this.grabMode="none";
-    this.grabHoldEvent=null;
-    this.carryBreakEvent=null;
-
     this.combo=0;
     this.rhythm=0;
 
@@ -726,10 +706,6 @@ class Game extends Phaser.Scene{
     this.matchOver=false;
     this.victoryShown=false;
     this.roundUnlockDone=false;
-
-    this.doormanSpawned=false;
-    this.doormanIntroActive=false;
-    this.doorman=null;
 
     this.pauseMenuOpen=false;
     this.pauseItems=[];
@@ -812,50 +788,27 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-L",()=>this.startContextB());
     this.input.keyboard.on("keydown-SPACE",()=>this.startContextY());
 
-    this.input.keyboard.on("keydown-E",()=>this.startGrab());
-    this.input.keyboard.on("keydown-G",()=>this.startGrab());
-
     this.input.keyboard.on("keydown-C",()=>this.startCrouch());
     this.input.keyboard.on("keydown-T",()=>this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE));
     this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
-    this.input.keyboard.on("keydown-I",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
-
     this.input.keyboard.on("keydown-H",()=>this.showReaction("hurt",350));
     this.input.keyboard.on("keydown-N",()=>this.showReaction("knockback",500));
     this.input.keyboard.on("keydown-M",()=>this.showReaction("ko",9999));
     this.input.keyboard.on("keydown-R",()=>this.showReaction("getup",600));
 
     this.input.keyboard.on("keydown-ESC",()=>this.togglePauseMenu());
-
-    this.input.keyboard.on("keydown-ENTER",()=>{
-      if(this.pauseMenuOpen) this.selectPauseOption();
-    });
-
-    this.input.keyboard.on("keydown-UP",()=>{
-      if(this.pauseMenuOpen) this.movePauseCursor(-1);
-    });
-
-    this.input.keyboard.on("keydown-DOWN",()=>{
-      if(this.pauseMenuOpen) this.movePauseCursor(1);
-    });
-  }
-
-  makeKeyboard(){
-    this.keys=this.input.keyboard.addKeys({
-      up:"UP",
-      down:"DOWN",
-      left:"LEFT",
-      right:"RIGHT",
-      w:"W",
-      a:"A",
-      s:"S",
-      d:"D",
-      c:"C",
-      shift:"SHIFT"
-    });
   }
 
   update(time,delta){
+    try{
+      this.safeUpdate(time,delta);
+    }catch(err){
+      this.showRuntimeError(err);
+      this.unlockPlayerControl();
+    }
+  }
+
+  safeUpdate(time,delta){
     delta=Math.min(delta || 16.67,33.33);
     this.frameDelta=delta;
 
@@ -865,7 +818,6 @@ class Game extends Phaser.Scene{
     this.updateBusyWatchdog();
 
     if(!this.pauseMenuOpen && this.matchStarted && !this.matchOver){
-      this.updateThrownEnemies(delta);
       this.checkDoubleUpJump();
       this.checkDirectCrouch();
     }
@@ -884,14 +836,8 @@ class Game extends Phaser.Scene{
         this.updateMovement();
       }
 
-      this.updateGrabbedEnemy();
-
       if(ENEMY_AI_ENABLED){
-        try{
-          this.updateEnemyAI();
-        }catch(err){
-          this.showRuntimeError(err);
-        }
+        this.updateEnemyAI();
       }
 
       this.checkVictory();
@@ -914,18 +860,33 @@ class Game extends Phaser.Scene{
       this.debugInputText.setText(
         "STARTED: "+this.matchStarted+
         " | BUSY: "+this.playerBusy+
-        " | BUSYMS: "+(this.busyWatchStartedAt ? Math.floor(this.time.now-this.busyWatchStartedAt) : 0)+
         " | CLIMB: "+this.isClimbing+
         " | PLATFORM: "+this.platform+
         " | INPUT X: "+this.moveX.toFixed(2)+
         " | INPUT Y: "+this.moveY.toFixed(2)+
         " | PX: "+Math.floor(this.player.x)+
         " | PY: "+Math.floor(this.player.y)+
-        " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)
+        " | STICK: "+this.stickX.toFixed(2)+","+this.stickY.toFixed(2)+
+        " | ERR: "+window.__MP_LAST_ERROR
       );
     }
 
     this.keepForegroundInFront();
+  }
+
+  makeKeyboard(){
+    this.keys=this.input.keyboard.addKeys({
+      up:"UP",
+      down:"DOWN",
+      left:"LEFT",
+      right:"RIGHT",
+      w:"W",
+      a:"A",
+      s:"S",
+      d:"D",
+      c:"C",
+      shift:"SHIFT"
+    });
   }
 
   readInput(){
@@ -988,7 +949,6 @@ class Game extends Phaser.Scene{
   }
 
   checkDoubleUpJump(){
-    if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -1014,7 +974,6 @@ class Game extends Phaser.Scene{
   }
 
   checkDirectCrouch(){
-    if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -1027,13 +986,6 @@ class Game extends Phaser.Scene{
     }
 
     if(this.downCrouchHeld) return;
-
-    const activeStairs=this.stairs && this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
-
-    if(activeStairs && this.platform==="middle"){
-      this.downCrouchHeld=true;
-      return;
-    }
 
     this.downCrouchHeld=true;
 
@@ -1085,14 +1037,9 @@ class Game extends Phaser.Scene{
 
     const running=keyboardRunning || stickPower>=RUN_STICK_THRESHOLD;
 
-    if(SIMPLE_DIRECT_MOVEMENT){
-      this.player.body.setVelocity(0,0);
-      this.player.x += vx * speed * dt;
-      this.player.y += vy * speed * 0.55 * dt;
-    }else{
-      this.player.body.velocity.x = Phaser.Math.Linear(this.player.body.velocity.x,vx*speed,0.22);
-      this.player.body.velocity.y = Phaser.Math.Linear(this.player.body.velocity.y,vy*speed*0.55,0.22);
-    }
+    this.player.body.setVelocity(0,0);
+    this.player.x += vx * speed * dt;
+    this.player.y += vy * speed * 0.55 * dt;
 
     if(Math.abs(vx)>0.1){
       this.lastDir="side";
@@ -1118,11 +1065,6 @@ class Game extends Phaser.Scene{
 
   playMoveAnim(moving,running){
     if(this.playerBusy) return;
-
-    if(this.grabbedEnemy && this.grabMode==="carry"){
-      this.showCarryPose();
-      return;
-    }
 
     this.player.setScale(PLAYER_MOVE_SCALE);
 
@@ -1160,198 +1102,16 @@ class Game extends Phaser.Scene{
     });
   }
 
-  isPlayerInZone(zone,padX=0,padY=0){
-    const b=zone.getBounds();
-
-    const r=new Phaser.Geom.Rectangle(
-      b.x-padX,
-      b.y-padY,
-      b.width+padX*2,
-      b.height+padY*2
-    );
-
-    return Phaser.Geom.Rectangle.Contains(r,this.player.x,this.player.y);
-  }
-
   handlePlatformTransitions(){
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
-
-    const verticalOnly =
-      Math.abs(this.moveY) >= LADDER_VERTICAL_INPUT &&
-      Math.abs(this.moveX) <= LADDER_MAX_SIDE_INPUT;
-
-    const nearLadder=this.ladders.find(l=>{
-      const closeX = Math.abs(this.player.x-l.x) <= LADDER_ACTIVATE_X_RANGE;
-      const closeY = Math.abs(this.player.y-l.middleY) <= LADDER_ACTIVATE_Y_RANGE ||
-                     Math.abs(this.player.y-l.topY) <= LADDER_ACTIVATE_Y_RANGE;
-      return closeX && closeY;
-    });
-
-    if(nearLadder && verticalOnly){
-      if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
-        this.startClimbing(nearLadder,"up");
-        return;
-      }
-
-      if(this.platform==="top" && this.moveY > LADDER_VERTICAL_INPUT){
-        this.startClimbing(nearLadder,"down");
-        return;
-      }
-    }
-
-    const stairVerticalOnly =
-      Math.abs(this.moveY) >= STAIR_VERTICAL_INPUT &&
-      Math.abs(this.moveX) <= STAIR_MAX_SIDE_INPUT;
-
-    const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
-
-    if(activeStairs && stairVerticalOnly){
-      if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
-        this.startStairTravel(activeStairs,"down");
-        return;
-      }
-
-      if(this.platform==="bottom" && this.moveY < -STAIR_VERTICAL_INPUT){
-        this.startStairTravel(activeStairs,"up");
-      }
-    }
+    if(!PLATFORM_TRANSITIONS_ENABLED) return;
   }
 
   startClimbing(ladder,direction="up"){
-    this.isClimbing=true;
-    this.currentLadder=ladder;
-
-    this.playerBusy=false;
-    this.player.body.setVelocity(0,0);
-
-    this.player.x=ladder.x;
-
-    if(direction==="down"){
-      this.player.y=PLATFORM_BOUNDS.top.maxY;
-    }else{
-      this.player.y=PLATFORM_BOUNDS.middle.minY;
-    }
-
-    const climbAnim=this.getPlayerAnim("climb");
-    const canShowClimbPose=hasAnim(this,climbAnim);
-
-    this.player.setVisible(!canShowClimbPose);
-
-    this.poseSprite.loadTexture(this.getPlayerActionSheet());
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
-    this.poseSprite.flipX=false;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(canShowClimbPose);
-
-    if(canShowClimbPose){
-      safePlay(this.poseSprite,climbAnim);
-    }else{
-      this.poseSprite.setVisible(false);
-      safePlay(this.player,this.getPlayerAnim("idle_up"));
-    }
-
-    this.zoneText.setText("CLIMBING LADDER");
+    this.isClimbing=false;
   }
 
   updateClimbing(){
-    const l=this.currentLadder;
-    if(!l) return;
-
-    const climbAnim=this.getPlayerAnim("climb");
-    const canShowClimbPose=hasAnim(this,climbAnim);
-
-    this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
-    this.player.body.setVelocity(0,this.moveY*this.climbSpeed);
-    this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
-
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
-    this.poseSprite.flipX=false;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(canShowClimbPose);
-
-    this.player.setVisible(!canShowClimbPose);
-
-    if(canShowClimbPose){
-      safePlay(this.poseSprite,climbAnim);
-    }else{
-      this.poseSprite.setVisible(false);
-      safePlay(this.player,this.getPlayerAnim("idle_up"));
-    }
-
-    if(this.player.y<=l.topY+2 && this.moveY<-0.35){
-      this.isClimbing=false;
-      this.platform="top";
-      this.player.y=PLATFORM_BOUNDS.top.maxY;
-      this.player.x=l.x;
-      this.currentLadder=null;
-      this.zoneText.setText("TOP PLATFORM");
-      this.forcePlayerReady();
-      return;
-    }
-
-    if(this.player.y>=l.middleY-2 && this.moveY>0.35){
-      this.isClimbing=false;
-      this.platform="middle";
-      this.player.y=PLATFORM_BOUNDS.middle.minY;
-      this.player.x=l.x;
-      this.currentLadder=null;
-      this.zoneText.setText("MIDDLE PLATFORM");
-      this.forcePlayerReady();
-    }
-  }
-
-  startStairTravel(stair,direction="down"){
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
-
-    this.playerBusy=true;
-    this.player.body.setVelocity(0,0);
-
-    const fromX=this.player.x;
-    const fromY=this.player.y;
-    const toX=direction==="down" ? stair.bottomX : stair.middleX;
-    const toY=direction==="down" ? stair.bottomY : stair.middleY;
-
-    this.lastDir="side";
-
-    if(stair.name==="leftStairs"){
-      this.player.setFlipX(direction==="down");
-    }else{
-      this.player.setFlipX(direction!=="down");
-    }
-
-    safePlay(this.player,this.getPlayerAnim("walk_side"));
-
-    this.tweens.addCounter({
-      from:0,
-      to:1,
-      duration:STAIR_TRAVEL_DURATION,
-      ease:"Sine.easeInOut",
-      onUpdate:tween=>{
-        const t=tween.getValue();
-        this.player.x=Phaser.Math.Linear(fromX,toX,t);
-        this.player.y=Phaser.Math.Linear(fromY,toY,t);
-      },
-      onComplete:()=>{
-        this.player.x=toX;
-        this.player.y=toY;
-
-        if(direction==="down"){
-          this.platform="bottom";
-          this.zoneText.setText("BOTTOM LEVEL");
-        }else{
-          this.platform="middle";
-          this.zoneText.setText("MIDDLE PLATFORM");
-        }
-
-        this.forcePlayerReady();
-      }
-    });
+    this.isClimbing=false;
   }
 
   applyPlatformBounds(){
@@ -1372,25 +1132,10 @@ class Game extends Phaser.Scene{
   startContextB(){
     if(!this.ensureRoundActive()) return;
 
-    if(this.grabbedEnemy){
-      return;
-    }
-
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.readInput();
-
-    if(this.isForwardHeld()){
-      this.startGrab();
-      return;
-    }
-
-    if(this.isBackHeld()){
-      this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE);
-      return;
-    }
 
     if(this.isUpHeld()){
       this.startJump();
@@ -1407,25 +1152,13 @@ class Game extends Phaser.Scene{
 
   startContextY(){
     if(!this.ensureRoundActive()) return;
-
-    if(this.grabbedEnemy){
-      this.throwGrabbedEnemy();
-      return;
-    }
-
     this.startAttack("heavy");
   }
 
   startContextKick(){
     if(!this.ensureRoundActive()) return;
 
-    if(this.grabbedEnemy){
-      this.startCarryEnemy();
-      return;
-    }
-
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.isClimbing || this.playerHealth<=0) return;
 
     const cHeld=this.keys && this.keys.c && this.keys.c.isDown;
@@ -1446,9 +1179,7 @@ class Game extends Phaser.Scene{
   startJump(){
     if(!this.ensureRoundActive()) return;
 
-    if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -1494,9 +1225,7 @@ class Game extends Phaser.Scene{
   startCrouch(){
     if(!this.ensureRoundActive()) return;
 
-    if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.isCrouching=true;
@@ -1509,7 +1238,6 @@ class Game extends Phaser.Scene{
 
   startSweep(){
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -1550,377 +1278,11 @@ class Game extends Phaser.Scene{
       if(e.platform!==this.platform) return;
 
       hit.add(e);
-
-      e.health-=sweepDamage;
-      this.createHitFX(e.x,e.y-35,"hit",sweepDamage);
-
-      e.busy=true;
-      e.state="hurt";
-      e.knockbackTime=520;
-      e.attackCooldown=700;
-
-      const resist=e.knockbackResist || 1;
-      e.setVelocityX((e.x<this.player.x ? -1 : 1)*160*resist);
-
-      this.combo++;
-      this.rhythm=Math.min(10,this.rhythm+1);
-
-      if(e.health<=0){
-        this.killEnemy(e);
-        return;
-      }
-
-      this.safeEnemyPlay(e,"hurt");
-      this.updateEnemyHealthBar(e);
-
-      this.time.delayedCall(420,()=>{
-        if(!e.dead){
-          e.busy=false;
-          e.state="idle";
-          this.safeEnemyPlay(e,"idle");
-        }
-      });
+      this.damageEnemy(e,sweepDamage,true);
     });
 
     this.time.delayedCall(130,()=>{
       if(box && box.destroy) box.destroy();
-    });
-  }
-
-  startGrab(){
-    if(!this.ensureRoundActive()) return;
-
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
-    if(this.grabbedEnemy) return;
-    if(!this.enemies) return;
-
-    let target=null;
-    let bestDist=9999;
-    const facing=this.getFacingDir();
-
-    this.enemies.children.each(e=>{
-      if(!e || e.dead || e.state==="dead") return;
-      if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
-      if(e.platform!==this.platform) return;
-      if(e.grabbed || e.thrownTime>0) return;
-
-      const dx=e.x-this.player.x;
-      const dy=Math.abs(this.player.y-e.y);
-      const inFront=dx*facing>0;
-      const dist=Math.abs(dx);
-
-      if(inFront && dist<75 && dy<45 && dist<bestDist){
-        target=e;
-        bestDist=dist;
-      }
-    });
-
-    if(!target){
-      this.enemies.children.each(e=>{
-        if(!e || e.dead || e.state==="dead") return;
-        if(e.canBeGrabbed===false || e.enemyType==="doorman") return;
-        if(e.platform!==this.platform) return;
-        if(e.grabbed || e.thrownTime>0) return;
-
-        const dx=Math.abs(this.player.x-e.x);
-        const dy=Math.abs(this.player.y-e.y);
-
-        if(dx<55 && dy<45 && dx<bestDist){
-          target=e;
-          bestDist=dx;
-        }
-      });
-    }
-
-    if(!target) return;
-
-    this.clearGrabTimers();
-
-    this.grabbedEnemy=target;
-    this.grabMode="hold";
-
-    this.playerBusy=true;
-    this.isBlocking=false;
-    this.isCrouching=false;
-    this.isJumping=false;
-
-    this.player.body.setVelocity(0,0);
-
-    target.grabbed=true;
-    target.busy=true;
-    target.state="grabbed";
-    target.knockbackTime=0;
-    target.attackCooldown=9999;
-    target.setVelocity(0,0);
-
-    this.safeEnemyPlay(target,"ko");
-    this.showCarryPose();
-    this.updateGrabbedEnemy();
-
-    this.grabHoldEvent=this.time.delayedCall(GRAB_HOLD_TIME,()=>{
-      if(this.grabbedEnemy && this.grabMode==="hold"){
-        this.enemyBreakGrab();
-      }
-    });
-  }
-
-  showCarryPose(){
-    if(!this.player || !this.poseSprite) return;
-
-    this.poseSprite.loadTexture(this.getPlayerActionSheet());
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
-    this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
-    this.poseSprite.setVisible(true);
-
-    this.player.setVisible(false);
-
-    safePlay(this.poseSprite,this.getPlayerAnim("carry"));
-  }
-
-  clearGrabTimers(){
-    if(this.grabHoldEvent){
-      this.grabHoldEvent.remove(false);
-      this.grabHoldEvent=null;
-    }
-
-    if(this.carryBreakEvent){
-      this.carryBreakEvent.remove(false);
-      this.carryBreakEvent=null;
-    }
-  }
-
-  updateGrabbedEnemy(){
-    if(!this.grabbedEnemy || !this.player) return;
-
-    const e=this.grabbedEnemy;
-
-    if(e.dead || e.state==="dead"){
-      this.clearGrabTimers();
-      this.grabbedEnemy=null;
-      this.grabMode="none";
-      return;
-    }
-
-    const dir=this.getFacingDir();
-    const offset=this.grabMode==="carry" ? CARRY_OFFSET_X : GRAB_OFFSET_X;
-
-    e.x=this.player.x+dir*offset;
-    e.y=this.player.y;
-    e.homeY=this.player.y;
-    e.platform=this.platform;
-
-    e.setVelocity(0,0);
-    e.setFlipX(dir<0);
-    e.setDepth(e.y+3);
-
-    this.safeEnemyPlay(e,"ko");
-    this.showCarryPose();
-
-    if(e.shadow){
-      e.shadow.x=e.x;
-      e.shadow.y=e.y+3;
-    }
-
-    this.updateEnemyNameplate(e);
-  }
-
-  startCarryEnemy(){
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(!this.grabbedEnemy) return;
-    if(this.grabMode==="carry") return;
-
-    this.clearGrabTimers();
-
-    this.grabMode="carry";
-    this.playerBusy=false;
-
-    this.showCarryPose();
-
-    this.carryBreakEvent=this.time.delayedCall(CARRY_BREAK_TIME,()=>{
-      if(this.grabbedEnemy && this.grabMode==="carry"){
-        this.enemyBreakGrab();
-      }
-    });
-  }
-
-  throwGrabbedEnemy(){
-    if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
-    if(!this.grabbedEnemy) return;
-
-    const e=this.grabbedEnemy;
-    const dir=this.getFacingDir();
-
-    this.clearGrabTimers();
-
-    this.grabbedEnemy=null;
-    this.grabMode="none";
-
-    this.playerBusy=false;
-    this.isBlocking=false;
-    this.isCrouching=false;
-    this.isJumping=false;
-
-    if(this.poseSprite){
-      this.poseSprite.stop();
-      this.poseSprite.setVisible(false);
-    }
-
-    if(this.player){
-      this.player.setVisible(true);
-      this.player.setScale(PLAYER_MOVE_SCALE);
-      safePlay(this.player,this.getPlayerAnim("idle_side"));
-    }
-
-    e.grabbed=false;
-    e.busy=true;
-    e.state="thrown";
-    e.thrownTime=850;
-    e.thrownHit=new Set();
-    e.knockbackTime=850;
-    e.attackCooldown=1200;
-    e.platform=this.platform;
-    e.homeY=this.player.y;
-
-    e.health-=THROW_DAMAGE;
-
-    this.createHitFX(e.x,e.y-55,"hit",THROW_DAMAGE);
-
-    e.setVelocityX(dir*THROW_SPEED);
-    this.safeEnemyPlay(e,"hurt");
-    this.updateEnemyHealthBar(e);
-
-    if(e.health<=0){
-      this.killEnemy(e);
-      e.thrownTime=0;
-      return;
-    }
-
-    this.time.delayedCall(850,()=>{
-      if(!e.dead && e.state==="thrown"){
-        e.busy=false;
-        e.state="idle";
-        e.thrownTime=0;
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"idle");
-      }
-    });
-  }
-
-  enemyBreakGrab(){
-    if(!this.grabbedEnemy) return;
-
-    const e=this.grabbedEnemy;
-    const dir=this.getFacingDir();
-
-    this.clearGrabTimers();
-
-    this.grabbedEnemy=null;
-    this.grabMode="none";
-
-    e.grabbed=false;
-    e.busy=false;
-    e.state="idle";
-    e.attackCooldown=900;
-    e.knockbackTime=250;
-    e.setVelocityX(dir*90);
-
-    this.safeEnemyPlay(e,"idle");
-
-    this.playerBusy=false;
-
-    if(this.poseSprite){
-      this.poseSprite.stop();
-      this.poseSprite.setVisible(false);
-    }
-
-    if(this.player){
-      this.player.setVisible(true);
-      this.player.setScale(PLAYER_MOVE_SCALE);
-      safePlay(this.player,this.getPlayerAnim("idle_side"));
-    }
-  }
-
-  updateThrownEnemies(delta){
-    if(!this.enemies) return;
-
-    this.enemies.children.each(e=>{
-      if(!e || e.dead) return;
-      if(!e.thrownTime || e.thrownTime<=0) return;
-
-      e.thrownTime-=delta;
-      if(e.thrownTime<0) e.thrownTime=0;
-
-      e.y=e.homeY;
-      e.setDepth(e.y+2);
-
-      if(e.shadow){
-        e.shadow.x=e.x;
-        e.shadow.y=e.y+3;
-      }
-
-      this.updateEnemyNameplate(e);
-
-      this.enemies.children.each(other=>{
-        if(!other || other===e) return;
-        if(other.dead || other.state==="dead") return;
-        if(other.platform!==e.platform) return;
-        if(other.grabbed) return;
-
-        if(!e.thrownHit){
-          e.thrownHit=new Set();
-        }
-
-        if(e.thrownHit.has(other)) return;
-
-        const dx=Math.abs(e.x-other.x);
-        const dy=Math.abs(e.y-other.y);
-
-        if(dx<70 && dy<45){
-          e.thrownHit.add(other);
-
-          other.health-=THROW_COLLISION_DAMAGE;
-          other.busy=true;
-          other.state="hurt";
-          other.knockbackTime=500;
-          other.attackCooldown=800;
-
-          const knockDir=other.x<e.x ? -1 : 1;
-          const resist=other.knockbackResist || 1;
-          other.setVelocityX(knockDir*180*resist);
-
-          this.createHitFX(other.x,other.y-55,"hit",THROW_COLLISION_DAMAGE);
-
-          if(other.health<=0){
-            this.killEnemy(other);
-            return;
-          }
-
-          this.safeEnemyPlay(other,"hurt");
-          this.updateEnemyHealthBar(other);
-
-          this.time.delayedCall(500,()=>{
-            if(!other.dead){
-              other.busy=false;
-              other.state="idle";
-              this.safeEnemyPlay(other,"idle");
-            }
-          });
-        }
-      });
-
-      if(e.thrownTime<=0 && !e.dead && e.state==="thrown"){
-        e.busy=false;
-        e.state="idle";
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"idle");
-      }
     });
   }
 
@@ -1986,34 +1348,14 @@ class Game extends Phaser.Scene{
     e.busy=false;
     e.platform=platform;
     e.homeY=y;
-
     e.state="idle";
     e.attackCooldown=Phaser.Math.Between(def.attackCooldownMin,def.attackCooldownMax);
-    e.attackCooldownMin=def.attackCooldownMin;
-    e.attackCooldownMax=def.attackCooldownMax;
     e.attackRange=def.attackRange;
     e.stopRange=def.stopRange;
     e.chaseSpeed=def.chaseSpeed;
     e.attackDamage=def.attackDamage;
     e.canBeGrabbed=def.canBeGrabbed !== false;
     e.knockbackResist=def.knockbackResist || 1;
-
-    e.bossActive=false;
-    e.bossIntro=false;
-    e.invulnerable=false;
-    e.guardCooldown=0;
-    e.guardTime=0;
-    e.tacticTimer=0;
-    e.tacticState="hold";
-
-    e.specialCooldown=def.specialCooldown || 0;
-    e.specialRange=def.specialRange || 0;
-    e.specialDamage=def.specialDamage || 0;
-
-    e.knockbackTime=0;
-    e.grabbed=false;
-    e.thrownTime=0;
-    e.thrownHit=null;
 
     e.shadow=this.add.ellipse(x,y+3,38,10,0x000000,0.45).setDepth(190);
 
@@ -2035,13 +1377,8 @@ class Game extends Phaser.Scene{
   }
 
   createEnemyNameplate(e){
-    if(e.enemyType==="doorman"){
-      e.enemyName="THE DOORMAN";
-      e.authTag="SUB-BOSS";
-    }else{
-      e.enemyName=this.pickRandomEnemyName();
-      e.authTag=this.pickRandomEnemyAuth();
-    }
+    e.enemyName=this.pickRandomEnemyName();
+    e.authTag=this.pickRandomEnemyAuth();
 
     e.authBadge=this.add.rectangle(e.x,e.y-106,64,14,0x000000,0.78)
       .setStrokeStyle(1,0x00eaff,0.9)
@@ -2061,7 +1398,7 @@ class Game extends Phaser.Scene{
   }
 
   createEnemyHealthBar(e){
-    const barW=e.enemyType==="doorman" ? 84 : 48;
+    const barW=48;
 
     e.hpBack=this.add.rectangle(e.x,e.y-76,barW,7,0x000000,0.9)
       .setOrigin(0.5,0.5)
@@ -2080,38 +1417,17 @@ class Game extends Phaser.Scene{
 
     const max=e.maxHealth || 30;
     const fillRatio=Phaser.Math.Clamp(e.health/max,0,1);
+    const barW=48;
+    const fillW=barW-4;
 
     let color=0x00ff44;
 
-    if(e.enemyType==="doorman"){
-      const base=e.baseHealth || 90;
-      const bossPercent=e.health/base;
-
-      if(bossPercent>=1.5){
-        color=0xffe600;
-      }else if(bossPercent>=1.0){
-        color=0x2299ff;
-      }else if(bossPercent>=0.5){
-        color=0x00ff44;
-      }else if(bossPercent>=0.15){
-        color=0xffa000;
-      }else{
-        color=0xff2222;
-      }
-    }else{
-      if(fillRatio<=0.15){
-        color=0xff2222;
-      }else if(fillRatio<=0.5){
-        color=0xffa000;
-      }else{
-        color=0x00ff44;
-      }
+    if(fillRatio<=0.15){
+      color=0xff2222;
+    }else if(fillRatio<=0.5){
+      color=0xffa000;
     }
 
-    const barW=e.enemyType==="doorman" ? 84 : 48;
-    const fillW=barW-4;
-
-    e.hpBack.setDisplaySize(barW,7);
     e.hpBack.x=e.x;
     e.hpBack.y=e.y-76;
 
@@ -2145,38 +1461,7 @@ class Game extends Phaser.Scene{
       e.nameText.y=e.y-91;
     }
 
-    if(e.speechBox){
-      e.speechBox.x=e.x;
-      e.speechBox.y=e.y-142;
-    }
-
-    if(e.speechText){
-      e.speechText.x=e.x;
-      e.speechText.y=e.y-142;
-    }
-
     this.updateEnemyHealthBar(e);
-  }
-
-  setEnemyNameplateDead(e){
-    if(!e) return;
-
-    if(e.authBadge){
-      e.authBadge.setStrokeStyle(1,0xff4fc3,0.9);
-    }
-
-    if(e.authText){
-      e.authText.setText("KO");
-      e.authText.setFill("#ff4fc3");
-    }
-
-    if(e.nameText){
-      e.nameText.setFill("#777777");
-    }
-
-    if(e.hpFill){
-      e.hpFill.setVisible(false);
-    }
   }
 
   killEnemy(e){
@@ -2189,511 +1474,34 @@ class Game extends Phaser.Scene{
     e.setVelocityX(0);
 
     this.safeEnemyPlay(e,"ko");
-    this.setEnemyNameplateDead(e);
+
+    if(e.authText){
+      e.authText.setText("KO");
+      e.authText.setFill("#ff4fc3");
+    }
+
+    if(e.hpFill){
+      e.hpFill.setVisible(false);
+    }
   }
 
   updateEnemyAI(){
     if(!this.enemies) return;
 
-    const delta=this.frameDelta || 16.67;
-
     this.enemies.children.each(e=>{
-      if(!e) return;
-
-      if(e.grabbed || e.thrownTime>0){
-        this.updateEnemyNameplate(e);
-
-        if(e.shadow){
-          e.shadow.x=e.x;
-          e.shadow.y=e.y+3;
-        }
-
-        return;
-      }
-
-      if(e.attackCooldown>0){
-        e.attackCooldown-=delta;
-        if(e.attackCooldown<0) e.attackCooldown=0;
-      }
-
-      if(e.knockbackTime>0){
-        e.knockbackTime-=delta;
-        if(e.knockbackTime<0) e.knockbackTime=0;
-      }
-
-      if(e.specialCooldown>0){
-        e.specialCooldown-=delta;
-        if(e.specialCooldown<0) e.specialCooldown=0;
-      }
-
-      if(e.guardCooldown>0){
-        e.guardCooldown-=delta;
-        if(e.guardCooldown<0) e.guardCooldown=0;
-      }
-
-      if(e.guardTime>0){
-        e.guardTime-=delta;
-        if(e.guardTime<0) e.guardTime=0;
-      }
-
-      if(e.dead || e.state==="dead"){
-        e.dead=true;
-        e.state="dead";
-        e.setVelocityX(0);
-
-        this.updateEnemyNameplate(e);
-
-        if(e.shadow){
-          e.shadow.x=e.x;
-          e.shadow.y=e.y+3;
-        }
-
-        return;
-      }
+      if(!e || e.dead) return;
 
       e.y=e.homeY;
-      e.setDepth(e.y+2);
-
-      this.updateEnemyNameplate(e);
+      e.setVelocity(0,0);
 
       if(e.shadow){
         e.shadow.x=e.x;
         e.shadow.y=e.y+3;
       }
 
-      this.applyEnemySeparation(e);
-
-      if(e.knockbackTime>0) return;
-      if(e.busy) return;
-
-      if(e.enemyType==="doorman"){
-        this.updateDoormanAI(e,delta);
-        return;
-      }
-
-      if(this.platform!==e.platform || this.playerHealth<=0){
-        e.state="idle";
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"idle");
-        return;
-      }
-
-      const dx=this.player.x-e.x;
-      const dy=this.player.y-e.y;
-      const dist=Math.abs(dx);
-
-      e.setFlipX(dx<0);
-
-      if(Math.abs(dy)>45){
-        e.state="idle";
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"idle");
-        return;
-      }
-
-      if(dist<=e.attackRange && e.attackCooldown<=0){
-        this.startEnemyAttack(e);
-        return;
-      }
-
-      if(dist>e.stopRange){
-        e.state="chase";
-        const chaseDir=dx>0 ? 1 : -1;
-        e.setVelocityX(chaseDir*e.chaseSpeed);
-        this.safeEnemyPlay(e,"walk");
-      }else{
-        e.state="idle";
-        e.setVelocityX(0);
-        this.safeEnemyPlay(e,"idle");
-      }
-    });
-  }
-
-  applyEnemySeparation(e){
-    if(!this.enemies || !e || e.dead) return;
-
-    this.enemies.children.each(other=>{
-      if(!other || other===e || other.dead) return;
-      if(other.platform!==e.platform) return;
-      if(other.grabbed || other.thrownTime>0) return;
-
-      const gap=e.x-other.x;
-      const absGap=Math.abs(gap);
-
-      if(absGap>0 && absGap<44){
-        const push=gap>0 ? 1.1 : -1.1;
-        e.x+=push;
-      }
-
-      if(absGap===0){
-        e.x+=Phaser.Math.Between(-2,2);
-      }
-    });
-
-    if(e.platform==="top"){
-      e.x=Phaser.Math.Clamp(e.x,190,820);
-    }else{
-      e.x=Phaser.Math.Clamp(e.x,120,860);
-    }
-  }
-
-  startEnemyAttack(e){
-    if(!e || e.dead || e.busy) return;
-    if(e.grabbed || e.thrownTime>0) return;
-
-    e.state="attack";
-    e.busy=true;
-    e.attackCooldown=Phaser.Math.Between(e.attackCooldownMin || 500,e.attackCooldownMax || 900);
-    e.setVelocityX(0);
-
-    this.safeEnemyPlay(e,"punch");
-
-    this.time.delayedCall(280,()=>{
-      if(!e || e.dead || e.state!=="attack") return;
-
-      const dx=Math.abs(this.player.x-e.x);
-      const dy=Math.abs(this.player.y-e.y);
-
-      if(dx<=e.attackRange+10 && dy<=45){
-        const dir=e.x<this.player.x ? 1 : -1;
-        this.damagePlayer(e.attackDamage || 8,dir);
-      }
-    });
-
-    this.time.delayedCall(560,()=>{
-      if(!e || e.dead) return;
-
-      e.busy=false;
-      e.state="idle";
+      this.updateEnemyNameplate(e);
       this.safeEnemyPlay(e,"idle");
     });
-  }
-
-  updateDoormanAI(e,delta){
-    if(!e || e.dead) return;
-
-    this.updateEnemyNameplate(e);
-
-    if(e.shadow){
-      e.shadow.x=e.x;
-      e.shadow.y=e.y+3;
-    }
-
-    e.y=e.homeY;
-    e.setDepth(e.y+2);
-
-    if(e.bossIntro || !e.bossActive || e.invulnerable){
-      e.setVelocityX(0);
-      return;
-    }
-
-    if(this.platform!==e.platform || this.playerHealth<=0){
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"idle");
-      return;
-    }
-
-    if(e.knockbackTime>0) return;
-    if(e.busy) return;
-
-    const dx=this.player.x-e.x;
-    const dy=this.player.y-e.y;
-    const dist=Math.abs(dx);
-    const dir=dx>0 ? 1 : -1;
-
-    e.setFlipX(dx<0);
-
-    if(Math.abs(dy)>50){
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"idle");
-      return;
-    }
-
-    if(this.playerBusy && dist<110 && e.guardCooldown<=0){
-      e.guardTime=520;
-      e.guardCooldown=2200;
-      e.attackCooldown=500;
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"taunt");
-      return;
-    }
-
-    if(e.guardTime>0){
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"taunt");
-      return;
-    }
-
-    if(e.specialCooldown<=0 && dist<=e.specialRange && dist>65){
-      this.startDoormanSpecial(e);
-      return;
-    }
-
-    if(dist<=e.attackRange && e.attackCooldown<=0){
-      this.startDoormanPunch(e);
-      return;
-    }
-
-    if(dist<48){
-      e.setVelocityX(-dir*e.chaseSpeed*0.75);
-      this.safeEnemyPlay(e,"walk");
-      return;
-    }
-
-    if(dist>e.specialRange){
-      e.setVelocityX(dir*e.chaseSpeed);
-      this.safeEnemyPlay(e,"walk");
-      return;
-    }
-
-    e.tacticTimer-=delta;
-
-    if(e.tacticTimer<=0){
-      const roll=Phaser.Math.Between(0,2);
-
-      if(roll===0){
-        e.tacticState="hold";
-        e.tacticTimer=Phaser.Math.Between(450,850);
-      }else if(roll===1){
-        e.tacticState="step_in";
-        e.tacticTimer=Phaser.Math.Between(300,600);
-      }else{
-        e.tacticState="step_back";
-        e.tacticTimer=Phaser.Math.Between(300,600);
-      }
-    }
-
-    if(e.tacticState==="hold"){
-      e.setVelocityX(0);
-      this.safeEnemyPlay(e,"idle");
-    }else if(e.tacticState==="step_in"){
-      e.setVelocityX(dir*e.chaseSpeed*0.45);
-      this.safeEnemyPlay(e,"walk");
-    }else if(e.tacticState==="step_back"){
-      e.setVelocityX(-dir*e.chaseSpeed*0.45);
-      this.safeEnemyPlay(e,"walk");
-    }
-
-    e.x=Phaser.Math.Clamp(e.x,120,860);
-  }
-
-  startDoormanPunch(e){
-    if(!e || e.dead || e.busy) return;
-
-    e.state="attack";
-    e.busy=true;
-    e.attackCooldown=Phaser.Math.Between(850,1250);
-    e.setVelocityX(0);
-
-    this.safeEnemyPlay(e,"punch");
-
-    this.time.delayedCall(320,()=>{
-      if(!e || e.dead || e.state!=="attack") return;
-
-      const dx=Math.abs(this.player.x-e.x);
-      const dy=Math.abs(this.player.y-e.y);
-
-      if(dx<=e.attackRange+12 && dy<=50){
-        const dir=e.x<this.player.x ? 1 : -1;
-        this.damagePlayer(e.attackDamage || 15,dir);
-      }
-    });
-
-    this.time.delayedCall(760,()=>{
-      if(!e || e.dead) return;
-
-      e.busy=false;
-      e.state="idle";
-      this.safeEnemyPlay(e,"idle");
-    });
-  }
-
-  startDoormanSpecial(e){
-    if(!e || e.dead || e.busy) return;
-
-    e.state="special";
-    e.busy=true;
-    e.setVelocityX(0);
-    e.specialCooldown=Phaser.Math.Between(3000,4200);
-    e.attackCooldown=1200;
-
-    this.safeEnemyPlay(e,"special");
-    this.sayDoorman(e,"Fire punch.",1100);
-
-    this.time.delayedCall(260,()=>{
-      if(!e || e.dead || e.state!=="special") return;
-      this.createDoormanFireTaunt(e);
-    });
-
-    this.time.delayedCall(430,()=>{
-      if(!e || e.dead || e.state!=="special") return;
-
-      const dx=Math.abs(this.player.x-e.x);
-      const dy=Math.abs(this.player.y-e.y);
-      const dir=e.x<this.player.x ? 1 : -1;
-
-      const fxX=e.x + dir*70;
-      const fxY=e.y - 65;
-
-      this.createHitFX(fxX,fxY,"hit",e.specialDamage || 20);
-
-      if(dx<=e.specialRange && dy<=55){
-        this.damagePlayer(e.specialDamage || 20,dir);
-      }
-    });
-
-    this.time.delayedCall(950,()=>{
-      if(!e || e.dead) return;
-
-      e.busy=false;
-      e.state="idle";
-      this.safeEnemyPlay(e,"idle");
-    });
-  }
-
-  spawnDoormanIntro(){
-    if(this.doormanSpawned) return;
-
-    this.doormanSpawned=true;
-    this.doormanIntroActive=true;
-
-    const boss=this.spawnEnemyType("doorman",DOORMAN_DOOR_X,DOORMAN_DOOR_Y,"middle");
-    this.doorman=boss;
-
-    boss.setFlipX(this.player.x < boss.x);
-    boss.homeY=DOORMAN_DOOR_Y;
-    boss.platform="middle";
-
-    boss.bossIntro=true;
-    boss.bossActive=false;
-    boss.invulnerable=true;
-    boss.busy=true;
-    boss.state="intro";
-    boss.setVelocityX(0);
-
-    this.zoneText.setText("SUB-BOSS: THE DOORMAN");
-
-    const title=this.makeArcadeText(480,155,"THE DOORMAN",54,"#fff45c");
-    const warning=this.makeArcadeText(480,220,"SUB-BOSS",32,"#ff4fc3");
-
-    this.sayDoorman(boss,"Nobody gets through my door.",2300);
-
-    this.safeEnemyPlay(boss,"taunt");
-    this.createDoormanFireTaunt(boss);
-
-    this.time.delayedCall(1200,()=>{
-      if(!boss || boss.dead) return;
-      this.sayDoorman(boss,"You want in? Go through me.",2300);
-      this.safeEnemyPlay(boss,"special");
-      this.createDoormanFireTaunt(boss);
-    });
-
-    this.time.delayedCall(3000,()=>{
-      if(title) title.destroy();
-      if(warning) warning.destroy();
-
-      if(!boss || boss.dead) return;
-
-      boss.bossIntro=false;
-      boss.bossActive=true;
-      boss.invulnerable=false;
-      boss.busy=false;
-      boss.state="idle";
-      boss.attackCooldown=700;
-      boss.specialCooldown=1800;
-
-      this.safeEnemyPlay(boss,"idle");
-      this.zoneText.setText("DOORMAN FIGHT");
-      this.doormanIntroActive=false;
-    });
-  }
-
-  sayDoorman(e,text,duration=1800){
-    if(!e) return;
-
-    if(e.speechBox){
-      e.speechBox.destroy();
-      e.speechBox=null;
-    }
-
-    if(e.speechText){
-      e.speechText.destroy();
-      e.speechText=null;
-    }
-
-    e.speechBox=this.add.rectangle(e.x,e.y-142,300,34,0x000000,0.82)
-      .setStrokeStyle(2,0xff4fc3,0.9)
-      .setDepth(16000);
-
-    e.speechText=this.add.text(e.x,e.y-142,text,{
-      font:"13px monospace",
-      fill:"#ffffff"
-    }).setOrigin(0.5).setDepth(16001);
-
-    this.time.delayedCall(duration,()=>{
-      if(e.speechBox){
-        e.speechBox.destroy();
-        e.speechBox=null;
-      }
-
-      if(e.speechText){
-        e.speechText.destroy();
-        e.speechText=null;
-      }
-    });
-  }
-
-  createDoormanFireTaunt(e){
-    if(!e) return;
-
-    const dir=e.flipX ? -1 : 1;
-    const fxX=e.x + dir*55;
-    const fxY=e.y - 68;
-
-    const fire=this.add.circle(fxX,fxY,22,0xff5a00,0.95)
-      .setDepth(14500)
-      .setBlendMode(Phaser.BlendModes.ADD);
-
-    const core=this.add.circle(fxX,fxY,10,0xffff66,1)
-      .setDepth(14501)
-      .setBlendMode(Phaser.BlendModes.ADD);
-
-    this.tweens.add({
-      targets:fire,
-      scale:2.1,
-      alpha:0,
-      duration:420,
-      onComplete:()=>fire.destroy()
-    });
-
-    this.tweens.add({
-      targets:core,
-      scale:2.6,
-      alpha:0,
-      duration:360,
-      onComplete:()=>core.destroy()
-    });
-
-    for(let i=0;i<12;i++){
-      const spark=this.add.circle(fxX,fxY,Phaser.Math.Between(2,4),0xffaa22,1)
-        .setDepth(14502)
-        .setBlendMode(Phaser.BlendModes.ADD);
-
-      const angle=Phaser.Math.FloatBetween(-0.8,0.8);
-      const dist=Phaser.Math.Between(30,70);
-
-      this.tweens.add({
-        targets:spark,
-        x:fxX + dir*Math.cos(angle)*dist,
-        y:fxY + Math.sin(angle)*dist,
-        alpha:0,
-        duration:350,
-        onComplete:()=>spark.destroy()
-      });
-    }
-
-    this.cameras.main.shake(120,0.004);
-    this.vibrateForDamage(18,"hit");
   }
 
   showPose(animKey,scale=PLAYER_ACTION_SCALE,yOffset=0){
@@ -2779,42 +1587,11 @@ class Game extends Phaser.Scene{
     return true;
   }
 
-  vibrateForDamage(damage=8,type="hit"){
-    if(!VIBRATION_ENABLED) return;
-    if(typeof navigator==="undefined" || !navigator.vibrate) return;
-
-    const power=Phaser.Math.Clamp(Math.round(20+damage*6),30,160);
-
-    if(type==="block"){
-      navigator.vibrate([20,25,20]);
-      return;
-    }
-
-    if(type==="jump"){
-      navigator.vibrate(20);
-      return;
-    }
-
-    if(damage>=18){
-      navigator.vibrate([45,35,130]);
-      return;
-    }
-
-    if(damage>=12){
-      navigator.vibrate([35,25,90]);
-      return;
-    }
-
-    navigator.vibrate(power);
-  }
-
   createHitFX(x,y,type="hit",damage=8){
     let color=0xfff45c;
 
     if(type==="block") color=0x00eaff;
     if(type==="jump") color=0xffffff;
-
-    this.vibrateForDamage(damage,type);
 
     const flash=this.add.circle(x,y,22,color,0.95)
       .setDepth(14000)
@@ -2827,26 +1604,6 @@ class Game extends Phaser.Scene{
       duration:190,
       onComplete:()=>flash.destroy()
     });
-
-    for(let i=0;i<12;i++){
-      const spark=this.add.rectangle(x,y,12,3,color,1)
-        .setDepth(14001)
-        .setBlendMode(Phaser.BlendModes.ADD);
-
-      const angle=Phaser.Math.FloatBetween(0,Math.PI*2);
-      const dist=Phaser.Math.Between(22,54);
-
-      spark.rotation=angle;
-
-      this.tweens.add({
-        targets:spark,
-        x:x+Math.cos(angle)*dist,
-        y:y+Math.sin(angle)*dist,
-        alpha:0,
-        duration:210,
-        onComplete:()=>spark.destroy()
-      });
-    }
 
     if(type==="hit"){
       const txt=this.add.text(x,y-18,"HIT",{
@@ -2864,9 +1621,32 @@ class Game extends Phaser.Scene{
         onComplete:()=>txt.destroy()
       });
     }
+  }
 
-    const shakePower=Phaser.Math.Clamp(0.003+damage*0.0003,0.004,0.012);
-    this.cameras.main.shake(90,shakePower);
+  damageEnemy(e,damage,stagger=false){
+    if(!e || e.dead) return;
+
+    e.health-=damage;
+    this.createHitFX(e.x,e.y-55,"hit",damage);
+
+    this.combo++;
+    this.rhythm=Math.min(10,this.rhythm+1);
+
+    if(e.health<=0){
+      this.killEnemy(e);
+      return;
+    }
+
+    this.safeEnemyPlay(e,stagger ? "knockback" : "hurt");
+    this.updateEnemyHealthBar(e);
+
+    this.time.delayedCall(stagger ? 650 : 300,()=>{
+      if(!e.dead){
+        e.busy=false;
+        e.state="idle";
+        this.safeEnemyPlay(e,"idle");
+      }
+    });
   }
 
   damagePlayer(amount,dir){
@@ -2957,7 +1737,6 @@ class Game extends Phaser.Scene{
       this.playerHealth<=0 ||
       this.isClimbing ||
       this.isJumping ||
-      this.grabbedEnemy ||
       this.pauseMenuOpen ||
       this.matchOver;
 
@@ -2970,15 +1749,6 @@ class Game extends Phaser.Scene{
 
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
-
-    if(this.grabbedEnemy && this.grabMode==="carry"){
-      this.playerBusy=false;
-      this.isBlocking=false;
-      this.isJumping=false;
-      this.isCrouching=false;
-      this.showCarryPose();
-      return;
-    }
 
     this.isJumping=false;
     this.isCrouching=false;
@@ -3005,7 +1775,6 @@ class Game extends Phaser.Scene{
   startAttack(type){
     if(!this.ensureRoundActive()) return;
 
-    if(this.grabbedEnemy) return;
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -3048,42 +1817,9 @@ class Game extends Phaser.Scene{
     this.physics.add.overlap(box,this.enemies,(b,e)=>{
       if(hit.has(e) || e.dead || e.state==="dead") return;
       if(e.platform!==this.platform) return;
-      if(e.grabbed || e.thrownTime>0) return;
-      if(e.invulnerable) return;
 
       hit.add(e);
-
-      e.health-=data.damage;
-      this.createHitFX(e.x,e.y-55,"hit",data.damage);
-
-      e.busy=true;
-      e.state=data.stagger ? "stagger" : "hurt";
-      e.knockbackTime=data.stagger ? 650 : 300;
-      e.attackCooldown=data.stagger ? 1100 : 500;
-
-      const resist=e.knockbackResist || 1;
-      const knockPower=data.stagger ? 190 : 120;
-
-      e.setVelocityX((e.x<this.player.x ? -1 : 1)*knockPower*resist);
-
-      this.combo++;
-      this.rhythm=Math.min(10,this.rhythm+1);
-
-      if(e.health<=0){
-        this.killEnemy(e);
-        return;
-      }
-
-      this.safeEnemyPlay(e,data.stagger ? "knockback" : "hurt");
-      this.updateEnemyHealthBar(e);
-
-      this.time.delayedCall(data.stagger ? 650 : 300,()=>{
-        if(!e.dead){
-          e.busy=false;
-          e.state="idle";
-          this.safeEnemyPlay(e,"idle");
-        }
-      });
+      this.damageEnemy(e,data.damage,data.stagger);
     });
 
     this.time.delayedCall(120,()=>{
@@ -3093,7 +1829,6 @@ class Game extends Phaser.Scene{
 
   quickBlock(){
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.startBlock();
@@ -3105,7 +1840,6 @@ class Game extends Phaser.Scene{
 
   startBlock(){
     if(this.pauseMenuOpen) return;
-    if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
 
     this.playerBusy=true;
@@ -3170,7 +1904,7 @@ class Game extends Phaser.Scene{
     if(!DEBUG_RUNTIME) return;
 
     const msg = err && err.message ? err.message : String(err);
-
+    window.__MP_LAST_ERROR = msg;
     console.error(err);
 
     if(!this.runtimeErrorText){
@@ -3195,78 +1929,22 @@ class Game extends Phaser.Scene{
       });
       return;
     }
+  }
 
-    this.countdownShade=this.add.rectangle(480,270,960,540,0x000000,0.42)
-      .setDepth(19990);
+  checkVictory(){
+    if(!this.matchStarted || this.matchOver || this.victoryShown) return;
+    if(!this.enemies) return;
 
-    const main=this.makeArcadeText(480,250,"READY",64,"#ff4fc3");
-    const sub=this.makeArcadeText(480,340,"GET SET",32,"#00eaff");
+    let aliveNormalEnemies=0;
 
-    const cleanup=()=>{
-      if(this.countdownShade){
-        this.countdownShade.destroy();
-        this.countdownShade=null;
-      }
+    this.enemies.children.each(e=>{
+      if(!e || e.dead || e.state==="dead" || e.health<=0) return;
+      aliveNormalEnemies++;
+    });
 
-      if(main) main.destroy();
-      if(sub) sub.destroy();
-    };
-
-    const finishCountdown=()=>{
-      if(this.roundUnlockDone) return;
-
-      this.roundUnlockDone=true;
-      cleanup();
-      this.unlockPlayerControl();
-    };
-
-    const steps=[
-      {main:"READY",sub:"GET SET",color:"#ff4fc3",size:64},
-      {main:"3",sub:"",color:"#fff45c",size:96},
-      {main:"2",sub:"",color:"#00eaff",size:96},
-      {main:"1",sub:"",color:"#ff4fc3",size:96},
-      {main:"FIGHT!",sub:"",color:"#7CFF6B",size:72}
-    ];
-
-    let i=0;
-
-    const showStep=()=>{
-      if(i>=steps.length){
-        this.time.delayedCall(500,finishCountdown);
-        return;
-      }
-
-      const step=steps[i];
-
-      main.setText(step.main);
-      main.setStyle({
-        font:step.size+"px monospace",
-        fill:step.color,
-        stroke:"#000000",
-        strokeThickness:8
-      });
-
-      sub.setText(step.sub || "");
-
-      main.setScale(0.6);
-      main.setAlpha(1);
-
-      this.tweens.add({
-        targets:main,
-        scale:1.15,
-        duration:160,
-        yoyo:true
-      });
-
-      this.cameras.main.shake(70,0.002);
-
-      i++;
-      this.time.delayedCall(650,showStep);
-    };
-
-    showStep();
-
-    this.time.delayedCall(4500,finishCountdown);
+    if(aliveNormalEnemies<=0){
+      this.showVictory();
+    }
   }
 
   showVictory(){
@@ -3299,39 +1977,6 @@ class Game extends Phaser.Scene{
       yoyo:true,
       repeat:-1
     });
-
-    this.cameras.main.shake(250,0.004);
-  }
-
-  checkVictory(){
-    if(!this.matchStarted || this.matchOver || this.victoryShown) return;
-    if(!this.enemies) return;
-
-    let aliveNormalEnemies=0;
-    let aliveDoorman=0;
-
-    this.enemies.children.each(e=>{
-      if(!e || e.dead || e.state==="dead" || e.health<=0) return;
-
-      if(e.enemyType==="doorman"){
-        aliveDoorman++;
-      }else{
-        aliveNormalEnemies++;
-      }
-    });
-
-    if(aliveNormalEnemies<=0 && !this.doormanSpawned){
-      if(DISABLE_DOORMAN_FOR_TEST){
-        this.showVictory();
-      }else{
-        this.spawnDoormanIntro();
-      }
-      return;
-    }
-
-    if(this.doormanSpawned && aliveDoorman<=0){
-      this.showVictory();
-    }
   }
 
   freezeActors(){
@@ -3341,7 +1986,7 @@ class Game extends Phaser.Scene{
 
     if(this.enemies){
       this.enemies.children.each(e=>{
-        if(e && e.body && !e.grabbed){
+        if(e && e.body){
           e.setVelocity(0,0);
         }
       });
@@ -3393,29 +2038,15 @@ class Game extends Phaser.Scene{
       strokeThickness:5
     }).setOrigin(0.5).setDepth(30002).setInteractive();
 
-    const hint=this.add.text(480,390,"MENU / ESC = unpause    ENTER = select",{
-      font:"15px monospace",
-      fill:"#00eaff"
-    }).setOrigin(0.5).setDepth(30002);
-
-    this.pauseOptions=[
-      {label:"CONTINUE",action:"continue",text:continueText},
-      {label:"QUIT TO TITLE",action:"quit",text:quitText}
-    ];
-
     continueText.on("pointerdown",()=>{
-      this.pauseCursor=0;
-      this.selectPauseOption();
+      this.closePauseMenu();
     });
 
     quitText.on("pointerdown",()=>{
-      this.pauseCursor=1;
-      this.selectPauseOption();
+      this.scene.start("Title");
     });
 
-    this.pauseItems=[shade,panel,title,continueText,quitText,hint];
-
-    this.updatePauseCursor();
+    this.pauseItems=[shade,panel,title,continueText,quitText];
   }
 
   closePauseMenu(){
@@ -3430,65 +2061,6 @@ class Game extends Phaser.Scene{
     }
 
     this.pauseItems=[];
-    this.pauseOptions=[];
-  }
-
-  movePauseCursor(dir){
-    if(!this.pauseMenuOpen || !this.pauseOptions.length) return;
-
-    this.pauseCursor+=dir;
-
-    if(this.pauseCursor<0){
-      this.pauseCursor=this.pauseOptions.length-1;
-    }
-
-    if(this.pauseCursor>=this.pauseOptions.length){
-      this.pauseCursor=0;
-    }
-
-    this.updatePauseCursor();
-  }
-
-  updatePauseCursor(){
-    if(!this.pauseOptions) return;
-
-    this.pauseOptions.forEach((option,index)=>{
-      const active=index===this.pauseCursor;
-      option.text.setText((active ? "▶ " : "  ")+option.label);
-      option.text.setFill(active ? "#fff45c" : "#ffffff");
-    });
-  }
-
-  selectPauseOption(){
-    if(!this.pauseMenuOpen || !this.pauseOptions.length) return;
-
-    const selected=this.pauseOptions[this.pauseCursor];
-
-    if(selected.action==="continue"){
-      this.closePauseMenu();
-      return;
-    }
-
-    if(selected.action==="quit"){
-      this.quitToTitle();
-    }
-  }
-
-  quitToTitle(){
-    this.pauseMenuOpen=false;
-    this.matchOver=true;
-    this.clearGrabTimers();
-
-    if(this.pauseItems && this.pauseItems.length){
-      this.pauseItems.forEach(item=>{
-        if(item && item.destroy) item.destroy();
-      });
-    }
-
-    this.pauseItems=[];
-    this.pauseOptions=[];
-
-    this.scene.start("Title");
   }
 
   addRain(){
@@ -3602,14 +2174,6 @@ class Game extends Phaser.Scene{
 
     g.lineStyle(4,0x2b1d0f,1);
     g.strokeRect(x-w/2,y-h,w,h);
-
-    g.lineStyle(4,0x2b1d0f,1);
-    g.beginPath();
-    g.moveTo(x-w/2+6,y-6);
-    g.lineTo(x+w/2-6,y-h+6);
-    g.moveTo(x-w/2+14,y-6);
-    g.lineTo(x+w/2-14,y-h+6);
-    g.strokePath();
 
     this.barricadeFront=g;
   }
