@@ -1,0 +1,92 @@
+name: Fix index 656
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fix-index-656.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Patch index.html
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Remove accidental assistant instruction text before HTML.
+          start = s.find('<!DOCTYPE html>')
+          if start != -1:
+              s = s[start:]
+
+          # iPhone/Safari safe viewport.
+          s = re.sub(
+              r'<meta name="viewport" content="[^"]*">',
+              '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">',
+              s,
+              count=1,
+          )
+
+          # Force canvas centered and scaled inside viewport.
+          new_style = '''<style>
+          html,body{
+            margin:0;
+            padding:0;
+            background:#000;
+            width:100%;
+            height:100%;
+            overflow:hidden;
+            touch-action:none;
+            position:fixed;
+            inset:0;
+          }
+
+          body{
+            display:block;
+          }
+
+          canvas{
+            display:block;
+            image-rendering:pixelated;
+            position:absolute !important;
+            left:50% !important;
+            top:50% !important;
+            transform:translate(-50%,-50%) !important;
+            max-width:100vw !important;
+            max-height:100dvh !important;
+          }
+          </style>'''
+
+          s = re.sub(r'<style>.*?</style>', new_style, s, count=1, flags=re.S)
+
+          # Version and Hew size fixes.
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 656;', s, count=1)
+          s = re.sub(r'const HEW_STATIC_SCALE\s*=\s*[^;]+;', 'const HEW_STATIC_SCALE = 0.095;', s, count=1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit fixed index
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "index.html already fixed"
+            exit 0
+          fi
+          git config user.name "ChatGPT Fix Bot"
+          git config user.email "chatgpt-fix-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix index canvas centering and Hew scale"
+          git push
