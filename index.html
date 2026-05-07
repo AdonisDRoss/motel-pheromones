@@ -13,7 +13,7 @@ canvas{width:100vw!important;height:100vh!important;object-fit:contain;image-ren
 <body>
 <script>
 
-const VERSION = 580;
+const VERSION = 581;
 const W = 960;
 const H = 540;
 
@@ -827,37 +827,30 @@ class Game extends Phaser.Scene{
     this.playerHealth=Math.max(0,this.playerHealth-finalDamage);
     this.playerInvuln=650;
 
+    if(this.player){
+      this.player.body.setVelocityX(dir*90);
+      this.player.setTint(0xff4444);
+
+      this.time.delayedCall(120,()=>{
+        if(this.player) this.player.clearTint();
+      });
+    }
+
     if(this.playerHealth<=0){
       this.playerHealth=0;
       this.playerBusy=true;
-      this.player.body.setVelocity(0,0);
 
-      if(hasAnim(this,"jt_ko")){
-        this.showPose("jt_ko",PLAYER_REACTION_SCALE);
-      }else{
+      if(this.player){
+        this.player.body.setVelocity(0,0);
         this.player.setTint(0xff4444);
+      }
+
+      if(this.poseSprite){
+        this.poseSprite.stop();
+        this.poseSprite.setVisible(false);
       }
 
       return;
-    }
-
-    if(this.player){
-      this.player.body.setVelocityX(dir*90);
-
-      if(hasAnim(this,"jt_hurt")){
-        this.playerBusy=true;
-        this.showPose("jt_hurt",PLAYER_REACTION_SCALE);
-
-        this.time.delayedCall(300,()=>{
-          this.forcePlayerReady();
-        });
-      }else{
-        this.player.setTint(0xff4444);
-
-        this.time.delayedCall(120,()=>{
-          if(this.player) this.player.clearTint();
-        });
-      }
     }
   }
 
