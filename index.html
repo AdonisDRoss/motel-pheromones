@@ -26,7 +26,7 @@ canvas{
 <body>
 <script>
 
-const VERSION = 612;
+const VERSION = 614;
 const W = 960;
 const H = 540;
 
@@ -44,7 +44,10 @@ const REACTION_FRAME_H = 236;
 
 const ENEMY_FRAME_W = 128;
 const ENEMY_FRAME_H = 128;
+const FERAL_FRAME_W = 163;
+const FERAL_FRAME_H = 164;
 
+  
 const PLAYER_MOVE_SCALE = 0.44;
 const PLAYER_ATTACK_SCALE = 0.32;
 const PLAYER_ACTION_SCALE = 0.32;
@@ -155,20 +158,20 @@ const ENEMY_TYPES = {
   },
 
   feral:{
-    key:"feral",
-    prefix:"feral",
-    label:"FERAL",
-    maxHealth:22,
-    scale:0.55,
-    chaseSpeed:88,
-    attackRange:64,
-    stopRange:50,
-    attackCooldownMin:160,
-    attackCooldownMax:460,
-    attackDamage:7,
-    canBeGrabbed:true,
-    knockbackResist:1
-  },
+  key:"feral",
+  prefix:"feral",
+  label:"FERAL",
+  maxHealth:22,
+  scale:0.46,
+  chaseSpeed:88,
+  attackRange:64,
+  stopRange:50,
+  attackCooldownMin:160,
+  attackCooldownMax:460,
+  attackDamage:7,
+  canBeGrabbed:true,
+  knockbackResist:1
+},
 
   doorman:{
     key:"doorman",
