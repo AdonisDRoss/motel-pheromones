@@ -96,11 +96,11 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 const PLATFORM_BOUNDS = {
-  topLeft:{   minX:305, maxX:440, minY:296, maxY:314 }, // small roof over car
-  top:{       minX:465, maxX:860, minY:238, maxY:268 }, // long upper purple-lit roof
-  middle:{    minX:120, maxX:860, minY:365, maxY:420 }, // balcony level below
-  behindCar:{ minX:120, maxX:295, minY:425, maxY:460 }, // lane behind car
-  bottom:{    minX:120, maxX:860, minY:485, maxY:520 }  // street
+  topLeft:{   minX:305, maxX:440, minY:296, maxY:314 },
+  top:{       minX:465, maxX:860, minY:238, maxY:268 },
+  middle:{    minX:120, maxX:860, minY:365, maxY:420 },
+  behindCar:{ minX:120, maxX:295, minY:425, maxY:460 },
+  bottom:{    minX:120, maxX:860, minY:485, maxY:520 }
 };
    const SPECIAL_LADDERS = [
   {
@@ -1167,6 +1167,8 @@ class Game extends Phaser.Scene{
   {
     name:"left",
     x:365,
+    topX:475,
+    bottomX:365,
     y:325,
     w:70,
     h:190,
@@ -1178,6 +1180,8 @@ class Game extends Phaser.Scene{
   {
     name:"right",
     x:806,
+    topX:806,
+    bottomX:806,
     y:355,
     w:90,
     h:250,
@@ -1303,7 +1307,7 @@ if(direction==="down"){
   this.isClimbing=false;
   this.platform=exitPlatform;
   this.player.y=getPlatformY(exitPlatform);
-  this.player.x=l.x;
+  this.player.x=l.topX || l.x;
   this.currentLadder=null;
 
   if(this.zoneText){
@@ -1319,7 +1323,7 @@ if(direction==="down"){
   this.isClimbing=false;
   this.platform=exitPlatform;
   this.player.y=getPlatformY(exitPlatform);
-  this.player.x=l.x;
+  this.player.x=l.bottomX || l.x;
   this.currentLadder=null;
 
   if(this.zoneText){
