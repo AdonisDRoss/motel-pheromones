@@ -140,37 +140,7 @@ const HEW_USE_STATIC_IMAGE = false;
 const HEW_STATIC_SCALE = 0.095;
 const DISABLE_DOORMAN_FOR_TEST = false;
 const VIBRATION_ENABLED = true;
-const JUMP_LINKS = [
-  // lower middle platform -> small upper-left roof
-  {
-    from: "middle",
-    to: "topLeft",
-    minX: 295,
-    maxX: 430,
-    landX: 360,
-    landY: 305
-  },
-
-  // small upper-left roof -> main upper roof
-  {
-    from: "topLeft",
-    to: "top",
-    minX: 390,
-    maxX: 445,
-    landX: 490,
-    landY: 252
-  },
-
-  // main upper roof -> small upper-left roof
-  {
-    from: "top",
-    to: "topLeft",
-    minX: 465,
-    maxX: 520,
-    landX: 420,
-    landY: 305
-  }
-];
+const JUMP_LINKS = [ ];
 const VIBE = {
   button:8,
   attack:18,
@@ -1194,9 +1164,29 @@ class Game extends Phaser.Scene{
   createPlatformZones(){
     const alpha=0;
     this.ladders=[
-      {name:"left",x:332,y:355,w:90,h:250,topY:250,middleY:390},
-      {name:"right",x:806,y:355,w:90,h:250,topY:250,middleY:390}
-    ];
+  {
+    name:"left",
+    x:365,
+    y:325,
+    w:70,
+    h:190,
+    topY:252,
+    middleY:390,
+    topPlatform:"top",
+    bottomPlatform:"middle"
+  },
+  {
+    name:"right",
+    x:806,
+    y:355,
+    w:90,
+    h:250,
+    topY:250,
+    middleY:390,
+    topPlatform:"top",
+    bottomPlatform:"middle"
+  }
+];
     this.stairs=[
       {name:"leftStairs",x:118,y:452,w:120,h:120,middleX:150,middleY:390,bottomX:120,bottomY:505},
       {name:"rightStairs",x:846,y:452,w:120,h:120,middleX:816,middleY:390,bottomX:860,bottomY:505}
