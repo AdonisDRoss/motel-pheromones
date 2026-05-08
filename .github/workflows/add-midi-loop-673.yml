@@ -1,0 +1,90 @@
+name: Add MIDI style loop 673
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/trigger-midi-loop-673.txt
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+          s=re.sub(r'const VERSION\s*=\s*\d+\s*;','const VERSION = 673;',s,1)
+          music_code = r'''
+let mpMidiCtx=null;
+let mpMidiTimer=null;
+let mpMidiPlaying=false;
+const MP_MIDI_BPM=154;
+function midiNoteFreq(n){
+  return 440*Math.pow(2,(n-69)/12);
+}
+function playMidiTone(note,start,dur,type,gainValue){
+  if(!mpMidiCtx) return;
+  const osc=mpMidiCtx.createOscillator();
+  const gain=mpMidiCtx.createGain();
+  osc.type=type || "square";
+  osc.frequency.setValueAtTime(midiNoteFreq(note),start);
+  gain.gain.setValueAtTime(0.0001,start);
+  gain.gain.linearRampToValueAtTime(gainValue,start+0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+  osc.connect(gain);
+  gain.connect(mpMidiCtx.destination);
+  osc.start(start);
+  osc.stop(start+dur+0.05);
+}
+function scheduleMidiLoop(){
+  if(!mpMidiCtx || !mpMidiPlaying) return;
+  const beat=60/MP_MIDI_BPM;
+  const now=mpMidiCtx.currentTime+0.05;
+  const bass=[40,40,43,40,45,45,43,38,40,40,43,45,47,45,43,40];
+  const lead=[64,67,69,71,72,71,69,67,64,62,64,67,69,67,64,62];
+  const drums=[36,42,38,42,36,42,38,46,36,42,38,42,36,42,38,46];
+  for(let i=0;i<16;i++){
+    const t=now+i*(beat/2);
+    playMidiTone(bass[i],t,beat*0.38,"square",0.035);
+    if(i%2===0) playMidiTone(lead[i],t,beat*0.42,"triangle",0.022);
+    playMidiTone(drums[i],t,beat*0.08,"sawtooth",i%2===0?0.018:0.01);
+  }
+  mpMidiTimer=setTimeout(scheduleMidiLoop,beat*8*1000);
+}
+function startMidiLoop(){
+  if(mpMidiPlaying) return;
+  const AudioContextClass=window.AudioContext || window.webkitAudioContext;
+  if(!AudioContextClass) return;
+  if(!mpMidiCtx) mpMidiCtx=new AudioContextClass();
+  try{ mpMidiCtx.resume(); }catch(e){}
+  mpMidiPlaying=true;
+  scheduleMidiLoop();
+}
+function stopMidiLoop(){
+  mpMidiPlaying=false;
+  if(mpMidiTimer){ clearTimeout(mpMidiTimer); mpMidiTimer=null; }
+}
+function toggleMidiLoop(){
+  if(mpMidiPlaying) stopMidiLoop();
+  else startMidiLoop();
+}
+'''
+          if 'function startMidiLoop()' not in s:
+              s=s.replace('const JT_BASE = "assets/sprites/player/jt";', music_code+'\nconst JT_BASE = "assets/sprites/player/jt";',1)
+          s=s.replace('this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));','this.input.once("pointerdown",()=>{ startMidiLoop(); this.scene.start("CharacterSelect"); });')
+          s=s.replace('this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));','this.input.keyboard.once("keydown-ENTER",()=>{ startMidiLoop(); this.scene.start("CharacterSelect"); });')
+          if 'keydown-O",()=>toggleMidiLoop()' not in s:
+              s=s.replace('this.input.keyboard.on("keydown-ESC",()=>this.togglePauseMenu());','this.input.keyboard.on("keydown-ESC",()=>this.togglePauseMenu());\n    this.input.keyboard.on("keydown-O",()=>toggleMidiLoop());',1)
+          p.write_text(s)
+          PY
+      - run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          git commit -m "Add MIDI style music loop"
+          git push
