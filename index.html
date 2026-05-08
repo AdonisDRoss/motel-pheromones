@@ -149,6 +149,8 @@ function vibrate(pattern){
 
 let titleMusicInstance = null;
 let titleMusicStarted = false;
+let fightMusicInstance = null;
+let fightMusicStarted = false;
 
 function startTitleMusic(){
   if(titleMusicStarted) return;
@@ -205,6 +207,48 @@ function toggleTitleMusic(){
 function goFromTitle(scene){
   startTitleMusic();
   scene.scene.start("CharacterSelect");
+}
+
+  function startFightMusic(){
+  if(fightMusicStarted) return;
+
+  try{
+    if(!fightMusicInstance){
+      fightMusicInstance = new Audio("assets/audio/fight-theme-loop.wav?v=" + VERSION);
+      fightMusicInstance.loop = true;
+      fightMusicInstance.volume = 0.55;
+      fightMusicInstance.preload = "auto";
+      fightMusicInstance.setAttribute("playsinline", "true");
+      fightMusicInstance.setAttribute("webkit-playsinline", "true");
+    }
+
+    const playPromise = fightMusicInstance.play();
+
+    if(playPromise && playPromise.then){
+      playPromise.then(function(){
+        fightMusicStarted = true;
+        console.log("FIGHT MUSIC PLAYING");
+      }).catch(function(err){
+        console.warn("FIGHT MUSIC BLOCKED OR FAILED:", err);
+      });
+    }else{
+      fightMusicStarted = true;
+    }
+
+  }catch(e){
+    console.warn("FIGHT MUSIC ERROR:", e);
+  }
+}
+
+function stopFightMusic(){
+  try{
+    if(fightMusicInstance){
+      fightMusicInstance.pause();
+      fightMusicInstance.currentTime = 0;
+    }
+  }catch(e){}
+
+  fightMusicStarted = false;
 }
 
 const JT_BASE = "assets/sprites/player/jt";
@@ -517,6 +561,7 @@ class Title extends Phaser.Scene{
   }
 
   create(){
+   
     if(hasTex(this,"title")){
       this.add.image(480,270,"title").setDisplaySize(960,540);
     }else{
@@ -642,16 +687,20 @@ class LevelSelect extends Phaser.Scene{
         this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01)
           .setInteractive()
           .setDepth(40)
-          .on("pointerdown",()=>{
-            selectedLevel=l.key;
-            selectedLevelName=l.name;
-            outline.setPosition(l.x,l.y);
-            outline.setSize(l.w,l.h);
-            status.setText("LOADING: "+l.name);
-            this.time.delayedCall(250,()=>{
-              this.scene.start("Game");
-            });
-          });
+   .on("pointerdown",()=>{
+  selectedLevel=l.key;
+  selectedLevelName=l.name;
+  outline.setPosition(l.x,l.y);
+  outline.setSize(l.w,l.h);
+  status.setText("LOADING: "+l.name);
+
+  stopTitleMusic();
+  startFightMusic();
+
+  this.time.delayedCall(250,()=>{
+    this.scene.start("Game");
+  });
+});
       });
     });
   }
@@ -721,6 +770,8 @@ class Game extends Phaser.Scene{
     };
   }
   create(){
+    stopTitleMusic();
+startFightMusic();
     this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
       .setDisplaySize(960,540)
       .setDepth(0);
