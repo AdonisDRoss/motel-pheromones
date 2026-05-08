@@ -1,0 +1,157 @@
+name: Patch Hew clean movement anims 661
+
+on:
+  push:
+    paths:
+      - ".github/workflows/patch-hew-clean-anims-661.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch Hew clean movement animations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Cache bust.
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 661;', s, count=1)
+
+          # Hew uploaded sheet is 1136x944 with a 5x5 layout.
+          if 'const HEW_MOVE_FRAME_W' not in s:
+              s = s.replace(
+                  'const MOVE_FRAME_H = 170;\n',
+                  'const MOVE_FRAME_H = 170;\n'
+                  'const HEW_MOVE_FRAME_W = 227;\n'
+                  'const HEW_MOVE_FRAME_H = 188;\n'
+                  'const HEW_MOVE_SCALE = 0.36;\n',
+                  1
+              )
+          else:
+              s = re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_W = 227;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_H = 188;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;', 'const HEW_MOVE_SCALE = 0.36;', s, count=1)
+
+          # Hew movement loader uses Hew-specific slice size.
+          s = s.replace(
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:MOVE_FRAME_W,\n'
+              '    frameHeight:MOVE_FRAME_H,',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:HEW_MOVE_FRAME_W,\n'
+              '    frameHeight:HEW_MOVE_FRAME_H,',
+              1
+          )
+
+          # Hew movement scale separate from JT.
+          old_scale = '''getPlayerMoveScale(){
+    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;
+  }'''
+          new_scale = '''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }'''
+          if old_scale in s:
+              s = s.replace(old_scale, new_scale, 1)
+
+          # Add Hew-specific animation rebuild so idle/up/down do not cycle through multiple poses.
+          if 'function rebuildHewMovementAnims(scene)' not in s:
+              helper = r'''
+function resetAnim(scene,key){
+  if(scene.anims.exists(key)){
+    scene.anims.remove(key);
+  }
+}
+
+function makeSingleFrameAnim(scene,key,sheet,frame,rate=1,repeat=-1){
+  if(!hasTex(scene,sheet)) return;
+  if(!textureHasFrame(scene,sheet,frame)) return;
+
+  resetAnim(scene,key);
+
+  scene.anims.create({
+    key:key,
+    frames:[{key:sheet,frame:frame}],
+    frameRate:rate,
+    repeat:repeat
+  });
+}
+
+function makeCleanRangeAnim(scene,key,sheet,start,end,rate,repeat){
+  if(!hasTex(scene,sheet)) return;
+
+  resetAnim(scene,key);
+
+  const frames=[];
+
+  for(let i=start;i<=end;i++){
+    if(textureHasFrame(scene,sheet,i)){
+      frames.push({key:sheet,frame:i});
+    }
+  }
+
+  if(frames.length<=0) return;
+
+  scene.anims.create({
+    key:key,
+    frames:frames,
+    frameRate:rate,
+    repeat:repeat
+  });
+}
+
+function rebuildHewMovementAnims(scene){
+  const sheet="hew_movement";
+
+  // The uploaded Hew movement sheet is a 5x5 pose sheet:
+  // Row 1 = front/down, row 2 = back/up, row 3 = side idle,
+  // row 4 = walk side, row 5 = run side.
+  // Use single frames for idle/up/down so Hew does not cycle through pose copies.
+  makeSingleFrameAnim(scene,"hew_idle_down",sheet,2,1,-1);
+  makeSingleFrameAnim(scene,"hew_idle_up",sheet,7,1,-1);
+  makeSingleFrameAnim(scene,"hew_idle_side",sheet,12,1,-1);
+
+  makeSingleFrameAnim(scene,"hew_walk_down",sheet,2,1,-1);
+  makeSingleFrameAnim(scene,"hew_walk_up",sheet,7,1,-1);
+  makeCleanRangeAnim(scene,"hew_walk_side",sheet,15,19,7,-1);
+
+  makeSingleFrameAnim(scene,"hew_run_down",sheet,2,1,-1);
+  makeSingleFrameAnim(scene,"hew_run_up",sheet,7,1,-1);
+  makeCleanRangeAnim(scene,"hew_run_side",sheet,20,24,9,-1);
+}
+'''
+              s = s.replace('function loadAssets(scene){', helper + '\nfunction loadAssets(scene){', 1)
+
+          if 'rebuildHewMovementAnims(scene);' not in s:
+              s = s.replace(
+                  'makePlayerAnimSet(scene,"jt");\n  makePlayerAnimSet(scene,"hew");',
+                  'makePlayerAnimSet(scene,"jt");\n  makePlayerAnimSet(scene,"hew");\n  rebuildHewMovementAnims(scene);',
+                  1
+              )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index.html changes needed"
+            exit 0
+          fi
+          git config user.name "ChatGPT Fix Bot"
+          git config user.email "chatgpt-fix-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix Hew movement animation cycling"
+          git push
