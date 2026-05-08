@@ -96,11 +96,11 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 const PLATFORM_BOUNDS = {
-  topLeft:{   minX:308, maxX:410, minY:296, maxY:312 }, // small left roof with purple lights under it
-  top:{       minX:470, maxX:860, minY:238, maxY:268 }, // main upper roof only
-  middle:{    minX:120, maxX:860, minY:365, maxY:420 },
-  behindCar:{ minX:120, maxX:295, minY:425, maxY:460 },
-  bottom:{    minX:120, maxX:860, minY:485, maxY:520 }
+  topLeft:{   minX:305, maxX:440, minY:296, maxY:314 }, // small roof over car
+  top:{       minX:465, maxX:860, minY:238, maxY:268 }, // long upper purple-lit roof
+  middle:{    minX:120, maxX:860, minY:365, maxY:420 }, // balcony level below
+  behindCar:{ minX:120, maxX:295, minY:425, maxY:460 }, // lane behind car
+  bottom:{    minX:120, maxX:860, minY:485, maxY:520 }  // street
 };
    const SPECIAL_LADDERS = [
   {
@@ -141,13 +141,34 @@ const HEW_STATIC_SCALE = 0.095;
 const DISABLE_DOORMAN_FOR_TEST = false;
 const VIBRATION_ENABLED = true;
 const JUMP_LINKS = [
+  // lower middle platform -> small upper-left roof
   {
     from: "middle",
     to: "topLeft",
-    minX: 290,
+    minX: 295,
     maxX: 430,
     landX: 360,
-    landY: 304
+    landY: 305
+  },
+
+  // small upper-left roof -> main upper roof
+  {
+    from: "topLeft",
+    to: "top",
+    minX: 390,
+    maxX: 445,
+    landX: 490,
+    landY: 252
+  },
+
+  // main upper roof -> small upper-left roof
+  {
+    from: "top",
+    to: "topLeft",
+    minX: 465,
+    maxX: 520,
+    landX: 420,
+    landY: 305
   }
 ];
 const VIBE = {
@@ -1918,10 +1939,8 @@ for(const link of JUMP_LINKS){
     }
   }
   getPlatformCenterY(platform){
-    if(platform==="top") return 250;
-    if(platform==="bottom") return 505;
-    return 390;
-  }
+  return getPlatformY(platform);
+}
   getNearestLadder(x){
     if(!this.ladders || !this.ladders.length) return null;
     let best=this.ladders[0];
