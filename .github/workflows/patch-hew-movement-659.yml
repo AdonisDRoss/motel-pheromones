@@ -1,0 +1,78 @@
+name: Patch Hew movement 659
+
+on:
+  push:
+    paths:
+      - ".github/workflows/patch-hew-movement-659.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch Hew movement sizing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Bump cache version.
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 659;', s, count=1)
+
+          # Add Hew-only movement sizing constants after the global movement frame constants.
+          if 'const HEW_MOVE_FRAME_W' not in s:
+              s = s.replace(
+                  'const MOVE_FRAME_H = 170;\n',
+                  'const MOVE_FRAME_H = 170;\n'
+                  'const HEW_MOVE_FRAME_W = 204;\n'
+                  'const HEW_MOVE_FRAME_H = 170;\n'
+                  'const HEW_MOVE_SCALE = 0.38;\n',
+                  1
+              )
+
+          # Make Hew movement.png use Hew-only frame dimensions.
+          s = s.replace(
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:MOVE_FRAME_W,\n'
+              '    frameHeight:MOVE_FRAME_H,',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:HEW_MOVE_FRAME_W,\n'
+              '    frameHeight:HEW_MOVE_FRAME_H,',
+              1
+          )
+
+          # Make Hew movement display scale separate from JT.
+          old = '''getPlayerMoveScale(){
+    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;
+  }'''
+          new = '''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index.html changes needed"
+            exit 0
+          fi
+          git config user.name "ChatGPT Fix Bot"
+          git config user.email "chatgpt-fix-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "Tune Hew movement sheet sizing"
+          git push
