@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Motel Pheromones</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;touch-action:none;overscroll-behavior:none}
+body{position:fixed;inset:0}
+#game{position:fixed;inset:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden}
+canvas{display:block!important;image-rendering:pixelated;max-width:100%!important;max-height:100%!important;margin:0!important}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<script>
+"use strict";
+
+window.__MP_LAST_ERROR = "";
+window.addEventListener("error", function(e){
+  window.__MP_LAST_ERROR = e.message || String(e);
+  console.error("Motel Pheromones runtime error:", e);
+});
+
+const VERSION = 688;
+const W = 960;
+const H = 540;
+
+const PATHS = {
+  levels: "assets/levels",
+  jt: "assets/sprites/player/jt",
+  hew: "assets/sprites/player/hew",
+  enemies: "assets/sprites/enemies",
+  audio: "assets/audio"
+};
+
+const FRAME = {
+  jtMove: { w:204, h:170, scale:0.44 },
+  jtMove2:{ w:324, h:243, scale:0.31 },
+  jtAttack:{ w:288, h:232, scale:0.32 },
+  jtAction:{ w:284, h:236, scale:0.32 },
+  jtReaction:{ w:284, h:236, scale:0.32 },
+  hewMove:{ w:227, h:188, scale:0.40 },
+  enemy:{ w:163, h:164, scale:0.46 },
+  hitfx:{ w:128, h:128, scale:1.0 }
+};
+
+const LANES = {
+  top:    { y:262, minX:120, maxX:850, label:"ROOF / TOP LANE" },
+  middle: { y:390, minX:90,  maxX:875, label:"STREET / MIDDLE LANE" },
+  bottom: { y:505, minX:90,  maxX:875, label:"CURB / BOTTOM LANE" }
+};
+
+const LADDER_ZONES = [
+  { id:"left_roof_ladder",  x:245, y1:262, y2:390, from:"middle", to:"top" },
+  { id:"right_roof_ladder", x:735, y1:262, y2:390, from:"middle", to:"top" },
+  { id:"street_ladder",     x:505, y1:390, y2:505, from:"bottom", to:"middle" }
+];
+
+const FIGHTERS = {
+  JT: {
+    name:"JT",
+    prefix:"jt",
+    unlocked:true,
+    collectible:false,
+    moveSheet:"jt_movement",
+    move2Sheet:"jt_movement2",
+    attackSheet:"jt_attacks",
+    actionSheet:"jt_actions",
+    reactionSheet:"jt_reactions",
+    moveScale:FRAME.jtMove.scale,
+    actionScale:FRAME.jtAction.scale,
+    attackScale:FRAME.jtAttack.scale,
+    reactionScale:FRAME.jtReaction.scale,
+    speed:190,
+    damage:1.0
+  },
+  HEW: {
+    name:"HEW",
+    prefix:"hew",
+    unlocked:true,
+    collectible:true,
+    moveSheet:"hew_movement",
+    move2Sheet:"hew_movement2",
+    attackSheet:"hew_attacks",
+    actionSheet:"hew_actions",
+    reactionSheet:"hew_reactions",
+    moveScale:FRAME.hewMove.scale,
+    actionScale:FRAME.jtAction.scale,
+    attackScale:FRAME.jtAttack.scale,
+    reactionScale:FRAME.jtReaction.scale,
+    speed:178,
+    damage:1.08
+  },
+  DOTTIE: {
+    name:"DOTTIE",
+    prefix:"dottie",
+    unlocked:false,
+    collectible:false
+  }
+};
+
+const LEVELS = [
+  { name:"HOUSE PARTY", key:"house", asset:"house-party.png", x:170, y:300, w:160, h:300 },
+  { name:"LEFTY'S INDOOR", key:"indoor", asset:"leftys-indoor.png", x:350, y:300, w:170, h:300 },
+  { name:"OUTDOOR", key:"outdoor", asset:"outdoor.png", x:520, y:300, w:180, h:330 },
+  { name:"LMNOP", key:"lmnop", asset:"Lmnop.png", x:690, y:300, w:160, h:300 },
+  { name:"CHICKEN COUPE", key:"chicken", asset:"Chicken-coupe.png", x:845, y:300, w:150, h:300 }
+];
+
+const ENEMY_TYPES = {
+  corpo_sellout:{ key:"corpo_sellout", prefix:"corpo", label:"CORPO", hp:30, speed:92, damage:8 },
+  corpo_wannabe:{ key:"corpo_wannabe", prefix:"wannabe", label:"WANNABE", hp:24, speed:82, damage:7 },
+  sellout:{ key:"sellout", prefix:"sellout", label:"SELLOUT", hp:28, speed:78, damage:8 },
+  feral:{ key:"feral", prefix:"feral", label:"FERAL", hp:22, speed:132, damage:7 },
+  doorman:{ key:"doorman", prefix:"doorman", label:"DOORMAN", hp:155, speed:54, damage:15, boss:true }
+};
+
+const ENEMY_POOL = ["corpo_sellout","corpo_wannabe","sellout","feral"];
+const ENEMY_NAMES = ["VINNY","MOOSE","TANK","DIEGO","RICO","BUZZ","SLIM","ROCCO","DUSTY","CHUCK"];
+
+let selectedFighter = "JT";
+let selectedLevel = "outdoor";
+let selectedLevelName = "OUTDOOR";
+let titleMusic = null;
+
+function tex(scene,key){ return scene.textures.exists(key); }
+function anim(scene,key){ return scene.anims.exists(key); }
+function play(sprite,key,ignoreIfPlaying=true){
+  if(!sprite || !sprite.scene || !anim(sprite.scene,key)) return;
+  if(ignoreIfPlaying && sprite.anims.currentAnim && sprite.anims.currentAnim.key === key && sprite.anims.isPlaying) return;
+  sprite.play(key,true);
+}
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function dist(a,b){ return Phaser.Math.Distance.Between(a.x,a.y,b.x,b.y); }
+function addAnim(scene,key,sheet,start,end,rate=10,repeat=0){
+  if(!tex(scene,sheet) || anim(scene,key)) return;
+  const frames=[];
+  for(let i=start;i<=end;i++){
+    try{
+      if(scene.textures.get(sheet).get(i)) frames.push({key:sheet,frame:i});
+    }catch(e){}
+  }
+  if(frames.length) scene.anims.create({key,frames,frameRate:rate,repeat});
+}
+function addStillAnim(scene,key,sheet){
+  if(tex(scene,sheet) && !anim(scene,key)) scene.anims.create({key,frames:[{key:sheet}],frameRate:1,repeat:-1});
+}
+function startTitleMusic(scene){
+  if(titleMusic || !scene.sound) return;
+  try{
+    if(scene.sound.locked){
+      scene.sound.once("unlocked",()=>startTitleMusic(scene));
+      return;
+    }
+    if(scene.sound.context && scene.sound.context.state === "suspended") scene.sound.context.resume();
+    if(scene.cache.audio.exists("title_music")){
+      titleMusic = scene.sound.add("title_music",{loop:true,volume:0.55});
+      titleMusic.play();
+    }
+  }catch(e){
+    console.warn("Title music skipped", e);
+  }
+}
+function stopTitleMusic(){
+  try{ if(titleMusic){ titleMusic.stop(); titleMusic.destroy(); } }catch(e){}
+  titleMusic = null;
+}
+
+class Boot extends Phaser.Scene{
+  constructor(){ super("Boot"); }
+  preload(){
+    this.load.on("loaderror", file => console.warn("Missing or failed asset:", file.key, file.url));
+
+    this.load.image("title", `${PATHS.levels}/title-screen.png?v=${VERSION}`);
+    this.load.image("character_select", `${PATHS.levels}/character-select.png?v=${VERSION}`);
+    this.load.image("level_select", `${PATHS.levels}/level-select.png?v=${VERSION}`);
+    LEVELS.forEach(l => this.load.image(l.key, `${PATHS.levels}/${l.asset}?v=${VERSION}`));
+    this.load.image("outdoor_barricade_front", `${PATHS.levels}/outdoor_barricade_front.png?v=${VERSION}`);
+    this.load.audio("title_music", `${PATHS.audio}/title-theme.mp3?v=${VERSION}`);
+
+    this.load.spritesheet("jt_movement", `${PATHS.jt}/movement.png?v=${VERSION}`, {frameWidth:FRAME.jtMove.w, frameHeight:FRAME.jtMove.h, margin:0, spacing:0});
+    this.load.spritesheet("jt_movement2", `${PATHS.jt}/movement2.png?v=${VERSION}`, {frameWidth:FRAME.jtMove2.w, frameHeight:FRAME.jtMove2.h, margin:0, spacing:0});
+    this.load.spritesheet("jt_attacks", `${PATHS.jt}/attacks/jt_attacks.png?v=${VERSION}`, {frameWidth:FRAME.jtAttack.w, frameHeight:FRAME.jtAttack.h, margin:0, spacing:0});
+    this.load.spritesheet("jt_actions", `${PATHS.jt}/actions/jt_actions.png?v=${VERSION}`, {frameWidth:FRAME.jtAction.w, frameHeight:FRAME.jtAction.h, margin:0, spacing:0});
+    this.load.spritesheet("jt_reactions", `${PATHS.jt}/reactions/jt_reactions.png?v=${VERSION}`, {frameWidth:FRAME.jtReaction.w, frameHeight:FRAME.jtReaction.h, margin:0, spacing:0});
+
+    this.load.spritesheet("hew_movement", `${PATHS.hew}/movement.png?v=${VERSION}`, {frameWidth:FRAME.hewMove.w, frameHeight:FRAME.hewMove.h, margin:0, spacing:0});
+    this.load.spritesheet("hew_movement2", `${PATHS.hew}/movement2.png?v=${VERSION}`, {frameWidth:FRAME.jtMove2.w, frameHeight:FRAME.jtMove2.h, margin:0, spacing:0});
+    this.load.spritesheet("hew_attacks", `${PATHS.hew}/attacks/hew_attacks.png?v=${VERSION}`, {frameWidth:FRAME.jtAttack.w, frameHeight:FRAME.jtAttack.h, margin:0, spacing:0});
+    this.load.spritesheet("hew_actions", `${PATHS.hew}/actions/hew_actions.png?v=${VERSION}`, {frameWidth:FRAME.jtAction.w, frameHeight:FRAME.jtAction.h, margin:0, spacing:0});
+    this.load.spritesheet("hew_reactions", `${PATHS.hew}/reactions/hew_reactions.png?v=${VERSION}`, {frameWidth:FRAME.jtReaction.w, frameHeight:FRAME.jtReaction.h, margin:0, spacing:0});
+
+    this.load.json("jt_movement_json", `${PATHS.jt}/data/movement.json?v=${VERSION}`);
+    this.load.json("jt_actions_json", `${PATHS.jt}/data/actions.json?v=${VERSION}`);
+    this.load.json("jt_attacks_json", `${PATHS.jt}/data/attacks.json?v=${VERSION}`);
+    this.load.json("jt_hit_fx_json", `${PATHS.jt}/data/hit_fx.json?v=${VERSION}`);
+    this.load.spritesheet("hit_fx", `${PATHS.jt}/fx/hit_fx.png?v=${VERSION}`, {frameWidth:FRAME.hitfx.w, frameHeight:FRAME.hitfx.h, margin:0, spacing:0});
+
+    Object.values(ENEMY_TYPES).forEach(t=>{
+      this.load.spritesheet(t.key, `${PATHS.enemies}/${t.key}.png?v=${VERSION}`, {frameWidth:FRAME.enemy.w, frameHeight:FRAME.enemy.h, margin:0, spacing:0});
+    });
+  }
+  create(){
+    this.createAnimations();
+    this.scene.start("Title");
+  }
+  createAnimations(){
+    ["jt","hew"].forEach(prefix=>{
+      addAnim(this,`${prefix}_idle_down`,`${prefix}_movement`,0,4,6,-1);
+      addAnim(this,`${prefix}_idle_up`,`${prefix}_movement`,5,9,6,-1);
+      addAnim(this,`${prefix}_idle_side`,`${prefix}_movement`,10,14,6,-1);
+      addAnim(this,`${prefix}_walk_down`,`${prefix}_movement`,15,19,9,-1);
+      addAnim(this,`${prefix}_walk_up`,`${prefix}_movement`,15,19,9,-1);
+      addAnim(this,`${prefix}_walk_side`,`${prefix}_movement`,15,19,9,-1);
+      addAnim(this,`${prefix}_run_down`,`${prefix}_movement`,20,24,13,-1);
+      addAnim(this,`${prefix}_run_up`,`${prefix}_movement`,20,24,13,-1);
+      addAnim(this,`${prefix}_run_side`,`${prefix}_movement`,20,24,13,-1);
+      addAnim(this,`${prefix}_jump`,`${prefix}_movement2`,0,4,10,0);
+      addAnim(this,`${prefix}_combo_setup`,`${prefix}_movement2`,5,9,12,0);
+      addAnim(this,`${prefix}_combo_1`,`${prefix}_movement2`,10,14,13,0);
+      addAnim(this,`${prefix}_combo_2`,`${prefix}_movement2`,15,19,13,0);
+      addAnim(this,`${prefix}_attack_light`,`${prefix}_attacks`,0,3,15,0);
+      addAnim(this,`${prefix}_attack_heavy`,`${prefix}_attacks`,4,7,12,0);
+      addAnim(this,`${prefix}_kick`,`${prefix}_attacks`,8,11,13,0);
+      addAnim(this,`${prefix}_block`,`${prefix}_attacks`,12,15,8,-1);
+      addAnim(this,`${prefix}_climb`,`${prefix}_actions`,0,3,8,-1);
+      addAnim(this,`${prefix}_crouch`,`${prefix}_actions`,4,7,8,-1);
+      addAnim(this,`${prefix}_taunt`,`${prefix}_actions`,8,11,8,0);
+      addAnim(this,`${prefix}_special`,`${prefix}_actions`,12,15,10,0);
+      addAnim(this,`${prefix}_hurt`,`${prefix}_reactions`,0,3,8,0);
+      addAnim(this,`${prefix}_knockback`,`${prefix}_reactions`,4,7,8,0);
+      addAnim(this,`${prefix}_ko`,`${prefix}_reactions`,8,11,6,0);
+      addAnim(this,`${prefix}_getup`,`${prefix}_reactions`,12,15,8,0);
+      addStillAnim(this,`${prefix}_fallback`,`${prefix}_movement`);
+    });
+
+    Object.values(ENEMY_TYPES).forEach(t=>{
+      const p=t.prefix;
+      addAnim(this,`${p}_idle`,t.key,0,4,8,-1);
+      addAnim(this,`${p}_walk`,t.key,5,9,10,-1);
+      addAnim(this,`${p}_punch`,t.key,10,14,13,0);
+      addAnim(this,`${p}_kick`,t.key,15,19,12,0);
+      addAnim(this,`${p}_hurt`,t.key,20,24,10,0);
+      addAnim(this,`${p}_knockback`,t.key,25,29,8,0);
+      addAnim(this,`${p}_ko`,t.key,30,34,7,0);
+      addAnim(this,`${p}_taunt`,t.key,35,39,8,0);
+      addStillAnim(this,`${p}_fallback`,t.key);
+    });
+    addAnim(this,"hit_fx_burst","hit_fx",0,7,18,0);
+  }
+}
+
+class Title extends Phaser.Scene{
+  constructor(){ super("Title"); }
+  create(){
+    if(tex(this,"title")) this.add.image(W/2,H/2,"title").setDisplaySize(W,H);
+    else this.drawFallback("MOTEL PHEROMONES","TAP TO START");
+    this.add.rectangle(W/2,H/2,W,H,0xffffff,0.001).setInteractive().on("pointerdown",()=>this.go());
+    this.add.text(W/2,486,"TAP TO START",{
+      fontFamily:"monospace",fontSize:"24px",color:"#ffffff",backgroundColor:"#000000"
+    }).setOrigin(0.5).setDepth(50);
+    this.add.text(W-16,16,"v"+VERSION,{fontFamily:"monospace",fontSize:"12px",color:"#aaaaaa"}).setOrigin(1,0).setDepth(50);
+    this.input.keyboard.once("keydown-ENTER",()=>this.go());
+    this.input.keyboard.once("keydown-SPACE",()=>this.go());
+  }
+  drawFallback(title,sub){
+    this.add.rectangle(W/2,H/2,W,H,0x050005,1);
+    this.add.text(W/2,220,title,{fontFamily:"monospace",fontSize:"44px",color:"#ff4fc3"}).setOrigin(0.5);
+    this.add.text(W/2,278,sub,{fontFamily:"monospace",fontSize:"20px",color:"#00eaff"}).setOrigin(0.5);
+  }
+  go(){
+    startTitleMusic(this);
+    this.scene.start("CharacterSelect");
+  }
+}
+
+class CharacterSelect extends Phaser.Scene{
+  constructor(){ super("CharacterSelect"); }
+  create(){
+    if(tex(this,"character_select")) this.add.image(W/2,H/2,"character_select").setDisplaySize(W,H);
+    else{
+      this.add.rectangle(W/2,H/2,W,H,0x160016,1);
+      this.add.text(W/2,60,"CHARACTER SELECT",{fontFamily:"monospace",fontSize:"34px",color:"#ff4fc3"}).setOrigin(0.5);
+    }
+
+    const slots = [
+      {name:"DOTTIE",x:260,y:302,w:170,h:260},
+      {name:"JT",x:480,y:302,w:170,h:260},
+      {name:"HEW",x:700,y:302,w:170,h:260}
+    ];
+
+    const outline = this.add.rectangle(480,302,170,260,0xff4fc3,0).setStrokeStyle(5,0xff4fc3).setDepth(20);
+    const status = this.add.text(W/2,503,"SELECT YOUR FIGHTER",{fontFamily:"monospace",fontSize:"18px",color:"#ffffff",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(30);
+
+    slots.forEach(s=>{
+      const f = FIGHTERS[s.name];
+      const hit = this.add.rectangle(s.x,s.y,s.w,s.h,0xffffff,0.01).setInteractive().setDepth(10);
+      if(!f.unlocked){
+        this.add.text(s.x,s.y,"LOCKED",{fontFamily:"monospace",fontSize:"18px",color:"#ff3333",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(25);
+      }
+      if(f.collectible){
+        this.add.text(s.x,s.y-150,"COLLECTIBLE",{fontFamily:"monospace",fontSize:"14px",color:"#00eaff",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(25);
+      }
+      hit.on("pointerdown",()=>{
+        if(!f.unlocked){
+          status.setText(s.name+" LOCKED");
+          return;
+        }
+        selectedFighter = s.name;
+        outline.setPosition(s.x,s.y);
+        status.setText("SELECTED: "+s.name);
+        this.time.delayedCall(180,()=>this.scene.start("LevelSelect"));
+      });
+    });
+  }
+}
+
+class LevelSelect extends Phaser.Scene{
+  constructor(){ super("LevelSelect"); }
+  create(){
+    if(tex(this,"level_select")) this.add.image(W/2,H/2,"level_select").setDisplaySize(W,H);
+    else{
+      this.add.rectangle(W/2,H/2,W,H,0x00151a,1);
+      this.add.text(W/2,60,"LEVEL SELECT",{fontFamily:"monospace",fontSize:"34px",color:"#00eaff"}).setOrigin(0.5);
+    }
+    const outline = this.add.rectangle(LEVELS[2].x,LEVELS[2].y,LEVELS[2].w,LEVELS[2].h,0xff4fc3,0).setStrokeStyle(5,0xff4fc3).setDepth(20);
+    const status = this.add.text(W/2,503,"TAP A LEVEL",{fontFamily:"monospace",fontSize:"18px",color:"#ffffff",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(30);
+
+    LEVELS.forEach(l=>{
+      this.add.rectangle(l.x,l.y,l.w,l.h,0xffffff,0.01).setInteractive().setDepth(10).on("pointerdown",()=>{
+        selectedLevel = l.key;
+        selectedLevelName = l.name;
+        outline.setPosition(l.x,l.y).setSize(l.w,l.h);
+        status.setText("LOADING: "+l.name);
+        stopTitleMusic();
+        this.time.delayedCall(180,()=>this.scene.start("Game"));
+      });
+    });
+  }
+}
+
+class Game extends Phaser.Scene{
+  constructor(){ super("Game"); }
+
+  create(){
+    this.fighter = FIGHTERS[selectedFighter] || FIGHTERS.JT;
+    this.lane = "middle";
+    this.inputVector = new Phaser.Math.Vector2();
+    this.lastDir = "side";
+    this.isBusy = false;
+    this.isBlocking = false;
+    this.isCrouching = false;
+    this.isJumping = false;
+    this.isClimbing = false;
+    this.currentLadder = null;
+    this.combo = 0;
+    this.groove = 0;
+    this.hp = 100;
+    this.lastTap = { left:0, right:0, up:0, down:0 };
+    this.enemies = [];
+    this.effects = [];
+    this.spawnTimer = 0;
+    this.wave = 1;
+    this.matchOver = false;
+
+    this.drawLevel();
+    this.makePlayer();
+    this.makeHud();
+    this.makeControls();
+    this.spawnWave();
+  }
+
+  drawLevel(){
+    if(tex(this,selectedLevel)) this.add.image(W/2,H/2,selectedLevel).setDisplaySize(W,H).setDepth(0);
+    else this.add.rectangle(W/2,H/2,W,H,0x151515,1).setDepth(0);
+
+    this.add.rectangle(W/2,LANES.top.y+2,760,6,0x111111,0.45).setDepth(1);
+    this.add.rectangle(W/2,LANES.middle.y+2,820,6,0x111111,0.45).setDepth(1);
+    this.add.rectangle(W/2,LANES.bottom.y+2,850,6,0x111111,0.45).setDepth(1);
+
+    LADDER_ZONES.forEach(l=>{
+      this.add.rectangle(l.x,(l.y1+l.y2)/2,18,Math.abs(l.y2-l.y1),0x00eaff,0.14).setDepth(2);
+      this.add.rectangle(l.x,(l.y1+l.y2)/2,34,Math.abs(l.y2-l.y1),0xffffff,0.01).setDepth(3);
+    });
+
+    if(tex(this,"outdoor_barricade_front")){
+      this.add.image(W/2,H-35,"outdoor_barricade_front").setDisplaySize(W,100).setDepth(900);
+    }
+  }
+
+  makePlayer(){
+    const key = tex(this,this.fighter.moveSheet) ? this.fighter.moveSheet : "jt_movement";
+    this.shadow = this.add.ellipse(470,LANES[this.lane].y+3,48,13,0x000000,0.40).setDepth(20);
+    this.player = this.add.sprite(470,LANES[this.lane].y,key).setOrigin(0.5,1).setScale(this.fighter.moveScale).setDepth(100);
+    play(this.player,this.animKey("idle_down"));
+  }
+
+  makeHud(){
+    this.zoneText = this.add.text(W/2,22,LANES[this.lane].label,{fontFamily:"monospace",fontSize:"16px",color:"#fff45c",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(2000);
+    this.infoText = this.add.text(18,18,"CHAR: "+selectedFighter+"\nLEVEL: "+selectedLevelName+"\nCOMBO: 0  GROOVE: 0\nHP: 100",{
+      fontFamily:"monospace",fontSize:"15px",color:"#ffffff",backgroundColor:"#000000"
+    }).setDepth(2000);
+    this.helpText = this.add.text(W-18,18,"MOVE: WASD / ARROWS\nJ LIGHT  K HEAVY  L KICK\nSPACE JUMP  E INTERACT\nB BLOCK  M MENU",{
+      fontFamily:"monospace",fontSize:"12px",color:"#cfcfcf",align:"right",backgroundColor:"#000000"
+    }).setOrigin(1,0).setDepth(2000);
+  }
+
+  makeControls(){
+    this.keys = this.input.keyboard.addKeys({
+      up:"W,UP",down:"S,DOWN",left:"A,LEFT",right:"D,RIGHT",
+      light:"J",heavy:"K",kick:"L",jump:"SPACE",interact:"E",block:"B",special:"U",menu:"M"
+    });
+    this.keys.light.on("down",()=>this.attack("light"));
+    this.keys.heavy.on("down",()=>this.attack("heavy"));
+    this.keys.kick.on("down",()=>this.attack("kick"));
+    this.keys.jump.on("down",()=>this.jump());
+    this.keys.interact.on("down",()=>this.interact());
+    this.keys.block.on("down",()=>this.block(true));
+    this.keys.block.on("up",()=>this.block(false));
+    this.keys.special.on("down",()=>this.special());
+    this.keys.menu.on("down",()=>this.togglePauseMenu());
+
+    this.touch = { x:0, y:0, active:false };
+    this.makeJoystick(115,H-95);
+    this.makeButton("Y", W-115, H-150, ()=>this.attack("light"));
+    this.makeButton("X", W-170, H-95, ()=>this.attack("heavy"));
+    this.makeButton("B", W-60, H-95, ()=>this.attack("kick"));
+    this.makeButton("A", W-115, H-40, ()=>this.jump());
+    this.makeButton("SP2", W-50, H-178, ()=>this.special(), 52, 38);
+    this.makeButton("MENU", W/2, H-34, ()=>this.togglePauseMenu(), 86, 34);
+  }
+
+  makeJoystick(cx,cy){
+    const base = this.add.circle(cx,cy,72,0xffffff,0.08).setStrokeStyle(2,0xffffff,0.22).setDepth(3000).setInteractive();
+    const knob = this.add.circle(cx,cy,28,0xffffff,0.16).setStrokeStyle(2,0xffffff,0.28).setDepth(3001);
+    const reset=()=>{ this.touch.active=false; this.touch.x=0; this.touch.y=0; knob.setPosition(cx,cy); };
+    base.on("pointerdown",p=>{ this.touch.active=true; this.updateJoystick(p,cx,cy,knob); });
+    base.on("pointermove",p=>{ if(this.touch.active) this.updateJoystick(p,cx,cy,knob); });
+    base.on("pointerup",reset);
+    base.on("pointerout",reset);
+  }
+
+  updateJoystick(pointer,cx,cy,knob){
+    const dx = pointer.x - cx;
+    const dy = pointer.y - cy;
+    const len = Math.max(1, Math.hypot(dx,dy));
+    const max = 58;
+    const nx = clamp(dx/len, -1, 1);
+    const ny = clamp(dy/len, -1, 1);
+    const mag = Math.min(len,max)/max;
+    this.touch.x = nx * mag;
+    this.touch.y = ny * mag;
+    knob.setPosition(cx + nx*Math.min(len,max), cy + ny*Math.min(len,max));
+  }
+
+  makeButton(label,x,y,cb,w=54,h=54){
+    const g = this.add.graphics().setDepth(3000);
+    g.fillStyle(0xffffff,0.10).fillRoundedRect(x-w/2,y-h/2,w,h,12);
+    g.lineStyle(2,0xffffff,0.30).strokeRoundedRect(x-w/2,y-h/2,w,h,12);
+    const t = this.add.text(x,y,label,{fontFamily:"monospace",fontSize:label.length>2?"14px":"22px",color:"#ffffff"}).setOrigin(0.5).setDepth(3001);
+    const hit = this.add.rectangle(x,y,w,h,0xffffff,0.01).setInteractive().setDepth(3002);
+    hit.on("pointerdown",()=>{ if(navigator.vibrate) navigator.vibrate(10); cb(); });
+    return {g,t,hit};
+  }
+
+  update(time,delta){
+    if(this.matchOver || this.scene.isPaused()) return;
+    this.readMovement(time);
+    this.updatePlayer(delta);
+    this.updateEnemies(time,delta);
+    this.sortDepths();
+    this.updateHud();
+  }
+
+  readMovement(time){
+    let x=0,y=0;
+    if(this.keys.left.isDown) x-=1;
+    if(this.keys.right.isDown) x+=1;
+    if(this.keys.up.isDown) y-=1;
+    if(this.keys.down.isDown) y+=1;
+    x += this.touch.x;
+    y += this.touch.y;
+    const v = new Phaser.Math.Vector2(x,y);
+    if(v.length()>1) v.normalize();
+    if(Math.abs(v.x)<0.08) v.x=0;
+    if(Math.abs(v.y)<0.08) v.y=0;
+    this.inputVector.copy(v);
+
+    [["left",-1,0],["right",1,0],["up",0,-1],["down",0,1]].forEach(([name,dx,dy])=>{
+      const active = (dx && Math.sign(v.x)===dx && Math.abs(v.x)>0.7) || (dy && Math.sign(v.y)===dy && Math.abs(v.y)>0.7);
+      if(active && (!this["tap_"+name] || time-this["tap_"+name+"_last"]>120)){
+        if(time - this.lastTap[name] < 260) this.runBoostUntil = time + 650;
+        this.lastTap[name]=time;
+        this["tap_"+name+"_last"]=time;
+      }
+      this["tap_"+name]=active;
+    });
+  }
+
+  updatePlayer(delta){
+    if(this.isBusy || this.isJumping) return;
+
+    if(this.isClimbing){
+      this.handleClimb(delta);
+      return;
+    }
+
+    const ladder = this.nearLadder();
+    if(ladder && Math.abs(this.inputVector.y)>0.65){
+      this.enterClimb(ladder);
+      return;
+    }
+
+    if(this.inputVector.y<-0.72) this.tryLane("up");
+    if(this.inputVector.y>0.72) this.tryLane("down");
+
+    const lane = LANES[this.lane];
+    const running = this.runBoostUntil && this.runBoostUntil > this.time.now;
+    const speed = (running ? 270 : this.fighter.speed) * (delta/1000);
+    this.player.x = clamp(this.player.x + this.inputVector.x*speed, lane.minX, lane.maxX);
+    this.player.y = lane.y;
+    this.shadow.setPosition(this.player.x,lane.y+3);
+
+    if(this.inputVector.x !== 0){
+      this.lastDir = "side";
+      this.player.setFlipX(this.inputVector.x < 0);
+      play(this.player,this.animKey(running ? "run_side" : "walk_side"));
+    }else if(this.inputVector.y !== 0){
+      this.lastDir = this.inputVector.y < 0 ? "up" : "down";
+      play(this.player,this.animKey(running ? "run_"+this.lastDir : "walk_"+this.lastDir));
+    }else{
+      play(this.player,this.animKey("idle_"+(this.lastDir==="up"?"up":this.lastDir==="down"?"down":"side")));
+    }
+  }
+
+  tryLane(dir){
+    const old = this.lane;
+    if(dir==="up"){
+      if(this.lane==="bottom") this.lane="middle";
+      else if(this.lane==="middle") this.lane="top";
+    }else{
+      if(this.lane==="top") this.lane="middle";
+      else if(this.lane==="middle") this.lane="bottom";
+    }
+    if(old!==this.lane){
+      this.player.y = LANES[this.lane].y;
+      this.shadow.y = LANES[this.lane].y+3;
+      this.zoneText.setText(LANES[this.lane].label);
+      this.isBusy = true;
+      this.time.delayedCall(180,()=>this.isBusy=false);
+    }
+  }
+
+  nearLadder(){
+    return LADDER_ZONES.find(l => Math.abs(this.player.x-l.x)<38 && this.player.y>=Math.min(l.y1,l.y2)-12 && this.player.y<=Math.max(l.y1,l.y2)+12);
+  }
+
+  enterClimb(ladder){
+    this.isClimbing = true;
+    this.currentLadder = ladder;
+    this.player.x = ladder.x;
+    this.shadow.setAlpha(0.14);
+    play(this.player,this.animKey("climb"),false);
+  }
+
+  handleClimb(delta){
+    const l = this.currentLadder;
+    if(!l) return;
+    const speed = 132*(delta/1000);
+    this.player.x = l.x;
+    this.player.y = clamp(this.player.y + this.inputVector.y*speed, Math.min(l.y1,l.y2), Math.max(l.y1,l.y2));
+    play(this.player,this.animKey("climb"));
+
+    if(this.player.y <= Math.min(l.y1,l.y2)+2){
+      this.lane = "top";
+      this.exitClimb(LANES.top.y);
+    }else if(this.player.y >= Math.max(l.y1,l.y2)-2){
+      if(l.from==="bottom" || l.to==="bottom") this.lane = "bottom";
+      else this.lane = "middle";
+      this.exitClimb(LANES[this.lane].y);
+    }
+  }
+
+  exitClimb(y){
+    this.player.y = y;
+    this.shadow.setAlpha(0.40).setPosition(this.player.x,y+3);
+    this.isClimbing = false;
+    this.currentLadder = null;
+    this.zoneText.setText(LANES[this.lane].label);
+  }
+
+  jump(){
+    if(this.isBusy || this.isJumping || this.isClimbing) return;
+    this.isJumping = true;
+    play(this.player,this.animKey("jump"),false);
+    const ground = this.player.y;
+    this.tweens.add({
+      targets:this.player,
+      y:ground-70,
+      duration:190,
+      ease:"Quad.easeOut",
+      yoyo:true,
+      onComplete:()=>{ this.player.y=ground; this.isJumping=false; }
+    });
+  }
+
+  block(on){
+    this.isBlocking = !!on;
+    if(on){
+      this.isBusy = true;
+      play(this.player,this.animKey("block"),false);
+    }else{
+      this.isBusy = false;
+    }
+  }
+
+  interact(){
+    const ladder = this.nearLadder();
+    if(ladder) this.enterClimb(ladder);
+  }
+
+  attack(type){
+    if(this.isBusy || this.isJumping || this.isClimbing || this.matchOver) return;
+    const data = {
+      light:{ anim:"attack_light", damage:8, range:82, busy:240 },
+      heavy:{ anim:"attack_heavy", damage:16, range:100, busy:430 },
+      kick:{ anim:"kick", damage:11, range:88, busy:330 }
+    }[type];
+    this.isBusy = true;
+    play(this.player,this.animKey(data.anim),false);
+    if(navigator.vibrate) navigator.vibrate(type==="heavy" ? [20,20,20] : 15);
+    this.time.delayedCall(data.busy*0.45,()=>this.hitEnemies(data));
+    this.time.delayedCall(data.busy,()=>{ this.isBusy=false; });
+  }
+
+  special(){
+    if(this.groove < 35 || this.isBusy) return;
+    this.groove -= 35;
+    this.isBusy = true;
+    play(this.player,this.animKey("special"),false);
+    this.addRadialFx(this.player.x,this.player.y-65);
+    this.enemies.forEach(e=>{
+      if(!e.dead && dist(this.player,e.sprite)<180){
+        this.damageEnemy(e,22,true);
+        e.stunUntil = this.time.now+950;
+      }
+    });
+    this.time.delayedCall(650,()=>this.isBusy=false);
+  }
+
+  hitEnemies(data){
+    let hitAny=false;
+    this.enemies.forEach(e=>{
+      if(e.dead) return;
+      const sameLane = Math.abs(e.sprite.y-this.player.y)<38;
+      const facing = this.player.flipX ? -1 : 1;
+      const inFront = facing>0 ? e.sprite.x>=this.player.x-12 : e.sprite.x<=this.player.x+12;
+      const close = Math.abs(e.sprite.x-this.player.x) < data.range && Math.abs(e.sprite.y-this.player.y)<52;
+      if(sameLane && inFront && close){
+        hitAny = true;
+        this.damageEnemy(e, data.damage*this.fighter.damage, data.damage>=16);
+      }
+    });
+    if(hitAny){
+      this.combo += 1;
+      this.groove = clamp(this.groove+8,0,100);
+    }else{
+      this.combo = 0;
+    }
+  }
+
+  damageEnemy(e,amount,big){
+    e.hp -= amount;
+    e.sprite.x += (e.sprite.x<this.player.x ? -1 : 1) * (big ? 46 : 22);
+    this.addHitFx(e.sprite.x,e.sprite.y-70);
+    if(e.hp<=0){
+      e.dead=true;
+      play(e.sprite,`${e.type.prefix}_ko`,false);
+      e.label.setText("KO");
+      this.groove = clamp(this.groove+12,0,100);
+      this.time.delayedCall(900,()=>{ e.sprite.destroy(); e.label.destroy(); });
+    }else{
+      play(e.sprite,big ? `${e.type.prefix}_knockback` : `${e.type.prefix}_hurt`,false);
+    }
+  }
+
+  addHitFx(x,y){
+    if(tex(this,"hit_fx") && anim(this,"hit_fx_burst")){
+      const fx = this.add.sprite(x,y,"hit_fx").setScale(0.7).setDepth(500);
+      fx.play("hit_fx_burst");
+      fx.once("animationcomplete",()=>fx.destroy());
+    }else{
+      const c = this.add.circle(x,y,16,0xff4fc3,0.5).setDepth(500);
+      this.tweens.add({targets:c,alpha:0,scale:2,duration:220,onComplete:()=>c.destroy()});
+    }
+  }
+
+  addRadialFx(x,y){
+    const c = this.add.circle(x,y,20,0x00eaff,0.3).setStrokeStyle(4,0xffffff,0.4).setDepth(500);
+    this.tweens.add({targets:c,alpha:0,scale:8,duration:480,ease:"Quad.easeOut",onComplete:()=>c.destroy()});
+  }
+
+  spawnWave(){
+    const count = this.wave===1 ? 4 : 5;
+    for(let i=0;i<count;i++){
+      const key = ENEMY_POOL[i%ENEMY_POOL.length];
+      this.spawnEnemy(key, 720 + i*38, i%2 ? LANES.middle.y : LANES.bottom.y);
+    }
+    if(this.wave>=2) this.spawnEnemy("doorman",780,LANES.middle.y);
+  }
+
+  spawnEnemy(typeKey,x,y){
+    const type = ENEMY_TYPES[typeKey] || ENEMY_TYPES.corpo_sellout;
+    const sheet = tex(this,type.key) ? type.key : "corpo_sellout";
+    const sprite = this.add.sprite(x,y,sheet).setOrigin(0.5,1).setScale(type.boss?0.55:FRAME.enemy.scale).setDepth(90);
+    sprite.setFlipX(true);
+    play(sprite,`${type.prefix}_idle`);
+    const label = this.add.text(x,y-142,(type.boss?"BOSS ":"")+type.label,{fontFamily:"monospace",fontSize:"12px",color:type.boss?"#ff4fc3":"#ffffff",backgroundColor:"#000000"}).setOrigin(0.5).setDepth(300);
+    this.enemies.push({type,sprite,label,hp:type.hp,dead:false,attackAt:0,stunUntil:0,name:ENEMY_NAMES[this.enemies.length%ENEMY_NAMES.length]});
+  }
+
+  updateEnemies(time,delta){
+    const alive = this.enemies.filter(e=>!e.dead);
+    alive.forEach(e=>{
+      e.label.setPosition(e.sprite.x,e.sprite.y-142);
+      if(time < e.stunUntil) return;
+      const dx = this.player.x - e.sprite.x;
+      const dy = this.player.y - e.sprite.y;
+      const close = Math.abs(dx)<76 && Math.abs(dy)<48;
+      if(close){
+        if(time > e.attackAt){
+          this.enemyAttack(e);
+          e.attackAt = time + Phaser.Math.Between(700,1300);
+        }
+      }else{
+        const vx = Math.sign(dx) * e.type.speed * (delta/1000);
+        const vy = Math.sign(dy) * Math.min(e.type.speed*0.65,80) * (delta/1000);
+        e.sprite.x += Math.abs(dx)>50 ? vx : 0;
+        e.sprite.y += Math.abs(dy)>20 ? vy : 0;
+        e.sprite.y = clamp(e.sprite.y, LANES.top.y, LANES.bottom.y);
+        e.sprite.setFlipX(dx<0);
+        play(e.sprite,`${e.type.prefix}_walk`);
+      }
+    });
+
+    if(alive.length===0 && !this.matchOver){
+      this.wave++;
+      if(this.wave>2) this.showVictory();
+      else this.time.delayedCall(800,()=>this.spawnWave());
+    }
+  }
+
+  enemyAttack(e){
+    play(e.sprite,Math.random()>0.45?`${e.type.prefix}_punch`:`${e.type.prefix}_kick`,false);
+    this.time.delayedCall(240,()=>{
+      if(e.dead) return;
+      if(Math.abs(e.sprite.x-this.player.x)<82 && Math.abs(e.sprite.y-this.player.y)<55){
+        const dmg = this.isBlocking ? Math.ceil(e.type.damage*0.35) : e.type.damage;
+        this.hp = clamp(this.hp-dmg,0,100);
+        if(!this.isBlocking) play(this.player,this.animKey("hurt"),false);
+        if(navigator.vibrate) navigator.vibrate(this.isBlocking ? 18 : [40,20,60]);
+        if(this.hp<=0) this.showDefeat();
+      }
+    });
+  }
+
+  sortDepths(){
+    [this.player,...this.enemies.map(e=>e.sprite)].forEach(o=>{
+      if(o && !o.destroyed) o.setDepth(100 + Math.floor(o.y));
+    });
+    this.shadow.setDepth(this.player.depth-1);
+  }
+
+  updateHud(){
+    this.infoText.setText(`CHAR: ${selectedFighter}\nLEVEL: ${selectedLevelName}\nCOMBO: ${this.combo}  GROOVE: ${Math.floor(this.groove)}\nHP: ${Math.floor(this.hp)}`);
+  }
+
+  showVictory(){
+    this.matchOver = true;
+    play(this.player,this.animKey("taunt"),false);
+    this.add.rectangle(W/2,H/2,560,150,0x000000,0.78).setDepth(5000);
+    this.add.text(W/2,H/2-24,"ROUND CLEAR",{fontFamily:"monospace",fontSize:"42px",color:"#00eaff"}).setOrigin(0.5).setDepth(5001);
+    this.add.text(W/2,H/2+36,"TAP TO RETURN TO LEVEL SELECT",{fontFamily:"monospace",fontSize:"18px",color:"#ffffff"}).setOrigin(0.5).setDepth(5001);
+    this.input.once("pointerdown",()=>this.scene.start("LevelSelect"));
+  }
+
+  showDefeat(){
+    this.matchOver = true;
+    play(this.player,this.animKey("ko"),false);
+    this.add.rectangle(W/2,H/2,560,150,0x000000,0.82).setDepth(5000);
+    this.add.text(W/2,H/2-24,"KNOCKED OUT",{fontFamily:"monospace",fontSize:"42px",color:"#ff3333"}).setOrigin(0.5).setDepth(5001);
+    this.add.text(W/2,H/2+36,"TAP TO RETRY",{fontFamily:"monospace",fontSize:"18px",color:"#ffffff"}).setOrigin(0.5).setDepth(5001);
+    this.input.once("pointerdown",()=>this.scene.start("Game"));
+  }
+
+  togglePauseMenu(){
+    if(this.pauseOpen){
+      this.pauseGroup.forEach(o=>o.destroy());
+      this.pauseOpen=false;
+      this.scene.resume();
+      return;
+    }
+    this.pauseOpen=true;
+    this.pauseGroup=[
+      this.add.rectangle(W/2,H/2,420,230,0x000000,0.85).setDepth(6000),
+      this.add.text(W/2,H/2-70,"MENU",{fontFamily:"monospace",fontSize:"32px",color:"#ff4fc3"}).setOrigin(0.5).setDepth(6001),
+      this.add.text(W/2,H/2-10,"TAP: RESUME\nHOLD MENU / PRESS M: CLOSE\nENTER: LEVEL SELECT",{fontFamily:"monospace",fontSize:"18px",color:"#ffffff",align:"center"}).setOrigin(0.5).setDepth(6001)
+    ];
+    this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("LevelSelect"));
+  }
+
+  animKey(action){
+    const key = `${this.fighter.prefix}_${action}`;
+    if(anim(this,key)) return key;
+    const jt = `jt_${action}`;
+    if(anim(this,jt)) return jt;
+    return `${this.fighter.prefix}_fallback`;
+  }
+}
+
+const config = {
+  type: Phaser.AUTO,
+  parent: "game",
+  width: W,
+  height: H,
+  backgroundColor: "#000000",
+  pixelArt: true,
+  roundPixels: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: W,
+    height: H
+  },
+  audio: {
+    disableWebAudio: false
+  },
+  scene: [Boot, Title, CharacterSelect, LevelSelect, Game]
+};
+
+new Phaser.Game(config);
+</script>
+</body>
+</html>
