@@ -103,14 +103,14 @@ const PLATFORM_BOUNDS = {
   behindCar:{minX:120, maxX:295, minY:425, maxY:460 },  // lane behind car
   bottom:{  minX:120, maxX:860, minY:485, maxY:520 }    // street
 };
-  const SPECIAL_LADDERS = [
+  const const SPECIAL_LADDERS = [
   {
-    name: "leftRoof_to_behindCar",
-    x: 238,
-    topPlatform: "topLeft",
-    bottomPlatform: "behindCar",
-    topY: 305,
-    bottomY: 440
+    name:"leftRoof_to_behindCar",
+    x:238,
+    topY:305,
+    middleY:440,
+    topPlatform:"topLeft",
+    bottomPlatform:"behindCar"
   }
 ];
   function getPlatformY(platform){
@@ -1910,7 +1910,17 @@ for(const link of JUMP_LINKS){
     });
     return best;
   }
+getNearestSpecialLadder(){
+  if(!SPECIAL_LADDERS || !SPECIAL_LADDERS.length) return null;
 
+  return SPECIAL_LADDERS.find(ladder=>{
+    const closeX = Math.abs(this.player.x - ladder.x) < 36;
+    const onTop = this.platform === ladder.topPlatform;
+    const onBottom = this.platform === ladder.bottomPlatform;
+
+    return closeX && (onTop || onBottom);
+  });
+}
   getNearestStair(x){
     if(!this.stairs || !this.stairs.length) return null;
     let best=this.stairs[0];
