@@ -150,94 +150,62 @@ function vibrate(pattern){
 let titleMusicInstance = null;
 let titleMusicStarted = false;
 
-function startTitleMusic(scene){
+function startTitleMusic(){
   if(titleMusicStarted) return;
-  if(!scene || !scene.sound) return;
 
   try{
-    // Make sure the audio was loaded
-    if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")){
-      console.warn("title_music not loaded. Check assets/audio/title-theme.mp3");
-      return;
+    if(!titleMusicInstance){
+      titleMusicInstance = new Audio("assets/audio/title-theme.mp3?v=" + VERSION);
+      titleMusicInstance.loop = true;
+      titleMusicInstance.volume = 0.65;
+      titleMusicInstance.preload = "auto";
+
+      // Helps iPhone/mobile browsers
+      titleMusicInstance.setAttribute("playsinline", "true");
+      titleMusicInstance.setAttribute("webkit-playsinline", "true");
     }
 
-    // Mobile/browser audio unlock
-    if(scene.sound.locked){
-      scene.sound.once("unlocked", function(){
-        startTitleMusic(scene);
+    const playPromise = titleMusicInstance.play();
+
+    if(playPromise && playPromise.then){
+      playPromise.then(function(){
+        titleMusicStarted = true;
+        console.log("TITLE MUSIC PLAYING");
+      }).catch(function(err){
+        console.warn("TITLE MUSIC BLOCKED OR FAILED:", err);
       });
-      return;
+    }else{
+      titleMusicStarted = true;
     }
-
-    // Resume WebAudio if suspended
-    if(scene.sound.context && scene.sound.context.state === "suspended"){
-      scene.sound.context.resume();
-    }
-
-    titleMusicInstance = scene.sound.add("title_music", {
-      loop: true,
-      volume: 0.65
-    });
-
-    titleMusicInstance.play();
-    titleMusicStarted = true;
 
   }catch(e){
-    console.warn("Title music failed:", e);
+    console.warn("TITLE MUSIC ERROR:", e);
   }
 }
 
 function stopTitleMusic(){
   try{
     if(titleMusicInstance){
-      titleMusicInstance.stop();
-      titleMusicInstance.destroy();
-      titleMusicInstance = null;
+      titleMusicInstance.pause();
+      titleMusicInstance.currentTime = 0;
     }
   }catch(e){}
 
   titleMusicStarted = false;
 }
 
-function toggleTitleMusic(scene){
+function toggleTitleMusic(){
   if(titleMusicStarted){
     stopTitleMusic();
   }else{
-    startTitleMusic(scene);
+    startTitleMusic();
   }
 }
 
 function goFromTitle(scene){
-  startTitleMusic(scene);
+  startTitleMusic();
   scene.scene.start("CharacterSelect");
 }
-function stopTitleMusic(){
-  try{
-    if(titleMusicInstance){
-      titleMusicInstance.stop();
-      titleMusicInstance = null;
-    }
-  }catch(e){}
-
-  titleMusicStarted = false;
-}
-
-function toggleTitleMusic(scene){
-  if(titleMusicStarted){
-    stopTitleMusic();
-  }else{
-    startTitleMusic(scene);
-  }
-}
-
-function goFromTitle(scene){
-  try{
-    startTitleMusic(scene);
-  }catch(e){}
-
-  scene.scene.start("CharacterSelect");
-}
-
 
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
@@ -564,7 +532,17 @@ class Title extends Phaser.Scene{
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(9999);
-
+this.add.text(480,520,"MUSIC TEST",{
+  font:"16px monospace",
+  fill:"#00eaff",
+  backgroundColor:"#000000"
+})
+.setOrigin(0.5)
+.setDepth(10000)
+.setInteractive()
+.on("pointerdown",()=>{
+  startTitleMusic();
+});
     const titleHit = this.add.rectangle(480,270,960,540,0xffffff,0.001)
       .setInteractive()
       .setDepth(9998);
