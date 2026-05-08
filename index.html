@@ -97,10 +97,26 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 const PLATFORM_BOUNDS = {
-  top:{minX:190,maxX:820,minY:238,maxY:268},
-  middle:{minX:120,maxX:860,minY:365,maxY:420},
-  bottom:{minX:120,maxX:860,minY:485,maxY:520}
+  topLeft:{ minX:300, maxX:445, minY:290, maxY:320 },   // small roof over car
+  top:{     minX:500, maxX:860, minY:238, maxY:268 },   // main upper roof
+  middle:{  minX:120, maxX:860, minY:365, maxY:420 },   // long balcony / sidewalk
+  behindCar:{minX:120, maxX:295, minY:425, maxY:460 },  // lane behind car
+  bottom:{  minX:120, maxX:860, minY:485, maxY:520 }    // street
 };
+  const SPECIAL_LADDERS = [
+  {
+    name: "leftRoof_to_behindCar",
+    x: 238,
+    topPlatform: "topLeft",
+    bottomPlatform: "behindCar",
+    topY: 305,
+    bottomY: 440
+  }
+];
+  function getPlatformY(platform){
+  const p = PLATFORM_BOUNDS[platform];
+  return Math.round((p.minY + p.maxY) * 0.5);
+}
 const LADDER_VERTICAL_INPUT = 0.65;
 const STAIR_VERTICAL_INPUT = 0.65;
 const STAIR_TRAVEL_DURATION = 720;
@@ -125,6 +141,16 @@ const HEW_USE_STATIC_IMAGE = false;
 const HEW_STATIC_SCALE = 0.095;
 const DISABLE_DOORMAN_FOR_TEST = false;
 const VIBRATION_ENABLED = true;
+const JUMP_LINKS = [
+  {
+    from: "middle",
+    to: "topLeft",
+    minX: 295,
+    maxX: 430,
+    landX: 360,
+    landY: 305
+  }
+];
 const VIBE = {
   button:8,
   attack:18,
@@ -460,6 +486,7 @@ function loadAssets(scene){
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
+  scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
   scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);
   scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
@@ -796,14 +823,23 @@ class Game extends Phaser.Scene{
     };
   }
   create(){
-    stopTitleMusic();
-startFightMusic();
-    this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
-      .setDisplaySize(960,540)
-      .setDepth(0);
-    this.platform="middle";
-    this.isClimbing=false;
-    this.currentLadder=null;
+  stopTitleMusic();
+  startFightMusic();
+
+  this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
+    .setDisplaySize(960,540)
+    .setDepth(0);
+
+  this.carFront = this.add.image(156, 400, "car_front")
+    .setOrigin(0.5, 1)
+    .setFlipX(true)
+    .setFlipX(true)
+    .setDisplaySize(186, 105)
+    .setDepth(560);
+
+  this.platform="middle";
+  this.isClimbing=false;
+  this.currentLadder=null;
     this.climbSpeed=120;
     this.stickX=0;
     this.stickY=0;
@@ -1230,26 +1266,38 @@ startFightMusic();
     if(this.poseSprite.visible){
       safePlay(this.poseSprite,this.getPlayerAnim("climb"));
     }
-    if(this.player.y<=l.topY+2 && this.moveY<-0.35){
-      this.isClimbing=false;
-      this.platform="top";
-      this.player.y=PLATFORM_BOUNDS.top.maxY;
-      this.player.x=l.x;
-      this.currentLadder=null;
-      this.zoneText.setText("TOP PLATFORM");
-      this.forcePlayerReady();
-      return;
-    }
-    if(this.player.y>=l.middleY-2 && this.moveY>0.35){
-      this.isClimbing=false;
-      this.platform="middle";
-      this.player.y=PLATFORM_BOUNDS.middle.minY;
-      this.player.x=l.x;
-      this.currentLadder=null;
-      this.zoneText.setText("MIDDLE PLATFORM");
-      this.forcePlayerReady();
-    }
+    if(this.player.y<=l.topY+2 && this.moveY<0){
+  const exitPlatform = l.topPlatform || "top";
+
+  this.isClimbing=false;
+  this.platform=exitPlatform;
+  this.player.y=getPlatformY(exitPlatform);
+  this.player.x=l.x;
+  this.currentLadder=null;
+
+  if(this.zoneText){
+    this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
   }
+
+  this.forcePlayerReady();
+  return;
+}
+    if(this.player.y>=l.middleY-2 && this.moveY>0){
+  const exitPlatform = l.bottomPlatform || "middle";
+
+  this.isClimbing=false;
+  this.platform=exitPlatform;
+  this.player.y=getPlatformY(exitPlatform);
+  this.player.x=l.x;
+  this.currentLadder=null;
+
+  if(this.zoneText){
+    this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
+  }
+
+  this.forcePlayerReady();
+  return;
+}
   startStairTravel(stair,direction="down"){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
@@ -1295,10 +1343,15 @@ startFightMusic();
     return PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
   }
   applyPlatformBounds(){
-    const bounds=this.getCurrentPlatformBounds();
-    this.player.x=Phaser.Math.Clamp(this.player.x,bounds.minX,bounds.maxX);
-    this.player.y=Phaser.Math.Clamp(this.player.y,bounds.minY,bounds.maxY);
-  }
+    const bounds = PLATFORM_BOUNDS[this.platform];
+
+this.player.x = Phaser.Math.Clamp(
+  this.player.x,
+  bounds.minX,
+  bounds.maxX
+);
+
+this.player.y = getPlatformY(this.platform);
   ensureRoundActive(){
     if(!this.matchStarted && !this.matchOver){
       this.unlockPlayerControl();
@@ -1358,6 +1411,53 @@ startFightMusic();
     const alreadyJumping=this.isJumping;
     const wasCrouching=this.isCrouching;
     const crouchGroundY=this.crouchBaseY || this.player.y;
+   // SPECIAL JUMP LINK: middle platform -> small upper-left roof
+for(const link of JUMP_LINKS){
+  if(
+    this.platform === link.from &&
+    this.player.x >= link.minX &&
+    this.player.x <= link.maxX
+  ){
+    this.playerBusy = true;
+    this.isJumping = true;
+
+    this.tweens.add({
+      targets:this.player,
+      x:link.landX,
+      y:link.landY,
+      duration:320,
+      ease:"Quad.easeOut",
+      onUpdate:()=>{
+        if(this.shadow){
+          this.shadow.x = this.player.x;
+        }
+        if(this.poseSprite){
+          this.poseSprite.x = this.player.x;
+          this.poseSprite.y = this.player.y;
+        }
+      },
+      onComplete:()=>{
+        this.platform = link.to;
+        this.player.y = getPlatformY(link.to);
+
+        if(this.shadow){
+          this.shadow.x = this.player.x;
+          this.shadow.y = this.player.y + 5;
+        }
+
+        if(this.poseSprite){
+          this.poseSprite.x = this.player.x;
+          this.poseSprite.y = this.player.y;
+        }
+
+        this.isJumping = false;
+        this.playerBusy = false;
+      }
+    });
+
+    return;
+  }
+}
     if(alreadyJumping && this.jumpCount>=this.maxJumps) return;
     if(this.playerBusy && !this.isJumping && !this.isCrouching && !force) return;
     if(this.playerBusy && !this.isJumping && force){
@@ -1810,6 +1910,7 @@ startFightMusic();
     });
     return best;
   }
+
   getNearestStair(x){
     if(!this.stairs || !this.stairs.length) return null;
     let best=this.stairs[0];
