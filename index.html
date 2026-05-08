@@ -386,6 +386,26 @@ function makeAnim(scene,key,sheet,start,end,rate,repeat){
     frameRate:rate,
     repeat:repeat
   });
+  function makeRunAnim(scene,key,sheet,rate){
+  if(!hasTex(scene,sheet)) return;
+  if(hasAnim(scene,key)) return;
+
+  scene.anims.create({
+    key:key,
+    frames:[
+      {key:sheet,frame:20},
+      {key:sheet,frame:21},
+      {key:sheet,frame:22},
+      {key:sheet,frame:23},
+      {key:sheet,frame:24},
+      {key:sheet,frame:23},
+      {key:sheet,frame:22},
+      {key:sheet,frame:21}
+    ],
+    frameRate:rate,
+    repeat:-1
+  });
+}
 }
 function makeEnemyAnimSet(scene,sheet,prefix){
   makeAnim(scene,prefix+"_idle",sheet,0,4,8,-1);
@@ -405,9 +425,9 @@ function makePlayerAnimSet(scene,prefix){
   makeAnim(scene,prefix+"_walk_down",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_up",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_side",prefix+"_movement",15,19,8,-1);
-  makeAnim(scene,prefix+"_run_down",prefix+"_movement",20,24,12,-1);
-  makeAnim(scene,prefix+"_run_up",prefix+"_movement",20,24,12,-1);
-  makeAnim(scene,prefix+"_run_side",prefix+"_movement",20,24,12,-1);
+  makeRunAnim(scene,prefix+"_run_down",prefix+"_movement",18);
+makeRunAnim(scene,prefix+"_run_up",prefix+"_movement",18);
+makeRunAnim(scene,prefix+"_run_side",prefix+"_movement",18);
   makeAnim(scene,prefix+"_jump",prefix+"_movement2",0,4,10,0);
   makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
   makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
