@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8" /
 <title>Motel Pheromones</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
@@ -114,7 +114,7 @@ const PLATFORM_BOUNDS = {
   }
 ];
   function getPlatformY(platform){
-  const p = PLATFORM_BOUNDS[platform];
+  const p = PLATFORM_BOUNDS[platform] || PLATFORM_BOUNDS.middle;
   return Math.round((p.minY + p.maxY) * 0.5);
 }
 const LADDER_VERTICAL_INPUT = 0.65;
@@ -830,12 +830,12 @@ class Game extends Phaser.Scene{
     .setDisplaySize(960,540)
     .setDepth(0);
 
-  this.carFront = this.add.image(156, 400, "car_front")
+/*  this.carFront = this.add.image(156, 400, "car_front")
     .setOrigin(0.5, 1)
     .setFlipX(true)
     .setFlipX(true)
     .setDisplaySize(186, 105)
-    .setDepth(560);
+    .setDepth(560);*/
 
   this.platform="middle";
   this.isClimbing=false;
