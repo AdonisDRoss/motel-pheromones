@@ -510,6 +510,7 @@ class Title extends Phaser.Scene{
   constructor(){
     super("Title");
   }
+
   create(){
     if(hasTex(this,"title")){
       this.add.image(480,270,"title").setDisplaySize(960,540);
@@ -520,18 +521,20 @@ class Title extends Phaser.Scene{
         fill:"#ff4fc3"
       }).setOrigin(0.5);
     }
+
     this.add.text(480,485,"TAP TO START",{
       font:"24px monospace",
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(9999);
+
     const titleHit = this.add.rectangle(480,270,960,540,0xffffff,0.001)
-  .setInteractive()
-  .setDepth(9998);
+      .setInteractive()
+      .setDepth(9998);
 
-titleHit.on("pointerdown",()=>goFromTitle(this));
+    titleHit.on("pointerdown",()=>goFromTitle(this));
 
-this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));});
+    this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));
   }
 }
 class CharacterSelect extends Phaser.Scene{
