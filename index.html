@@ -273,8 +273,8 @@ const ENEMY_TYPES = {
     maxHealth:30,
     scale:0.46,
     chaseSpeed:95,
-    attackRange:125,
-    stopRange:145,
+    attackRange:75,
+    stopRange:82,
     attackCooldownMin:420,
     attackCooldownMax:900,
     attackDamage:8,
@@ -288,8 +288,8 @@ const ENEMY_TYPES = {
     maxHealth:24,
     scale:0.46,
     chaseSpeed:78,
-    attackRange:108,
-    stopRange:116,
+    attackRange:70,
+    stopRange:78,
     attackCooldownMin:300,
     attackCooldownMax:700,
     attackDamage:7,
@@ -303,8 +303,8 @@ const ENEMY_TYPES = {
     maxHealth:28,
     scale:0.46,
     chaseSpeed:72,
-    attackRange:112,
-    stopRange:120,
+    attackRange:72,
+    stopRange:80,
     attackCooldownMin:350,
     attackCooldownMax:850,
     attackDamage:8,
@@ -318,8 +318,8 @@ const ENEMY_TYPES = {
     maxHealth:22,
     scale:0.46,
     chaseSpeed:150,
-    attackRange:120,
-    stopRange:130,
+    attackRange:76,
+    stopRange:84,
     attackCooldownMin:220,
     attackCooldownMax:520,
     attackDamage:7,
@@ -334,8 +334,8 @@ const ENEMY_TYPES = {
     maxHealth:180,
     scale:0.55,
     chaseSpeed:48,
-    attackRange:120,
-    stopRange:130,
+    attackRange:80,
+    stopRange:90,
     attackCooldownMin:650,
     attackCooldownMax:1200,
     attackDamage:15,
@@ -415,8 +415,8 @@ function makeRunAnim(scene,key,sheet,rate){
 function makeEnemyAnimSet(scene,sheet,prefix){
   makeAnim(scene,prefix+"_idle",sheet,0,4,8,-1);
   makeAnim(scene,prefix+"_walk",sheet,5,9,10,-1);
-  makeAnim(scene,prefix+"_punch",sheet,10,14,14,0);
-  makeAnim(scene,prefix+"_kick",sheet,15,19,12,0);
+  makeAnim(scene,prefix+"_punch",sheet,10,14,10,0);
+makeAnim(scene,prefix+"_kick",sheet,15,19,9,0);
   makeAnim(scene,prefix+"_hurt",sheet,20,24,10,0);
   makeAnim(scene,prefix+"_knockback",sheet,25,29,8,0);
   makeAnim(scene,prefix+"_ko",sheet,30,34,8,0);
@@ -437,10 +437,9 @@ makeRunAnim(scene,prefix+"_run_side",prefix+"_movement",18);
   makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
   makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
   makeAnim(scene,prefix+"_combo_2",prefix+"_movement2",15,19,12,0);
-  makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,14,0);
-  makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,12,0);
-  makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,13,0);
-  makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,10,0);
+makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,9,0);
+makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
   makeAnim(scene,prefix+"_climb",prefix+"_actions",0,3,8,-1);
   makeAnim(scene,prefix+"_crouch",prefix+"_actions",4,7,8,-1);
   makeAnim(scene,prefix+"_taunt",prefix+"_actions",8,11,8,0);
@@ -783,11 +782,11 @@ class Game extends Phaser.Scene{
     return selectedFighter==="HEW" ? 1.05 : 1;
   }
   getAttackData(type){
-    const base={
-      light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false,range:82},
-      heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false,range:96},
-      kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false,range:88}
-    }[type];
+  const base={
+  light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false,range:54},
+  heavy:{anim:this.getPlayerAnim("attack_heavy"),damage:16,stagger:false,range:68},
+  kick:{anim:this.getPlayerAnim("kick"),damage:11,stagger:false,range:60}
+}[type];
     if(!base) return null;
     return {
       anim:base.anim,
