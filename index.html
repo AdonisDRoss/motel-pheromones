@@ -68,7 +68,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 683;
+const VERSION = 685;
 const W = 960;
 const H = 540;
 const MOVE_FRAME_W = 204;
@@ -81,6 +81,9 @@ const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
+const HEW_MOVE_FRAME_W = 227;
+const HEW_MOVE_FRAME_H = 188;
+const HEW_MOVE_SCALE = 0.40;
 const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 const PLAYER_MOVE_SCALE = 0.44;
@@ -416,12 +419,12 @@ function loadAssets(scene){
     margin:0,
     spacing:0
   });
-  scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{
-    frameWidth:MOVE_FRAME_W,
-    frameHeight:MOVE_FRAME_H,
-    margin:0,
-    spacing:0
-  });
+  scene.load.spritesheet("hew_movement", HEW_BASE + "/movement.png?v=" + VERSION,{
+  frameWidth: HEW_MOVE_FRAME_W,
+  frameHeight: HEW_MOVE_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
   scene.load.spritesheet("hew_movement2",HEW_BASE + "/movement2.png?v=" + VERSION,{
     frameWidth:MOVE2_FRAME_W,
     frameHeight:MOVE2_FRAME_H,
@@ -653,8 +656,12 @@ class Game extends Phaser.Scene{
     return selectedFighter==="HEW" && HEW_USE_STATIC_IMAGE && hasTex(this,"hew_static");
   }
   getPlayerMoveScale(){
-    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;
+  if(selectedFighter === "HEW"){
+    return HEW_MOVE_SCALE;
   }
+
+  return PLAYER_MOVE_SCALE;
+}
   getSafeTextureKey(key,fallback){
     return hasTex(this,key) ? key : fallback;
   }
