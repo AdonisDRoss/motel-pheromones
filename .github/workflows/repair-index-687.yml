@@ -1,0 +1,212 @@
+name: Repair index 687
+"on":
+  push:
+    paths:
+      - ".github/trigger-repair-index-687.txt"
+      - ".github/workflows/repair-index-687.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+      - name: Patch index
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 687;', s, count=1)
+
+          if 'const HEW_MOVE_FRAME_W' not in s:
+              s = s.replace(
+                  'const REACTION_FRAME_H = 236;\n',
+                  'const REACTION_FRAME_H = 236;\nconst HEW_MOVE_FRAME_W = 227;\nconst HEW_MOVE_FRAME_H = 188;\nconst HEW_MOVE_SCALE = 0.40;\n',
+                  1
+              )
+          else:
+              s = re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*[^;]+;', 'const HEW_MOVE_FRAME_W = 227;', s)
+              s = re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*[^;]+;', 'const HEW_MOVE_FRAME_H = 188;', s)
+              s = re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;', 'const HEW_MOVE_SCALE = 0.40;', s)
+
+          music_block = '''let titleMusicInstance = null;
+let titleMusicStarted = false;
+
+function startTitleMusic(scene){
+  if(titleMusicStarted) return;
+  if(!scene || !scene.sound) return;
+
+  try{
+    if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")){
+      console.warn("title_music not found in cache");
+      return;
+    }
+
+    if(scene.sound.locked){
+      scene.sound.once("unlocked",()=>{
+        startTitleMusic(scene);
+      });
+      return;
+    }
+
+    if(scene.sound.context && scene.sound.context.state === "suspended"){
+      scene.sound.context.resume();
+    }
+
+    titleMusicInstance = scene.sound.add("title_music",{
+      loop:true,
+      volume:0.65
+    });
+
+    titleMusicInstance.play();
+    titleMusicStarted = true;
+  }catch(e){
+    console.warn("Title music skipped:", e);
+  }
+}
+
+function stopTitleMusic(){
+  try{
+    if(titleMusicInstance){
+      titleMusicInstance.stop();
+      titleMusicInstance = null;
+    }
+  }catch(e){}
+
+  titleMusicStarted = false;
+}
+
+function toggleTitleMusic(scene){
+  if(titleMusicStarted){
+    stopTitleMusic();
+  }else{
+    startTitleMusic(scene);
+  }
+}
+
+function goFromTitle(scene){
+  try{
+    startTitleMusic(scene);
+  }catch(e){
+    console.warn("Music start failed:", e);
+  }
+
+  scene.scene.start("CharacterSelect");
+}
+
+'''
+          s = re.sub(
+              r'let titleMusicInstance\s*=\s*null;\s*\nlet titleMusicStarted\s*=\s*false;.*?function goFromTitle\(scene\)\{.*?\n\}\s*\n\n(?=const JT_BASE)',
+              music_block,
+              s,
+              flags=re.S,
+              count=1
+          )
+
+          if 'scene.load.audio("title_music"' not in s:
+              s = s.replace(
+                  'scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);',
+                  'scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);\n  scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);',
+                  1
+              )
+
+          s = re.sub(
+              r'scene\.load\.spritesheet\("hew_movement",\s*HEW_BASE \+ "/movement\.png\?v=" \+ VERSION,\{\s*\n\s*frameWidth:[^,]+,\s*\n\s*frameHeight:[^,]+,\s*\n\s*margin:\s*0,\s*\n\s*spacing:\s*0\s*\n\s*\}\);',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:HEW_MOVE_FRAME_W,\n    frameHeight:HEW_MOVE_FRAME_H,\n    margin:0,\n    spacing:0\n  });',
+              s,
+              count=1
+          )
+
+          hew_anims = '''\nfunction makeHewMovementAnims(scene){
+  makeAnim(scene,"hew_idle_down","hew_movement",0,4,6,-1);
+  makeAnim(scene,"hew_idle_up","hew_movement",5,9,6,-1);
+  makeAnim(scene,"hew_idle_side","hew_movement",10,14,6,-1);
+  makeAnim(scene,"hew_walk_down","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_walk_up","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_walk_side","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_run_down","hew_movement",20,24,12,-1);
+  makeAnim(scene,"hew_run_up","hew_movement",20,24,12,-1);
+  makeAnim(scene,"hew_run_side","hew_movement",20,24,12,-1);
+}
+'''
+          if 'function makeHewMovementAnims(scene)' not in s:
+              s = s.replace('function loadAssets(scene){', hew_anims + '\nfunction loadAssets(scene){', 1)
+
+          s = s.replace('makePlayerAnimSet(scene,"jt");\n  makePlayerAnimSet(scene,"hew");', 'makePlayerAnimSet(scene,"jt");\n  makeHewMovementAnims(scene);')
+
+          start = s.find('getPlayerMoveScale(){')
+          end = s.find('getPlayerSpeedMod(){', start)
+          if start != -1 and end != -1:
+              new_methods = '''getPlayerMoveScale(){
+    if(selectedFighter === "HEW"){
+      return HEW_MOVE_SCALE;
+    }
+    return PLAYER_MOVE_SCALE;
+  }
+  getSafeTextureKey(key,fallback){
+    return hasTex(this,key) ? key : fallback;
+  }
+  getSafeAnimKey(key,fallback){
+    return hasAnim(this,key) ? key : fallback;
+  }
+  getPlayerMoveSheet(){
+    if(selectedFighter === "HEW"){
+      return "hew_movement";
+    }
+    return "jt_movement";
+  }
+  getPlayerAttackSheet(){
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_attacks","jt_attacks");
+  }
+  getPlayerActionSheet(){
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_actions","jt_actions");
+  }
+  getPlayerReactionSheet(){
+    return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
+  }
+  getPlayerAnim(action){
+    const prefix = this.getPlayerPrefix();
+    const key = prefix + "_" + action;
+    if(selectedFighter === "HEW"){
+      return key;
+    }
+    return this.getSafeAnimKey(key,"jt_"+action);
+  }
+  '''
+              s = s[:start] + new_methods + s[end:]
+
+          if 'audio:{' not in s and 'disableWebAudio:false' not in s:
+              s = s.replace(
+                  'scene:[Boot,Title,CharacterSelect,LevelSelect,Game]\n};',
+                  'scene:[Boot,Title,CharacterSelect,LevelSelect,Game],\n  audio:{\n    disableWebAudio:false\n  }\n};',
+                  1
+              )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Check syntax
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          s = Path('index.html').read_text(encoding='utf-8')
+          js = s.split('<script>',1)[1].rsplit('</script>',1)[0]
+          Path('/tmp/index-check.js').write_text(js, encoding='utf-8')
+          PY
+          node --check /tmp/index-check.js
+      - name: Commit patch
+        run: |
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No index changes"
+            exit 0
+          fi
+          git commit -m "Fix Hew walking animation and title music"
+          git push
