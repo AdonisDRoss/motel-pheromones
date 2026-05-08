@@ -1,0 +1,98 @@
+name: Restore full index 678
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/trigger-restore-full-index-678.txt
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore full old index and patch tap/music
+        run: |
+          set -e
+          git show aab18a40b124584377b7d391ae4437d750407373^:index.html > index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          s=re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 678;', s, count=1)
+          s=re.sub(r'const HEW_USE_STATIC_IMAGE\s*=\s*(true|false)\s*;', 'const HEW_USE_STATIC_IMAGE = false;', s, count=1)
+
+          # Ensure user title music is loaded.
+          if 'scene.load.audio("title_music"' not in s:
+              s=s.replace('scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);',
+                          'scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);\n  scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);',1)
+
+          safe_music='''let titleMusicInstance=null;
+let titleMusicStarted=false;
+function startTitleMusic(scene){
+  if(titleMusicStarted) return;
+  if(!scene || !scene.sound) return;
+  try{
+    if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")) return;
+    titleMusicInstance=scene.sound.add("title_music",{loop:true,volume:0.55});
+    titleMusicInstance.play();
+    titleMusicStarted=true;
+  }catch(e){
+    console.warn("Title music skipped",e);
+  }
+}
+function stopTitleMusic(){
+  try{
+    if(titleMusicInstance){ titleMusicInstance.stop(); titleMusicInstance=null; }
+  }catch(e){}
+  titleMusicStarted=false;
+}
+function toggleTitleMusic(scene){
+  if(titleMusicStarted) stopTitleMusic();
+  else startTitleMusic(scene);
+}
+function goFromTitle(scene){
+  try{ startTitleMusic(scene); }catch(e){}
+  scene.scene.start("CharacterSelect");
+}
+'''
+          # Replace any existing title music block, including the broken MIDI fallback calls.
+          s2=re.sub(r'let titleMusicInstance=null;\nlet titleMusicStarted=false;\nfunction startTitleMusic\(scene\)\{.*?\nfunction toggleTitleMusic\(scene\)\{\n\s*if\(titleMusicStarted\) stopTitleMusic\(\);\n\s*else startTitleMusic\(scene\);\n\}', safe_music, s, flags=re.S, count=1)
+          s=s2
+          if 'function goFromTitle(scene)' not in s:
+              s=s.replace('const JT_BASE = "assets/sprites/player/jt";', safe_music+'\nconst JT_BASE = "assets/sprites/player/jt";', 1)
+
+          # Title tap must never be blocked by audio.
+          s=s.replace('this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));','this.input.once("pointerdown",()=>goFromTitle(this));')
+          s=s.replace('this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));','this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));')
+          s=s.replace('this.input.once("pointerdown",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });','this.input.once("pointerdown",()=>goFromTitle(this));')
+          s=s.replace('this.input.keyboard.once("keydown-ENTER",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });','this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));')
+
+          # Hew uses the normal movement.png sheet on the JT-sized 204x170 grid.
+          s=s.replace('/hew_movement.png?v=', '/movement.png?v=')
+          s=s.replace('/movement .png?v=', '/movement.png?v=')
+          s=re.sub(r'scene\.load\.spritesheet\("hew_movement",HEW_BASE \+ "/movement\.png\?v=" \+ VERSION,\{\n\s*frameWidth:[^,]+,\n\s*frameHeight:[^,]+,',
+                   'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:MOVE_FRAME_W,\n    frameHeight:MOVE_FRAME_H,', s, count=1)
+
+          # Make sure Phaser audio is allowed in config.
+          if 'audio:{disableWebAudio:false}' not in s:
+              s=s.replace('scene:[Boot,Title,CharacterSelect,LevelSelect,Game]\n};', 'scene:[Boot,Title,CharacterSelect,LevelSelect,Game],\n  audio:{disableWebAudio:false}\n};', 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit restored full index
+        run: |
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          if [ -f .nojekyll ]; then git add .nojekyll; fi
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Restore full index with tap and music fixes"
+          git push
