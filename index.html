@@ -369,24 +369,29 @@ function textureHasFrame(scene,sheet,frameIndex){
   }catch(e){
     return false;
   }
-}
-function makeAnim(scene,key,sheet,start,end,rate,repeat){
+}function makeAnim(scene,key,sheet,start,end,rate,repeat){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
+
   const frames=[];
+
   for(let i=start;i<=end;i++){
     if(textureHasFrame(scene,sheet,i)){
       frames.push({key:sheet,frame:i});
     }
   }
+
   if(frames.length<=0) return;
+
   scene.anims.create({
     key:key,
     frames:frames,
     frameRate:rate,
     repeat:repeat
   });
-  function makeRunAnim(scene,key,sheet,rate){
+}
+
+function makeRunAnim(scene,key,sheet,rate){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
 
@@ -493,12 +498,7 @@ function loadAssets(scene){
   margin: 0,
   spacing: 0
 });
-  scene.load.spritesheet("hew_movement", HEW_BASE + "/movement.png?v=" + VERSION,{
-  frameWidth: HEW_MOVE_FRAME_W,
-  frameHeight: HEW_MOVE_FRAME_H,
-  margin: 0,
-  spacing: 0
-});
+  
   scene.load.image("hew_static",HEW_BASE + "/hew_static.png?v=" + VERSION);
   scene.load.spritesheet("hew_attacks",HEW_BASE + "/attacks/hew_attacks.png?v=" + VERSION,{
     frameWidth:ATTACK_FRAME_W,
