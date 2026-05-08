@@ -147,24 +147,59 @@ function vibrate(pattern){
   }catch(e){}
 }
 
-let titleMusicInstance=null;
-let titleMusicStarted=false;
+let titleMusicInstance = null;
+let titleMusicStarted = false;
+
 function startTitleMusic(scene){
   if(titleMusicStarted) return;
   if(!scene || !scene.sound) return;
-  if(!scene.cache.audio.exists("title_music")){ startMidiLoop(); return; }
-  titleMusicInstance=scene.sound.add("title_music",{loop:true,volume:0.55});
-  titleMusicInstance.play();
-  titleMusicStarted=true;
-  stopMidiLoop();
+
+  try{
+    if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")){
+      return;
+    }
+
+    if(scene.sound.context && scene.sound.context.state === "suspended"){
+      scene.sound.context.resume();
+    }
+
+    titleMusicInstance = scene.sound.add("title_music", {
+      loop: true,
+      volume: 0.55
+    });
+
+    titleMusicInstance.play();
+    titleMusicStarted = true;
+  }catch(e){
+    console.warn("Title music skipped:", e);
+  }
 }
+
 function stopTitleMusic(){
-  if(titleMusicInstance){ titleMusicInstance.stop(); titleMusicInstance=null; }
-  titleMusicStarted=false;
+  try{
+    if(titleMusicInstance){
+      titleMusicInstance.stop();
+      titleMusicInstance = null;
+    }
+  }catch(e){}
+
+  titleMusicStarted = false;
 }
+
 function toggleTitleMusic(scene){
-  if(titleMusicStarted) stopTitleMusic();
-  else startTitleMusic(scene);
+  if(titleMusicStarted){
+    stopTitleMusic();
+  }else{
+    startTitleMusic(scene);
+  }
+}
+
+function goFromTitle(scene){
+  try{
+    startTitleMusic(scene);
+  }catch(e){}
+
+  scene.scene.start("CharacterSelect");
 }
 
 const JT_BASE = "assets/sprites/player/jt";
@@ -490,10 +525,13 @@ class Title extends Phaser.Scene{
       fill:"#ffffff",
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(9999);
-    this.time.delayedCall(500,()=>{
-      this.input.once("pointerdown",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });
-      this.input.keyboard.once("keydown-ENTER",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });
-    });
+    const titleHit = this.add.rectangle(480,270,960,540,0xffffff,0.001)
+  .setInteractive()
+  .setDepth(9998);
+
+titleHit.on("pointerdown",()=>goFromTitle(this));
+
+this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));});
   }
 }
 class CharacterSelect extends Phaser.Scene{
@@ -3292,6 +3330,9 @@ const config={
   scale:{
     mode:Phaser.Scale.FIT,
     autoCenter:Phaser.Scale.CENTER_BOTH
+  },
+  audio:{
+    disableWebAudio:false
   },
   scene:[Boot,Title,CharacterSelect,LevelSelect,Game]
 };
