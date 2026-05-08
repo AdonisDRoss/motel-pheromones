@@ -155,26 +155,62 @@ function startTitleMusic(scene){
   if(!scene || !scene.sound) return;
 
   try{
+    // Make sure the audio was loaded
     if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")){
+      console.warn("title_music not loaded. Check assets/audio/title-theme.mp3");
       return;
     }
 
+    // Mobile/browser audio unlock
+    if(scene.sound.locked){
+      scene.sound.once("unlocked", function(){
+        startTitleMusic(scene);
+      });
+      return;
+    }
+
+    // Resume WebAudio if suspended
     if(scene.sound.context && scene.sound.context.state === "suspended"){
       scene.sound.context.resume();
     }
 
     titleMusicInstance = scene.sound.add("title_music", {
       loop: true,
-      volume: 0.55
+      volume: 0.65
     });
 
     titleMusicInstance.play();
     titleMusicStarted = true;
+
   }catch(e){
-    console.warn("Title music skipped:", e);
+    console.warn("Title music failed:", e);
   }
 }
 
+function stopTitleMusic(){
+  try{
+    if(titleMusicInstance){
+      titleMusicInstance.stop();
+      titleMusicInstance.destroy();
+      titleMusicInstance = null;
+    }
+  }catch(e){}
+
+  titleMusicStarted = false;
+}
+
+function toggleTitleMusic(scene){
+  if(titleMusicStarted){
+    stopTitleMusic();
+  }else{
+    startTitleMusic(scene);
+  }
+}
+
+function goFromTitle(scene){
+  startTitleMusic(scene);
+  scene.scene.start("CharacterSelect");
+}
 function stopTitleMusic(){
   try{
     if(titleMusicInstance){
