@@ -97,7 +97,7 @@ const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:296, maxY:314 },
-  top:{       minX:465, maxX:860, minY:238, maxY:268 },
+  top:{       minX:305, maxX:860, minY:238, maxY:268 },
   middle:{    minX:120, maxX:860, minY:365, maxY:420 },
   behindCar:{ minX:120, maxX:295, minY:425, maxY:460 },
   bottom:{    minX:120, maxX:860, minY:485, maxY:520 }
@@ -1164,19 +1164,19 @@ class Game extends Phaser.Scene{
   createPlatformZones(){
     const alpha=0;
     this.ladders=[
-  {
-    name:"left",
-    x:365,
-    topX:475,
-    bottomX:365,
-    y:325,
-    w:70,
-    h:190,
-    topY:252,
-    middleY:390,
-    topPlatform:"top",
-    bottomPlatform:"middle"
-  },
+{
+  name:"left",
+  x:365,
+  topX:365,
+  bottomX:365,
+  y:325,
+  w:70,
+  h:190,
+  topY:252,
+  middleY:390,
+  topPlatform:"top",
+  bottomPlatform:"middle"
+}
   {
     name:"right",
     x:806,
