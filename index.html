@@ -1216,28 +1216,34 @@ class Game extends Phaser.Scene{
     }
   }
 
-  const nearLadder=this.ladders.find(l=>{
-    if(nearLadder && Math.abs(this.moveX)<=0.35){
-      if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
-        this.startClimbing(nearLadder,"up");
-        return;
-      }
-      if(this.platform==="top" && this.moveY > LADDER_VERTICAL_INPUT){
-        this.startClimbing(nearLadder,"down");
-        return;
-      }
+  const nearLadder=this.ladders.find(l=>this.isPlayerInZone(l.zone,8,8));
+
+  if(nearLadder && Math.abs(this.moveX)<=0.35){
+    if(this.platform==="middle" && this.moveY < -LADDER_VERTICAL_INPUT){
+      this.startClimbing(nearLadder,"up");
+      return;
     }
-    const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
-    if(activeStairs && Math.abs(this.moveX)<=0.45){
-      if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
-        this.startStairTravel(activeStairs,"down");
-        return;
-      }
-      if(this.platform==="bottom" && this.moveY < -STAIR_VERTICAL_INPUT){
-        this.startStairTravel(activeStairs,"up");
-      }
+
+    if(this.platform==="top" && this.moveY > LADDER_VERTICAL_INPUT){
+      this.startClimbing(nearLadder,"down");
+      return;
     }
   }
+
+  const activeStairs=this.stairs.find(s=>this.isPlayerInZone(s.zone,8,8));
+
+  if(activeStairs && Math.abs(this.moveX)<=0.45){
+    if(this.platform==="middle" && this.moveY > STAIR_VERTICAL_INPUT){
+      this.startStairTravel(activeStairs,"down");
+      return;
+    }
+
+    if(this.platform==="bottom" && this.moveY < -STAIR_VERTICAL_INPUT){
+      this.startStairTravel(activeStairs,"up");
+      return;
+    }
+  }
+}
   startClimbing(ladder,direction="up"){
     this.isClimbing=true;
     this.currentLadder=ladder;
@@ -1312,7 +1318,9 @@ if(direction==="down"){
   this.forcePlayerReady();
   return;
 }
-  startStairTravel(stair,direction="down"){
+}
+
+startStairTravel(stair,direction="down"){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -1357,15 +1365,18 @@ if(direction==="down"){
     return PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
   }
   applyPlatformBounds(){
-    const bounds = PLATFORM_BOUNDS[this.platform];
+  const bounds = PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
 
-this.player.x = Phaser.Math.Clamp(
-  this.player.x,
-  bounds.minX,
-  bounds.maxX
-);
+  this.player.x = Phaser.Math.Clamp(
+    this.player.x,
+    bounds.minX,
+    bounds.maxX
+  );
 
-this.player.y = getPlatformY(this.platform);
+  this.player.y = getPlatformY(this.platform);
+}
+
+
   ensureRoundActive(){
     if(!this.matchStarted && !this.matchOver){
       this.unlockPlayerControl();
