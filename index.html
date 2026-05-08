@@ -1199,6 +1199,19 @@ class Game extends Phaser.Scene{
   }
   handlePlatformTransitions(){
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
+   const specialLadder = this.getNearestSpecialLadder();
+
+if(specialLadder && Math.abs(this.moveY) > LADDER_VERTICAL_INPUT){
+  if(this.platform === specialLadder.topPlatform && this.moveY > 0){
+    this.startClimbing(specialLadder,"down");
+    return;
+  }
+
+  if(this.platform === specialLadder.bottomPlatform && this.moveY < 0){
+    this.startClimbing(specialLadder,"up");
+    return;
+  }
+}
     const nearLadder=this.ladders.find(l=>{
       return Math.abs(this.player.x-l.x)<=34;
     });
@@ -1229,11 +1242,11 @@ class Game extends Phaser.Scene{
     this.playerBusy=false;
     this.busyUntil=0;
     this.player.x=ladder.x;
-    if(direction==="down"){
-      this.player.y=PLATFORM_BOUNDS.top.maxY;
-    }else{
-      this.player.y=PLATFORM_BOUNDS.middle.minY;
-    }
+if(direction==="down"){
+  this.player.y = ladder.topY || getPlatformY(ladder.topPlatform || "top");
+}else{
+  this.player.y = ladder.middleY || getPlatformY(ladder.bottomPlatform || "middle");
+}
     const climbAnim=this.getPlayerAnim("climb");
     const canShowClimbPose=hasAnim(this,climbAnim);
     this.player.setVisible(!canShowClimbPose);
