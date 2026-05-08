@@ -1,0 +1,130 @@
+name: Final game fixes 676
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/trigger-final-game-fixes-676.txt
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply final game fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Version / cache bust.
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 676;', s, count=1)
+
+          # Ensure user music loads from the correct path.
+          if 'scene.load.audio("title_music"' not in s:
+              s = s.replace(
+                  'scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);',
+                  'scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);\n  scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);',
+                  1
+              )
+
+          # Replace unsafe title music block with safe version that cannot block title input.
+          safe_music = '''let titleMusicInstance=null;
+let titleMusicStarted=false;
+function startTitleMusic(scene){
+  if(titleMusicStarted) return;
+  if(!scene || !scene.sound) return;
+  try{
+    if(!scene.cache || !scene.cache.audio || !scene.cache.audio.exists("title_music")) return;
+    titleMusicInstance=scene.sound.add("title_music",{loop:true,volume:0.55});
+    titleMusicInstance.play();
+    titleMusicStarted=true;
+  }catch(e){
+    console.warn("Title music skipped:",e);
+  }
+}
+function stopTitleMusic(){
+  try{
+    if(titleMusicInstance){ titleMusicInstance.stop(); titleMusicInstance=null; }
+  }catch(e){}
+  titleMusicStarted=false;
+}
+function toggleTitleMusic(scene){
+  if(titleMusicStarted) stopTitleMusic();
+  else startTitleMusic(scene);
+}
+function goFromTitle(scene){
+  try{ startTitleMusic(scene); }catch(e){}
+  scene.scene.start("CharacterSelect");
+}
+'''
+          s2 = re.sub(
+              r'let titleMusicInstance=null;\nlet titleMusicStarted=false;\nfunction startTitleMusic\(scene\)\{.*?\nfunction toggleTitleMusic\(scene\)\{\n\s*if\(titleMusicStarted\) stopTitleMusic\(\);\n\s*else startTitleMusic\(scene\);\n\}',
+              safe_music,
+              s,
+              flags=re.S,
+              count=1
+          )
+          s = s2
+          if 'function goFromTitle(scene)' not in s:
+              s = s.replace('const JT_BASE = "assets/sprites/player/jt";', safe_music + '\nconst JT_BASE = "assets/sprites/player/jt";', 1)
+
+          # Make the Title scene use safe transition.
+          s = s.replace('this.input.once("pointerdown",()=>{ startMidiLoop(); this.scene.start("CharacterSelect"); });','this.input.once("pointerdown",()=>goFromTitle(this));')
+          s = s.replace('this.input.keyboard.once("keydown-ENTER",()=>{ startMidiLoop(); this.scene.start("CharacterSelect"); });','this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));')
+          s = s.replace('this.input.once("pointerdown",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });','this.input.once("pointerdown",()=>goFromTitle(this));')
+          s = s.replace('this.input.keyboard.once("keydown-ENTER",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });','this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));')
+          s = s.replace('this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));','this.input.once("pointerdown",()=>goFromTitle(this));')
+          s = s.replace('this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));','this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));')
+
+          # O key toggles real title music safely, not MIDI fallback.
+          s = s.replace('this.input.keyboard.on("keydown-O",()=>toggleMidiLoop());','this.input.keyboard.on("keydown-O",()=>toggleTitleMusic(this));')
+
+          # Hew should use the normal movement.png file and the same 204x170 grid as JT.
+          s = s.replace('/movement .png?v=', '/movement.png?v=')
+          s = s.replace('/hew_movement.png?v=', '/movement.png?v=')
+          s = re.sub(
+              r'scene\.load\.spritesheet\("hew_movement",HEW_BASE \+ "/movement\.png\?v=" \+ VERSION,\{\n\s*frameWidth:[^,]+,\n\s*frameHeight:[^,]+,',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:MOVE_FRAME_W,\n    frameHeight:MOVE_FRAME_H,',
+              s,
+              count=1
+          )
+
+          # Neutralize old Hew special movement constants if present.
+          s = re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*[^;]+;', 'const HEW_MOVE_FRAME_W = MOVE_FRAME_W;', s)
+          s = re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*[^;]+;', 'const HEW_MOVE_FRAME_H = MOVE_FRAME_H;', s)
+          s = re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;', 'const HEW_MOVE_SCALE = PLAYER_MOVE_SCALE;', s)
+          s = re.sub(r'const HEW_MOVE_Y_OFFSET\s*=\s*[^;]+;', 'const HEW_MOVE_Y_OFFSET = 0;', s)
+
+          # Normal shared movement scale.
+          s = re.sub(
+              r'getPlayerMoveScale\(\)\{\n\s*if\(this\.playerUsesHewStatic\(\)\) return HEW_STATIC_SCALE;\n\s*if\(selectedFighter==="HEW"\) return HEW_MOVE_SCALE;\n\s*return PLAYER_MOVE_SCALE;\n\s*\}',
+              'getPlayerMoveScale(){\n    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;\n  }',
+              s
+          )
+          s = s.replace('this.player=this.add.sprite(470,390 + this.getPlayerYOffset(),this.getPlayerMoveSheet());','this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());')
+
+          # Remove Hew-only idle workaround if present.
+          s = re.sub(
+              r'function makeHewMovementAnims\(scene\)\{.*?\n\}\n\nfunction makePlayerAnimSet\(scene,prefix\)\{\n\s*if\(prefix==="hew"\)\{.*?\n\s*return;\n\s*\}\n\s*makeAnim\(scene,prefix\+"_idle_down",prefix\+"_movement",0,4,6,-1\);',
+              'function makePlayerAnimSet(scene,prefix){\n  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);',
+              s,
+              flags=re.S
+          )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit final fixes
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index.html changes needed"
+            exit 0
+          fi
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          git commit -m "Apply final title music and Hew fixes"
+          git push
