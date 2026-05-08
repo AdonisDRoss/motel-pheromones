@@ -68,7 +68,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 672;
+const VERSION = 674;
 const W = 960;
 const H = 540;
 const MOVE_FRAME_W = 204;
@@ -146,6 +146,27 @@ function vibrate(pattern){
     navigator.vibrate(pattern);
   }catch(e){}
 }
+
+let titleMusicInstance=null;
+let titleMusicStarted=false;
+function startTitleMusic(scene){
+  if(titleMusicStarted) return;
+  if(!scene || !scene.sound) return;
+  if(!scene.cache.audio.exists("title_music")){ startMidiLoop(); return; }
+  titleMusicInstance=scene.sound.add("title_music",{loop:true,volume:0.55});
+  titleMusicInstance.play();
+  titleMusicStarted=true;
+  stopMidiLoop();
+}
+function stopTitleMusic(){
+  if(titleMusicInstance){ titleMusicInstance.stop(); titleMusicInstance=null; }
+  titleMusicStarted=false;
+}
+function toggleTitleMusic(scene){
+  if(titleMusicStarted) stopTitleMusic();
+  else startTitleMusic(scene);
+}
+
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const ENEMY_BASE = "assets/sprites/enemies";
@@ -328,6 +349,7 @@ function loadAssets(scene){
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
+  scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);
   scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
     frameHeight:MOVE_FRAME_H,
@@ -469,8 +491,8 @@ class Title extends Phaser.Scene{
       backgroundColor:"#000000"
     }).setOrigin(0.5).setDepth(9999);
     this.time.delayedCall(500,()=>{
-      this.input.once("pointerdown",()=>this.scene.start("CharacterSelect"));
-      this.input.keyboard.once("keydown-ENTER",()=>this.scene.start("CharacterSelect"));
+      this.input.once("pointerdown",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });
+      this.input.keyboard.once("keydown-ENTER",()=>{ startTitleMusic(this); this.scene.start("CharacterSelect"); });
     });
   }
 }
