@@ -416,11 +416,11 @@ function loadAssets(scene){
     spacing:0
   });
   scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{
-    frameWidth:MOVE_FRAME_W,
-    frameHeight:MOVE_FRAME_H,
-    margin:0,
-    spacing:0
-  });
+  frameWidth:MOVE_FRAME_W,
+  frameHeight:MOVE_FRAME_H,
+  margin:0,
+  spacing:0
+});
   scene.load.spritesheet("hew_movement2",HEW_BASE + "/movement2.png?v=" + VERSION,{
     frameWidth:MOVE2_FRAME_W,
     frameHeight:MOVE2_FRAME_H,
@@ -662,11 +662,16 @@ class Game extends Phaser.Scene{
     return hasAnim(this,key) ? key : fallback;
   }
   getPlayerMoveSheet(){
-    if(this.playerUsesHewStatic()){
-      return "hew_static";
-    }
-    return this.getSafeTextureKey(this.getPlayerPrefix()+"_movement","jt_movement");
+  if(this.playerUsesHewStatic()){
+    return "hew_static";
   }
+
+  if(selectedFighter==="HEW"){
+    return "hew_movement";
+  }
+
+  return "jt_movement";
+}
   getPlayerAttackSheet(){
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_attacks","jt_attacks");
   }
@@ -677,11 +682,26 @@ class Game extends Phaser.Scene{
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
   }
   getPlayerAnim(action){
-    if(this.playerUsesHewStatic()){
-      if(action.startsWith("idle_") || action.startsWith("walk_") || action.startsWith("run_")){
-        return "hew_static_idle";
-      }
+  if(this.playerUsesHewStatic()){
+    if(action.startsWith("idle_") || action.startsWith("walk_") || action.startsWith("run_")){
+      return "hew_static_idle";
     }
+  }
+
+  const prefix = this.getPlayerPrefix();
+  const key = prefix + "_" + action;
+
+  if(selectedFighter==="HEW"){
+    if(hasAnim(this,key)){
+      return key;
+    }
+
+    // Do NOT fall back to JT for HEW.
+    return key;
+  }
+
+  return this.getSafeAnimKey(key,"jt_"+action);
+}
     return this.getSafeAnimKey(this.getPlayerPrefix()+"_"+action,"jt_"+action);
   }
   getPlayerSpeedMod(){
