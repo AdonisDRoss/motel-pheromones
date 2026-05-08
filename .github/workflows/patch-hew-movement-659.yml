@@ -1,4 +1,4 @@
-name: Patch Hew movement 659
+name: Patch Hew movement 660
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Patch Hew movement sizing
+      - name: Patch Hew movement sizing for uploaded 5x5 sheet
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -27,24 +27,40 @@ jobs:
           s = p.read_text(encoding='utf-8')
 
           # Bump cache version.
-          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 659;', s, count=1)
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 660;', s, count=1)
 
-          # Add Hew-only movement sizing constants after the global movement frame constants.
+          # New uploaded Hew movement image is about 1136x944, 5 columns x 5 rows.
+          # 1136/5 ~= 227 and 944/5 ~= 188, so use a Hew-only slice size.
+          constants = (
+              'const MOVE_FRAME_H = 170;\n'
+              'const HEW_MOVE_FRAME_W = 227;\n'
+              'const HEW_MOVE_FRAME_H = 188;\n'
+              'const HEW_MOVE_SCALE = 0.36;\n'
+          )
+
           if 'const HEW_MOVE_FRAME_W' not in s:
-              s = s.replace(
-                  'const MOVE_FRAME_H = 170;\n',
-                  'const MOVE_FRAME_H = 170;\n'
-                  'const HEW_MOVE_FRAME_W = 204;\n'
-                  'const HEW_MOVE_FRAME_H = 170;\n'
-                  'const HEW_MOVE_SCALE = 0.38;\n',
-                  1
-              )
+              s = s.replace('const MOVE_FRAME_H = 170;\n', constants, 1)
+          else:
+              s = re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_W = 227;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_H = 188;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;', 'const HEW_MOVE_SCALE = 0.36;', s, count=1)
 
           # Make Hew movement.png use Hew-only frame dimensions.
           s = s.replace(
               'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
               '    frameWidth:MOVE_FRAME_W,\n'
               '    frameHeight:MOVE_FRAME_H,',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:HEW_MOVE_FRAME_W,\n'
+              '    frameHeight:HEW_MOVE_FRAME_H,',
+              1
+          )
+
+          # If already patched once, make sure the Hew loader uses the new values.
+          s = s.replace(
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:HEW_MOVE_FRAME_W,\n'
+              '    frameHeight:HEW_MOVE_FRAME_H,',
               'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
               '    frameWidth:HEW_MOVE_FRAME_W,\n'
               '    frameHeight:HEW_MOVE_FRAME_H,',
@@ -74,5 +90,7 @@ jobs:
           git config user.name "ChatGPT Fix Bot"
           git config user.email "chatgpt-fix-bot@users.noreply.github.com"
           git add index.html
-          git commit -m "Tune Hew movement sheet sizing"
+          git commit -m "Tune Hew uploaded movement sheet slicing"
           git push
+
+# trigger-660
