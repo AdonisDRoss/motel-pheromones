@@ -1,0 +1,37 @@
+name: Undo Hew file 672
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/undo-hew-file-672.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+          s=re.sub(r'const VERSION\s*=\s*\d+\s*;','const VERSION = 672;',s,1)
+          s=s.replace('/hew_movement.png?v=','/movement.png?v=')
+          s=s.replace('/movement .png?v=','/movement.png?v=')
+          s=re.sub(
+            r'scene\.load\.spritesheet\("hew_movement",HEW_BASE \+ "/movement\.png\?v=" \+ VERSION,\{\n\s*frameWidth:[^,]+,\n\s*frameHeight:[^,]+,',
+            'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:MOVE_FRAME_W,\n    frameHeight:MOVE_FRAME_H,',
+            s,
+            count=1
+          )
+          p.write_text(s)
+          PY
+      - run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          git commit -m "Undo Hew movement file pointer"
+          git push
