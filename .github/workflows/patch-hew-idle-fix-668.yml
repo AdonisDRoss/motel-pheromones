@@ -1,0 +1,113 @@
+name: Patch Hew idle fix 668
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/patch-hew-idle-fix-668.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+          s=re.sub(r'const VERSION\s*=\s*\d+\s*;','const VERSION = 668;',s,1)
+          if 'const HEW_MOVE_FRAME_W' not in s:
+              s=s.replace('const MOVE_FRAME_H = 170;\n','const MOVE_FRAME_H = 170;\nconst HEW_MOVE_FRAME_W = 227;\nconst HEW_MOVE_FRAME_H = 188;\nconst HEW_MOVE_SCALE = 0.36;\nconst HEW_MOVE_Y_OFFSET = 4;\n',1)
+          else:
+              s=re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*[^;]+;','const HEW_MOVE_FRAME_W = 227;',s,1)
+              s=re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*[^;]+;','const HEW_MOVE_FRAME_H = 188;',s,1)
+              s=re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;','const HEW_MOVE_SCALE = 0.36;',s,1)
+              if 'const HEW_MOVE_Y_OFFSET' not in s:
+                  s=s.replace('const HEW_MOVE_SCALE = 0.36;\n','const HEW_MOVE_SCALE = 0.36;\nconst HEW_MOVE_Y_OFFSET = 4;\n',1)
+              else:
+                  s=re.sub(r'const HEW_MOVE_Y_OFFSET\s*=\s*[^;]+;','const HEW_MOVE_Y_OFFSET = 4;',s,1)
+          s=s.replace('/movement .png?v=','/movement.png?v=')
+          s=s.replace('scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:MOVE_FRAME_W,\n    frameHeight:MOVE_FRAME_H,','scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n    frameWidth:HEW_MOVE_FRAME_W,\n    frameHeight:HEW_MOVE_FRAME_H,',1)
+          s=s.replace('''getPlayerMoveScale(){
+    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;
+  }''','''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }
+  getPlayerYOffset(){
+    if(selectedFighter==="HEW" && !this.playerUsesHewStatic()) return HEW_MOVE_Y_OFFSET;
+    return 0;
+  }''',1)
+          if 'getPlayerYOffset(){' not in s and 'getPlayerMoveScale(){' in s:
+              s=s.replace('''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }''','''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }
+  getPlayerYOffset(){
+    if(selectedFighter==="HEW" && !this.playerUsesHewStatic()) return HEW_MOVE_Y_OFFSET;
+    return 0;
+  }''',1)
+          s=s.replace('''this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setDepth(200);''','''this.player=this.add.sprite(470,390 + this.getPlayerYOffset(),this.getPlayerMoveSheet());
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setDepth(200);''',1)
+          # Hew-specific idle animations: single-frame idle prevents side-to-side drift inside the uploaded frames.
+          if 'function makeHewMovementAnims' not in s:
+              marker='''function makePlayerAnimSet(scene,prefix){
+  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);'''
+              inject='''function makeHewMovementAnims(scene){
+  makeAnim(scene,"hew_idle_down","hew_movement",2,2,1,-1);
+  makeAnim(scene,"hew_idle_up","hew_movement",7,7,1,-1);
+  makeAnim(scene,"hew_idle_side","hew_movement",12,12,1,-1);
+  makeAnim(scene,"hew_walk_down","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_walk_up","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_walk_side","hew_movement",15,19,8,-1);
+  makeAnim(scene,"hew_run_down","hew_movement",20,24,12,-1);
+  makeAnim(scene,"hew_run_up","hew_movement",20,24,12,-1);
+  makeAnim(scene,"hew_run_side","hew_movement",20,24,12,-1);
+}
+
+function makePlayerAnimSet(scene,prefix){
+  if(prefix==="hew"){
+    makeHewMovementAnims(scene);
+    makeAnim(scene,prefix+"_jump",prefix+"_movement2",0,4,10,0);
+    makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
+    makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
+    makeAnim(scene,prefix+"_combo_2",prefix+"_movement2",15,19,12,0);
+    makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,14,0);
+    makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,12,0);
+    makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,13,0);
+    makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+    makeAnim(scene,prefix+"_climb",prefix+"_actions",0,3,8,-1);
+    makeAnim(scene,prefix+"_crouch",prefix+"_actions",4,7,8,-1);
+    makeAnim(scene,prefix+"_taunt",prefix+"_actions",8,11,8,0);
+    makeAnim(scene,prefix+"_special",prefix+"_actions",12,15,10,0);
+    makeAnim(scene,prefix+"_carry",prefix+"_actions",12,15,8,-1);
+    makeAnim(scene,prefix+"_hurt",prefix+"_reactions",0,3,8,0);
+    makeAnim(scene,prefix+"_knockback",prefix+"_reactions",4,7,8,0);
+    makeAnim(scene,prefix+"_ko",prefix+"_reactions",8,11,6,0);
+    makeAnim(scene,prefix+"_getup",prefix+"_reactions",12,15,8,0);
+    return;
+  }
+  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);'''
+              s=s.replace(marker,inject,1)
+          p.write_text(s)
+          PY
+      - run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name bot
+          git config user.email bot@example.com
+          git add index.html
+          git commit -m "Fix Hew idle movement slicing"
+          git push
