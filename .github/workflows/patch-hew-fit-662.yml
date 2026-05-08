@@ -1,0 +1,126 @@
+name: Patch Hew fit 662
+
+on:
+  push:
+    paths:
+      - ".github/workflows/patch-hew-fit-662.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Make Hew sprite fit better
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Cache bust.
+          s = re.sub(r'const VERSION\s*=\s*\d+\s*;', 'const VERSION = 662;', s, count=1)
+
+          # Hew uploaded sheet: 5x5, about 1136x944. Use 227x188 slices.
+          if 'const HEW_MOVE_FRAME_W' not in s:
+              s = s.replace(
+                  'const MOVE_FRAME_H = 170;\n',
+                  'const MOVE_FRAME_H = 170;\n'
+                  'const HEW_MOVE_FRAME_W = 227;\n'
+                  'const HEW_MOVE_FRAME_H = 188;\n'
+                  'const HEW_MOVE_SCALE = 0.31;\n'
+                  'const HEW_MOVE_Y_OFFSET = 6;\n',
+                  1
+              )
+          else:
+              s = re.sub(r'const HEW_MOVE_FRAME_W\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_W = 227;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_FRAME_H\s*=\s*\d+\s*;', 'const HEW_MOVE_FRAME_H = 188;', s, count=1)
+              s = re.sub(r'const HEW_MOVE_SCALE\s*=\s*[^;]+;', 'const HEW_MOVE_SCALE = 0.31;', s, count=1)
+              if 'const HEW_MOVE_Y_OFFSET' not in s:
+                  s = s.replace('const HEW_MOVE_SCALE = 0.31;\n', 'const HEW_MOVE_SCALE = 0.31;\nconst HEW_MOVE_Y_OFFSET = 6;\n', 1)
+              else:
+                  s = re.sub(r'const HEW_MOVE_Y_OFFSET\s*=\s*[^;]+;', 'const HEW_MOVE_Y_OFFSET = 6;', s, count=1)
+
+          # Make Hew movement.png use Hew-only frame size.
+          s = s.replace(
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:MOVE_FRAME_W,\n'
+              '    frameHeight:MOVE_FRAME_H,',
+              'scene.load.spritesheet("hew_movement",HEW_BASE + "/movement.png?v=" + VERSION,{\n'
+              '    frameWidth:HEW_MOVE_FRAME_W,\n'
+              '    frameHeight:HEW_MOVE_FRAME_H,',
+              1
+          )
+
+          # Hew movement scale separate from JT.
+          old_scale = '''getPlayerMoveScale(){
+    return this.playerUsesHewStatic() ? HEW_STATIC_SCALE : PLAYER_MOVE_SCALE;
+  }'''
+          new_scale = '''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }'''
+          if old_scale in s:
+              s = s.replace(old_scale, new_scale, 1)
+
+          # Add helper for Hew y offset.
+          if 'getPlayerYOffset(){' not in s:
+              s = s.replace(
+                  '''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }''',
+                  '''getPlayerMoveScale(){
+    if(this.playerUsesHewStatic()) return HEW_STATIC_SCALE;
+    if(selectedFighter==="HEW") return HEW_MOVE_SCALE;
+    return PLAYER_MOVE_SCALE;
+  }
+  getPlayerYOffset(){
+    if(selectedFighter==="HEW" && !this.playerUsesHewStatic()) return HEW_MOVE_Y_OFFSET;
+    return 0;
+  }''',
+                  1
+              )
+
+          # Apply y offset once at spawn so the feet stay grounded after scaling.
+          old_spawn = '''this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setDepth(200);'''
+          new_spawn = '''this.player=this.add.sprite(470,390 + this.getPlayerYOffset(),this.getPlayerMoveSheet());
+    this.player.setOrigin(0.5,1);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setDepth(200);'''
+          if old_spawn in s:
+              s = s.replace(old_spawn, new_spawn, 1)
+
+          # When returning to ready state, preserve Hew scale and clear weird transforms.
+          s = s.replace(
+              'this.player.setScale(this.getPlayerMoveScale());\n      this.player.clearTint();',
+              'this.player.setScale(this.getPlayerMoveScale());\n      this.player.clearTint();',
+              1
+          )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index.html changes needed"
+            exit 0
+          fi
+          git config user.name "ChatGPT Fix Bot"
+          git config user.email "chatgpt-fix-bot@users.noreply.github.com"
+          git add index.html
+          git commit -m "Adjust Hew movement sprite fit"
+          git push
