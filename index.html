@@ -68,8 +68,10 @@ window.addEventListener("error",function(e){
 });
 
 const VERSION = 687;
-const W = 960;
 const H = 540;
+const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
+const CX = W / 2;
+const CY = H / 2;
 const MOVE_FRAME_W = 204;
 const MOVE_FRAME_H = 170;
 const MOVE2_FRAME_W = 324;
@@ -830,7 +832,7 @@ class Game extends Phaser.Scene{
   // Camera bounds.
   // For a normal 960x540 screen, keep this 960x540.
   // For a long story-mode level, increase width later.
-  cam.setBounds(0, 0, 960, 540);
+  cam.setBounds(0, 0, W, H);
 
   // Follow the player smoothly
   cam.startFollow(this.player, true, 0.08, 0.08);
@@ -934,9 +936,9 @@ getPlayerAnim(action){
   stopTitleMusic();
   startFightMusic();
 
-  this.add.image(480,270,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
-    .setDisplaySize(960,540)
-    .setDepth(0);
+  this.add.image(CX,CY,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
+  .setDisplaySize(W,H)
+  .setDepth(0);
 
 /*  this.carFront = this.add.image(156, 400, "car_front")
     .setOrigin(0.5, 1)
@@ -3674,30 +3676,7 @@ getNearestSpecialLadder(){
       this.stickX=0;
       this.stickY=0;
     });
-    this.mobileButton(820,340,"X",()=>this.startAttack("light"));
-    this.mobileButton(760,410,"Y",()=>this.startContextY());
-    this.mobileButton(880,410,"A",()=>this.startContextKick());
-    this.mobileButton(820,480,"B",()=>this.startContextB());
-    this.mobileButton(700,320,"SP",()=>this.startAttack("heavy"));
-    this.mobileButton(640,380,"CR",()=>{
-      this.recoverActionInput();
-      this.startCrouch(true);
-    });
-    const menuHit=this.add.rectangle(480,505,120,38,0x000000,0.35)
-  .setInteractive()
-  .setDepth(9500)
-  .setScrollFactor(0);
-    this.add.rectangle(480,505,120,38,0xffffff,0.16)
-  .setStrokeStyle(2,0xffffff,0.45)
-  .setDepth(9501)
-  .setScrollFactor(0);
-    this.add.text(480,505,"MENU",{
-  font:"16px monospace",
-  fill:"#fff"
-}).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
-    menuHit.on("pointerdown",()=>this.togglePauseMenu());
-  }
-  mobileButton(x,y,label,down,up=null){
+    mobileButton(x,y,label,down,up=null){
     const hit=this.add.circle(x,y,42,0x00ff00,0.01)
       .setInteractive()
       .setDepth(9500)
