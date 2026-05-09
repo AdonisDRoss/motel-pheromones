@@ -882,13 +882,16 @@ getPlayerReactionScale(){
   getPlayerReactionSheet(){
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
   }
-  getPlayerAnim(action){
+getPlayerAnim(action){
   const prefix = this.getPlayerPrefix();
   const key = prefix + "_" + action;
 
   if(selectedFighter==="HEW" || selectedFighter==="DONNY"){
     return key;
   }
+
+  return this.getSafeAnimKey(key,"jt_"+action);
+}
 
   return this.getSafeAnimKey(key,"jt_"+action);
 }
