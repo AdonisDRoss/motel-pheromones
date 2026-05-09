@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 690;
+const VERSION = 691;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -1173,48 +1173,64 @@ class CharacterSelect extends Phaser.Scene {
   }
 
   updateSelection() {
-    const fighter = this.fighters[this.selectedIndex];
+  const fighter = this.fighters[this.selectedIndex];
 
-    this.cardFrames.forEach((frame, index) => {
-      const selected = index === this.selectedIndex;
-      const unlocked = this.fighters[index].unlocked;
+  this.cardFrames.forEach((frame, index) => {
+    const selected = index === this.selectedIndex;
+    const unlocked = this.fighters[index].unlocked;
 
-      frame.setStrokeStyle(
-        selected ? 5 : 2,
-        selected ? 0xff1493 : unlocked ? 0x7a225a : 0x444444
+    frame.setStrokeStyle(
+      selected ? 5 : 2,
+      selected ? 0xff1493 : unlocked ? 0x7a225a : 0x444444
+    );
+
+    frame.setScale(selected ? 1.08 : 1.0);
+
+    frame.setFillStyle(
+      unlocked ? 0x090009 : 0x111111,
+      selected ? 0.98 : 0.82
+    );
+  });
+
+  this.cardImages.forEach((obj, index) => {
+    const selected = index === this.selectedIndex;
+    const unlocked = this.fighters[index].unlocked;
+
+    if (!obj) return;
+
+    obj.setAlpha(unlocked ? 1 : 0.45);
+
+    // IMPORTANT:
+    // Do not use setScale() on real card PNGs after setDisplaySize().
+    // It destroys the intended card size.
+    if (obj.texture && obj.texture.key) {
+      const bigW = 122 - 4;
+      const bigH = 260 - 4;
+      const normalW = 122 - 10;
+      const normalH = 260 - 10;
+
+      obj.setDisplaySize(
+        selected ? bigW : normalW,
+        selected ? bigH : normalH
       );
+    } else if (obj.setScale) {
+      // Placeholder containers can still use scale safely.
+      obj.setScale(selected ? 1.05 : 1.0);
+    }
+  });
 
-      frame.setScale(selected ? 1.08 : 1.0);
-      frame.setFillStyle(
-        unlocked ? 0x090009 : 0x111111,
-        selected ? 0.98 : 0.82
-      );
-    });
+  this.nameTexts.forEach((text, index) => {
+    const selected = index === this.selectedIndex;
+    const unlocked = this.fighters[index].unlocked;
 
-    this.cardImages.forEach((obj, index) => {
-      const selected = index === this.selectedIndex;
+    text.setColor(selected ? "#ff4fc3" : unlocked ? "#ffffff" : "#777777");
+  });
 
-      if (obj && obj.setScale) {
-        obj.setScale(selected ? 1.05 : 1.0);
-      }
-
-      if (obj && obj.setAlpha) {
-        obj.setAlpha(this.fighters[index].unlocked ? 1 : 0.45);
-      }
-    });
-
-    this.nameTexts.forEach((text, index) => {
-      const selected = index === this.selectedIndex;
-      const unlocked = this.fighters[index].unlocked;
-
-      text.setColor(selected ? "#ff4fc3" : unlocked ? "#ffffff" : "#777777");
-    });
-
-    this.infoName.setText(fighter.displayName);
-    this.infoFaction.setText("FACTION: " + (fighter.faction || "LOCKED"));
-    this.infoRole.setText("ROLE: " + fighter.role);
-    this.infoWeapon.setText("WEAPON: " + fighter.weapon);
-  }
+  this.infoName.setText(fighter.displayName);
+  this.infoFaction.setText("FACTION: " + (fighter.faction || "LOCKED"));
+  this.infoRole.setText("ROLE: " + fighter.role);
+  this.infoWeapon.setText("WEAPON: " + fighter.weapon);
+}
 
   selectFighter() {
     const fighter = this.fighters[this.selectedIndex];
