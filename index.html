@@ -285,8 +285,21 @@ function stopFightMusic(){
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
 const DONNY_BASE = "assets/sprites/player/donny";
+const JACKSON_BASE = "assets/sprites/player/jackson";
 const ENEMY_BASE = "assets/sprites/enemies";
-let selectedFighter = "JT";
+const JT_BASE = "assets/sprites/player/jt";
+const HEW_BASE = "assets/sprites/player/hew";
+const DONNY_BASE = "assets/sprites/player/donny";
+const JACKSON_BASE = "assets/sprites/player/jackson";
+const ENEMY_BASE = "assets/sprites/enemies";
+let selectedFighter = "DONNY";
+const JACKSON_FRAME_W = 256;
+const JACKSON_FRAME_H = 256;
+const JACKSON_SCALE = 0.30;
+let selectedFighter = "DONNY";
+const JACKSON_FRAME_W = 256;
+const JACKSON_FRAME_H = 256;
+const JACKSON_SCALE = 0.30;
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 const ENEMY_NAMES = [
@@ -514,6 +527,49 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,"donny_ko","donny_reactions",12,17,6,0);
   makeAnim(scene,"donny_getup","donny_reactions",18,23,8,0);
 }
+  function makeJacksonAnimSet(scene){
+  // movement sheet: 6 columns x 4 rows, 256x256
+  makeAnim(scene,"jackson_idle_down","jackson_movement",0,5,6,-1);
+  makeAnim(scene,"jackson_idle_up","jackson_movement",0,5,6,-1);
+  makeAnim(scene,"jackson_idle_side","jackson_movement",0,5,6,-1);
+
+  makeAnim(scene,"jackson_walk_down","jackson_movement",6,11,8,-1);
+  makeAnim(scene,"jackson_walk_up","jackson_movement",6,11,8,-1);
+  makeAnim(scene,"jackson_walk_side","jackson_movement",6,11,8,-1);
+
+  makeAnim(scene,"jackson_run_down","jackson_movement",12,17,12,-1);
+  makeAnim(scene,"jackson_run_up","jackson_movement",12,17,12,-1);
+  makeAnim(scene,"jackson_run_side","jackson_movement",12,17,12,-1);
+
+  makeAnim(scene,"jackson_jump","jackson_movement",18,23,10,0);
+
+  // attacks sheet: 6x6
+  makeAnim(scene,"jackson_attack_light","jackson_attacks",0,5,10,0);
+  makeAnim(scene,"jackson_attack_heavy","jackson_attacks",6,11,9,0);
+  makeAnim(scene,"jackson_kick","jackson_attacks",12,17,10,0);
+  makeAnim(scene,"jackson_sweep","jackson_attacks",18,23,10,0);
+  makeAnim(scene,"jackson_combo_starter","jackson_attacks",24,29,10,0);
+  makeAnim(scene,"jackson_combo_finisher","jackson_attacks",30,35,10,0);
+
+  // fallback block pose using crouch row if no block row exists
+  makeAnim(scene,"jackson_block","jackson_actions",6,11,8,-1);
+
+  // actions sheet: 6x6
+  makeAnim(scene,"jackson_climb","jackson_actions",0,5,8,-1);
+  makeAnim(scene,"jackson_crouch","jackson_actions",6,11,8,-1);
+  makeAnim(scene,"jackson_taunt","jackson_actions",12,17,8,0);
+  makeAnim(scene,"jackson_special","jackson_actions",18,23,10,0);
+  makeAnim(scene,"jackson_carry","jackson_actions",24,29,8,-1);
+  makeAnim(scene,"jackson_victory","jackson_actions",30,35,8,0);
+
+  // reactions sheet: 6x6
+  makeAnim(scene,"jackson_hurt","jackson_reactions",0,5,8,0);
+  makeAnim(scene,"jackson_hurt_heavy","jackson_reactions",6,11,8,0);
+  makeAnim(scene,"jackson_knockback","jackson_reactions",12,17,8,0);
+  makeAnim(scene,"jackson_ko","jackson_reactions",18,23,6,0);
+  makeAnim(scene,"jackson_downed","jackson_reactions",24,29,6,-1);
+  makeAnim(scene,"jackson_getup","jackson_reactions",30,35,8,0);
+}
 function loadAssets(scene){
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
@@ -609,6 +665,33 @@ scene.load.spritesheet("donny_reactions", DONNY_BASE + "/reactions/donny_reactio
   margin:0,
   spacing:0
 });
+  scene.load.spritesheet("jackson_movement", JACKSON_BASE + "/movement.png?v=" + VERSION, {
+  frameWidth: JACKSON_FRAME_W,
+  frameHeight: JACKSON_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
+
+scene.load.spritesheet("jackson_attacks", JACKSON_BASE + "/attacks/jackson_attacks.png?v=" + VERSION, {
+  frameWidth: JACKSON_FRAME_W,
+  frameHeight: JACKSON_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
+
+scene.load.spritesheet("jackson_actions", JACKSON_BASE + "/actions/jackson_actions.png?v=" + VERSION, {
+  frameWidth: JACKSON_FRAME_W,
+  frameHeight: JACKSON_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
+
+scene.load.spritesheet("jackson_reactions", JACKSON_BASE + "/reactions/jackson_reactions.png?v=" + VERSION, {
+  frameWidth: JACKSON_FRAME_W,
+  frameHeight: JACKSON_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
   scene.load.spritesheet("corpo_sellout",ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
     frameHeight:ENEMY_FRAME_H,
@@ -644,6 +727,7 @@ function createAllAnims(scene){
   makePlayerAnimSet(scene,"jt");
   makePlayerAnimSet(scene,"hew");
   makeDonnyAnimSet(scene);
+  makeJacksonAnimSet(scene);
 
   if(hasTex(scene,"hew_static") && !hasAnim(scene,"hew_static_idle")){
     scene.anims.create({
@@ -653,6 +737,13 @@ function createAllAnims(scene){
       repeat:-1
     });
   }
+
+  makeEnemyAnimSet(scene,"corpo_sellout","enemy");
+  makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
+  makeEnemyAnimSet(scene,"sellout","sellout");
+  makeEnemyAnimSet(scene,"feral","feral");
+  makeEnemyAnimSet(scene,"doorman","doorman");
+}
 
   makeEnemyAnimSet(scene,"corpo_sellout","enemy");
   makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
@@ -713,63 +804,388 @@ this.add.text(480,520,"MUSIC TEST",{
     this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));
   }
 }
-class CharacterSelect extends Phaser.Scene{
-  constructor(){
+class CharacterSelect extends Phaser.Scene {
+  constructor() {
     super("CharacterSelect");
+    this.selectedIndex = 0;
+    this.cardFrames = [];
+    this.cardImages = [];
+    this.nameTexts = [];
   }
-  create(){
-    if(hasTex(this,"charSelect")){
-      this.add.image(480,270,"charSelect").setDisplaySize(960,540);
-    }else{
-      this.add.rectangle(480,270,960,540,0x120012,1);
-      this.add.text(480,90,"CHARACTER SELECT",{
-        font:"30px monospace",
-        fill:"#ff4fc3"
-      }).setOrigin(0.5);
+
+  preload() {
+    const v = typeof VERSION !== "undefined" ? VERSION : Date.now();
+
+    // Optional card images.
+    // If these files are missing, the screen still works with placeholder cards.
+    this.load.image("char_card_donny", "assets/ui/cards/donny_card.png?v=" + v);
+    this.load.image("char_card_jt", "assets/ui/cards/jt_card.png?v=" + v);
+    this.load.image("char_card_hew", "assets/ui/cards/hew_card.png?v=" + v);
+    this.load.image("char_card_jackson", "assets/ui/cards/jackson_card.png?v=" + v);
+    this.load.image("character_select_bg", "assets/ui/character_select_bg.png?v=" + v);
+  }
+
+  create() {
+    this.fighters = [
+      {
+        id: "donny",
+        displayName: "DONNY",
+        faction: "MOTEL PHEROMONES",
+        role: "FRONTMAN / HYPE LEADER",
+        weapon: "BLACK HOLLOW-BODY GUITAR",
+        cardKey: "char_card_donny",
+        unlocked: true
+      },
+      {
+        id: "jt",
+        displayName: "JT",
+        faction: "MOTEL PHEROMONES",
+        role: "RHYTHM CONTROLLER / TEMPO ENGINE",
+        weapon: "DRUMSTICKS",
+        cardKey: "char_card_jt",
+        unlocked: true
+      },
+      {
+        id: "hew",
+        displayName: "HEW",
+        faction: "MOTEL PHEROMONES",
+        role: "TANK / CROWD CONTROL",
+        weapon: "MEPHISTA BASS",
+        cardKey: "char_card_hew",
+        unlocked: true
+      },
+      {
+        id: "jackson",
+        displayName: "JACKSON",
+        faction: "ROCKER BOYS",
+        role: "LEAD GUITAR",
+        weapon: "GRETSCHEN GOLDIE",
+        cardKey: "char_card_jackson",
+        unlocked: true
+      },
+      {
+        id: "locked_1",
+        displayName: "EMPTY SLOT",
+        faction: "",
+        role: "LOCKED",
+        weapon: "",
+        cardKey: null,
+        unlocked: false
+      },
+      {
+        id: "locked_2",
+        displayName: "EMPTY SLOT",
+        faction: "",
+        role: "LOCKED",
+        weapon: "",
+        cardKey: null,
+        unlocked: false
+      }
+    ];
+
+    this.buildBackground();
+    this.buildTitle();
+    this.buildCards();
+    this.buildInfoPanel();
+    this.buildInput();
+    this.updateSelection();
+  }
+
+  buildBackground() {
+    if (this.textures.exists("character_select_bg")) {
+      this.add.image(480, 270, "character_select_bg")
+        .setDisplaySize(960, 540)
+        .setDepth(0);
+    } else {
+      this.add.rectangle(480, 270, 960, 540, 0x030006).setDepth(0);
+      this.add.rectangle(480, 270, 910, 500, 0x120014, 0.92).setDepth(1);
+      this.add.rectangle(480, 270, 860, 440, 0x050005, 0.65).setDepth(2);
     }
-    const fighters=[
-  {name:"DONNY",x:220,y:300,w:150,h:260,unlocked:true},
-  {name:"JT",x:420,y:300,w:150,h:260,unlocked:true},
-  {name:"HEW",x:780,y:300,w:150,h:260,unlocked:true,collectible:true}
-];
-    const outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
-      .setStrokeStyle(5,0xff4fc3)
-      .setDepth(50);
-    this.add.text(480,505,"HEW IS A COLLECTIBLE CHARACTER",{
-      font:"16px monospace",
-      fill:"#fff45c",
-      backgroundColor:"#000000"
-    }).setOrigin(0.5).setDepth(60);
-    this.time.delayedCall(250,()=>{
-      fighters.forEach(f=>{
-        const hit=this.add.rectangle(f.x,f.y,f.w,f.h,0xffffff,0.01)
-          .setInteractive()
-          .setDepth(40);
-        if(!f.unlocked){
-          this.add.text(f.x,f.y,"LOCKED",{
-            font:"18px monospace",
-            fill:"#ff2222",
-            backgroundColor:"#000000"
-          }).setOrigin(0.5).setDepth(61);
+  }
+
+  buildTitle() {
+    this.add.text(480, 36, "CHARACTER SELECT", {
+      fontFamily: "monospace",
+      fontSize: "38px",
+      color: "#ffffff",
+      stroke: "#ff1493",
+      strokeThickness: 5
+    }).setOrigin(0.5).setDepth(20);
+
+    this.add.text(480, 76, "CHOOSE YOUR FIGHTER", {
+      fontFamily: "monospace",
+      fontSize: "16px",
+      color: "#ff4fc3"
+    }).setOrigin(0.5).setDepth(20);
+  }
+
+  buildCards() {
+    const startX = 135;
+    const y = 250;
+    const gap = 145;
+    const cardW = 122;
+    const cardH = 260;
+
+    this.cardFrames = [];
+    this.cardImages = [];
+    this.nameTexts = [];
+
+    this.fighters.forEach((fighter, index) => {
+      const x = startX + index * gap;
+
+      const frame = this.add.rectangle(x, y, cardW, cardH, 0x090009, 0.92)
+        .setStrokeStyle(2, fighter.unlocked ? 0x7a225a : 0x444444)
+        .setDepth(5)
+        .setInteractive({ useHandCursor: true });
+
+      this.cardFrames.push(frame);
+
+      let cardObj;
+
+      if (fighter.cardKey && this.textures.exists(fighter.cardKey)) {
+        cardObj = this.add.image(x, y, fighter.cardKey)
+          .setDisplaySize(cardW - 10, cardH - 10)
+          .setDepth(6);
+      } else {
+        cardObj = this.makePlaceholderCard(x, y, cardW, cardH, fighter, index);
+      }
+
+      this.cardImages.push(cardObj);
+
+      const nameText = this.add.text(x, y - 148, fighter.displayName, {
+        fontFamily: "monospace",
+        fontSize: fighter.displayName.length > 7 ? "12px" : "17px",
+        color: fighter.unlocked ? "#ffffff" : "#777777",
+        stroke: "#000000",
+        strokeThickness: 3
+      }).setOrigin(0.5).setDepth(12);
+
+      this.nameTexts.push(nameText);
+
+      frame.on("pointerdown", () => {
+        if (!fighter.unlocked) return;
+
+        if (this.selectedIndex === index) {
+          this.selectFighter();
+        } else {
+          this.selectedIndex = index;
+          this.updateSelection();
         }
-        if(f.collectible){
-          this.add.text(f.x,f.y-150,"COLLECTIBLE",{
-            font:"14px monospace",
-            fill:"#00eaff",
-            backgroundColor:"#000000"
-          }).setOrigin(0.5).setDepth(61);
-        }
-        hit.on("pointerdown",()=>{
-          if(!f.unlocked) return;
-          selectedFighter=f.name;
-          outline.setPosition(f.x,f.y);
-          this.time.delayedCall(180,()=>{
-            this.scene.start("LevelSelect");
-          });
-        });
       });
     });
   }
+
+  makePlaceholderCard(x, y, w, h, fighter, index) {
+    const group = this.add.container(x, y).setDepth(6);
+
+    const bg = this.add.rectangle(0, 0, w - 10, h - 10, fighter.unlocked ? 0x18001d : 0x111111, 0.95)
+      .setStrokeStyle(1, fighter.unlocked ? 0xff1493 : 0x555555);
+
+    const num = this.add.text(-42, -108, String(index + 1), {
+      fontFamily: "monospace",
+      fontSize: "28px",
+      color: fighter.unlocked ? "#ff1493" : "#555555",
+      stroke: "#000000",
+      strokeThickness: 3
+    }).setOrigin(0.5);
+
+    const name = this.add.text(0, -48, fighter.displayName, {
+      fontFamily: "monospace",
+      fontSize: fighter.displayName.length > 7 ? "12px" : "19px",
+      color: fighter.unlocked ? "#ffffff" : "#777777",
+      align: "center"
+    }).setOrigin(0.5);
+
+    const faction = this.add.text(0, 18, fighter.faction || "LOCKED", {
+      fontFamily: "monospace",
+      fontSize: "10px",
+      color: fighter.unlocked ? "#ff4fc3" : "#666666",
+      align: "center",
+      wordWrap: { width: w - 24 }
+    }).setOrigin(0.5);
+
+    const role = this.add.text(0, 60, fighter.role, {
+      fontFamily: "monospace",
+      fontSize: "10px",
+      color: fighter.unlocked ? "#ffffff" : "#666666",
+      align: "center",
+      wordWrap: { width: w - 24 }
+    }).setOrigin(0.5);
+
+    group.add([bg, num, name, faction, role]);
+    return group;
+  }
+
+  buildInfoPanel() {
+    this.infoBox = this.add.rectangle(480, 468, 670, 88, 0x050005, 0.92)
+      .setStrokeStyle(2, 0xff1493)
+      .setDepth(20);
+
+    this.infoName = this.add.text(170, 432, "", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      color: "#ffffff"
+    }).setDepth(21);
+
+    this.infoFaction = this.add.text(170, 456, "", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#ff4fc3"
+    }).setDepth(21);
+
+    this.infoRole = this.add.text(170, 476, "", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#ffffff"
+    }).setDepth(21);
+
+    this.infoWeapon = this.add.text(170, 496, "", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#ffffff"
+    }).setDepth(21);
+
+    this.selectButton = this.add.rectangle(720, 468, 145, 44, 0x210018, 0.96)
+      .setStrokeStyle(2, 0xff1493)
+      .setDepth(21)
+      .setInteractive({ useHandCursor: true });
+
+    this.add.text(720, 468, "SELECT", {
+      fontFamily: "monospace",
+      fontSize: "18px",
+      color: "#ffffff"
+    }).setOrigin(0.5).setDepth(22);
+
+    this.selectButton.on("pointerdown", () => this.selectFighter());
+
+    this.add.text(480, 526, "← → CYCLE    ENTER / A SELECT    ESC / B BACK", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#ffffff"
+    }).setOrigin(0.5).setDepth(21);
+  }
+
+  buildInput() {
+    this.input.keyboard.on("keydown-LEFT", () => this.moveSelection(-1));
+    this.input.keyboard.on("keydown-RIGHT", () => this.moveSelection(1));
+
+    this.input.keyboard.on("keydown-ENTER", () => this.selectFighter());
+    this.input.keyboard.on("keydown-SPACE", () => this.selectFighter());
+    this.input.keyboard.on("keydown-A", () => this.selectFighter());
+
+    this.input.keyboard.on("keydown-ESC", () => this.goBack());
+    this.input.keyboard.on("keydown-B", () => this.goBack());
+
+    // Big invisible mobile tap zones for left/right cycling.
+    this.add.rectangle(70, 270, 120, 360, 0x000000, 0.01)
+      .setDepth(30)
+      .setInteractive()
+      .on("pointerdown", () => this.moveSelection(-1));
+
+    this.add.rectangle(890, 270, 120, 360, 0x000000, 0.01)
+      .setDepth(30)
+      .setInteractive()
+      .on("pointerdown", () => this.moveSelection(1));
+
+    this.add.text(60, 270, "<", {
+      fontFamily: "monospace",
+      fontSize: "60px",
+      color: "#ff1493"
+    }).setOrigin(0.5).setDepth(31);
+
+    this.add.text(900, 270, ">", {
+      fontFamily: "monospace",
+      fontSize: "60px",
+      color: "#ff1493"
+    }).setOrigin(0.5).setDepth(31);
+  }
+
+  moveSelection(direction) {
+    let next = this.selectedIndex;
+
+    for (let i = 0; i < this.fighters.length; i++) {
+      next += direction;
+
+      if (next < 0) next = this.fighters.length - 1;
+      if (next >= this.fighters.length) next = 0;
+
+      if (this.fighters[next].unlocked) {
+        this.selectedIndex = next;
+        this.updateSelection();
+        return;
+      }
+    }
+  }
+
+  updateSelection() {
+    const fighter = this.fighters[this.selectedIndex];
+
+    this.cardFrames.forEach((frame, index) => {
+      const selected = index === this.selectedIndex;
+      const unlocked = this.fighters[index].unlocked;
+
+      frame.setStrokeStyle(
+        selected ? 5 : 2,
+        selected ? 0xff1493 : unlocked ? 0x7a225a : 0x444444
+      );
+
+      frame.setScale(selected ? 1.08 : 1.0);
+      frame.setFillStyle(unlocked ? 0x090009 : 0x111111, selected ? 0.98 : 0.9);
+    });
+
+    this.cardImages.forEach((obj, index) => {
+      const selected = index === this.selectedIndex;
+
+      if (obj && obj.setScale) {
+        obj.setScale(selected ? 1.05 : 1.0);
+      }
+
+      if (obj && obj.setAlpha) {
+        obj.setAlpha(this.fighters[index].unlocked ? 1 : 0.45);
+      }
+    });
+
+    this.nameTexts.forEach((text, index) => {
+      const selected = index === this.selectedIndex;
+      const unlocked = this.fighters[index].unlocked;
+
+      text.setColor(selected ? "#ff4fc3" : unlocked ? "#ffffff" : "#777777");
+    });
+
+    this.infoName.setText(fighter.displayName);
+    this.infoFaction.setText("FACTION: " + (fighter.faction || "LOCKED"));
+    this.infoRole.setText("ROLE: " + fighter.role);
+    this.infoWeapon.setText("WEAPON: " + fighter.weapon);
+  }
+
+  selectFighter() {
+    const fighter = this.fighters[this.selectedIndex];
+
+    if (!fighter || !fighter.unlocked) return;
+
+    window.selectedFighter = fighter.id.toUpperCase();
+
+    // Supports old code that uses selectedFighter as a global variable.
+    try {
+      selectedFighter = fighter.id.toUpperCase();
+    } catch (e) {}
+
+    console.log("Selected fighter:", window.selectedFighter);
+
+    if (this.scene.get("LevelSelect")) {
+      this.scene.start("LevelSelect");
+    } else {
+      this.scene.start("GameScene");
+    }
+  }
+
+ goBack() {
+  this.scene.start("Title");
+}
+}
+  function getSelectedFighterId() {
+  const raw = window.selectedFighter || "DONNY";
+  return String(raw).toUpperCase();
 }
 class LevelSelect extends Phaser.Scene{
   constructor(){
@@ -838,17 +1254,26 @@ class Game extends Phaser.Scene{
   cam.stopFollow();
 }
   getPlayerPrefix(){
-  if(selectedFighter==="HEW") return "hew";
-  if(selectedFighter==="DONNY") return "donny";
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "HEW") return "hew";
+  if(fighter === "DONNY") return "donny";
+  if(fighter === "JACKSON") return "jackson";
+
   return "jt";
 }
   playerUsesHewStatic(){
     return selectedFighter==="HEW" && HEW_USE_STATIC_IMAGE && hasTex(this,"hew_static");
   }
-  getPlayerMoveScale(){
-  if(selectedFighter==="HEW"){
-    return HEW_MOVE_SCALE;
-  }
+getPlayerMoveScale(){
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "HEW") return HEW_MOVE_SCALE;
+  if(fighter === "DONNY") return DONNY_SCALE;
+  if(fighter === "JACKSON") return JACKSON_SCALE;
+
+  return PLAYER_MOVE_SCALE;
+}
 
   if(selectedFighter==="DONNY"){
     return DONNY_SCALE;
@@ -858,17 +1283,29 @@ class Game extends Phaser.Scene{
 }
 
   getPlayerAttackScale(){
-  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "DONNY") return DONNY_SCALE;
+  if(fighter === "JACKSON") return JACKSON_SCALE;
+
   return PLAYER_ATTACK_SCALE;
 }
 
 getPlayerActionScale(){
-  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "DONNY") return DONNY_SCALE;
+  if(fighter === "JACKSON") return JACKSON_SCALE;
+
   return PLAYER_ACTION_SCALE;
 }
 
 getPlayerReactionScale(){
-  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "DONNY") return DONNY_SCALE;
+  if(fighter === "JACKSON") return JACKSON_SCALE;
+
   return PLAYER_REACTION_SCALE;
 }
 
@@ -879,9 +1316,14 @@ getPlayerReactionScale(){
     return hasAnim(this,key) ? key : fallback;
   }
   getPlayerMoveSheet(){
-  if(selectedFighter==="HEW"){
-    return "hew_movement";
-  }
+  const fighter = getSelectedFighterId();
+
+  if(fighter === "HEW") return "hew_movement";
+  if(fighter === "DONNY") return "donny_movement";
+  if(fighter === "JACKSON") return "jackson_movement";
+
+  return "jt_movement";
+}
 
   if(selectedFighter==="DONNY"){
     return "donny_movement";
@@ -899,14 +1341,16 @@ getPlayerReactionScale(){
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
   }
 getPlayerAnim(action){
+  const fighter = getSelectedFighterId();
   const prefix = this.getPlayerPrefix();
   const key = prefix + "_" + action;
 
-  if(selectedFighter==="HEW" || selectedFighter==="DONNY"){
+  // Do not fall back to JT for non-JT fighters.
+  if(fighter === "HEW" || fighter === "DONNY" || fighter === "JACKSON"){
     return key;
   }
 
-  return this.getSafeAnimKey(key,"jt_"+action);
+  return this.getSafeAnimKey(key,"jt_" + action);
 }
 
   getPlayerSpeedMod(){
@@ -929,10 +1373,11 @@ getPlayerAnim(action){
       range:base.range
     };
   }
-  create(){
+ create(){
+  selectedFighter = getSelectedFighterId();
+
   stopTitleMusic();
   startFightMusic();
-
   this.add.image(CX,CY,hasTex(this,selectedLevel)?selectedLevel:"outdoor")
   .setDisplaySize(W,H)
   .setDepth(0);
