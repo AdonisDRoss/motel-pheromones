@@ -3636,94 +3636,133 @@ getNearestSpecialLadder(){
       this.barricadeFront.setDepth(850);
     }
   }
-  makeMobileControls(){
-    const bx=115;
-    const by=420;
-    const r=58;
-    this.add.circle(bx,by,r,0xffffff,0.16)
-  .setDepth(9000)
-  .setScrollFactor(0);
-    const knob=this.add.circle(bx,by,25,0xffffff,0.38)
-  .setDepth(9001)
-  .setScrollFactor(0);
-    let dragging=false;
-    const move=p=>{
-      let dx=p.x-bx;
-      let dy=p.y-by;
-      const d=Math.sqrt(dx*dx+dy*dy);
-      if(d>r){
-        dx=dx/d*r;
-        dy=dy/d*r;
-      }
-      knob.x=bx+dx;
-      knob.y=by+dy;
-      this.stickX=dx/r;
-      this.stickY=dy/r;
-    };
-    this.input.on("pointerdown",p=>{
-      if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<95){
-        dragging=true;
-        move(p);
-      }
-    });
-    this.input.on("pointermove",p=>{
-      if(dragging) move(p);
-    });
-    this.input.on("pointerup",()=>{
-      dragging=false;
-      knob.x=bx;
-      knob.y=by;
-      this.stickX=0;
-      this.stickY=0;
-    });
-    mobileButton(x,y,label,down,up=null){
-    const hit=this.add.circle(x,y,42,0x00ff00,0.01)
-      .setInteractive()
-      .setDepth(9500)
-      .setScrollFactor(0);
+ makeMobileControls(){
+  const bx=115;
+  const by=420;
+  const r=58;
 
-    this.add.circle(x,y,34,0xffffff,0.24)
-      .setDepth(9501)
-      .setScrollFactor(0);
+  this.add.circle(bx,by,r,0xffffff,0.16)
+    .setDepth(9000)
+    .setScrollFactor(0);
 
-    this.add.text(x,y,label,{
-      font:"18px monospace",
-      fill:"#fff"
-    }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+  const knob=this.add.circle(bx,by,25,0xffffff,0.38)
+    .setDepth(9001)
+    .setScrollFactor(0);
 
-    hit.on("pointerdown",p=>{
-      if(p && p.event && p.event.preventDefault){
-        p.event.preventDefault();
-      }
+  let dragging=false;
 
-      this.ensureRoundActive();
-      this.readInput();
-      this.recoverActionInput();
-      vibrate(VIBE.button);
+  const move=p=>{
+    let dx=p.x-bx;
+    let dy=p.y-by;
+    const d=Math.sqrt(dx*dx+dy*dy);
 
-      if(down){
-        down();
-      }
-    });
+    if(d>r){
+      dx=dx/d*r;
+      dy=dy/d*r;
+    }
 
-    hit.on("pointerup",p=>{
-      if(p && p.event && p.event.preventDefault){
-        p.event.preventDefault();
-      }
+    knob.x=bx+dx;
+    knob.y=by+dy;
+    this.stickX=dx/r;
+    this.stickY=dy/r;
+  };
 
-      if(up){
-        up();
-      }
-    });
+  this.input.on("pointerdown",p=>{
+    if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<95){
+      dragging=true;
+      move(p);
+    }
+  });
 
-    hit.on("pointerout",()=>{
-      if(up){
-        up();
-      }
-    });
-  }
+  this.input.on("pointermove",p=>{
+    if(dragging){
+      move(p);
+    }
+  });
+
+  this.input.on("pointerup",()=>{
+    dragging=false;
+    knob.x=bx;
+    knob.y=by;
+    this.stickX=0;
+    this.stickY=0;
+  });
+
+  this.mobileButton(W-160,340,"X",()=>this.startAttack("light"));
+  this.mobileButton(W-220,410,"Y",()=>this.startContextY());
+  this.mobileButton(W-100,410,"A",()=>this.startContextKick());
+  this.mobileButton(W-160,480,"B",()=>this.startContextB());
+  this.mobileButton(W-340,320,"SP",()=>this.startAttack("heavy"));
+  this.mobileButton(W-400,380,"CR",()=>{
+    this.recoverActionInput();
+    this.startCrouch(true);
+  });
+
+  const menuHit=this.add.rectangle(CX,505,120,38,0x000000,0.35)
+    .setInteractive()
+    .setDepth(9500)
+    .setScrollFactor(0);
+
+  this.add.rectangle(CX,505,120,38,0xffffff,0.16)
+    .setStrokeStyle(2,0xffffff,0.45)
+    .setDepth(9501)
+    .setScrollFactor(0);
+
+  this.add.text(CX,505,"MENU",{
+    font:"16px monospace",
+    fill:"#fff"
+  }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+
+  menuHit.on("pointerdown",()=>this.togglePauseMenu());
 }
 
+mobileButton(x,y,label,down,up=null){
+  const hit=this.add.circle(x,y,42,0x00ff00,0.01)
+    .setInteractive()
+    .setDepth(9500)
+    .setScrollFactor(0);
+
+  this.add.circle(x,y,34,0xffffff,0.24)
+    .setDepth(9501)
+    .setScrollFactor(0);
+
+  this.add.text(x,y,label,{
+    font:"18px monospace",
+    fill:"#fff"
+  }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+
+  hit.on("pointerdown",p=>{
+    if(p && p.event && p.event.preventDefault){
+      p.event.preventDefault();
+    }
+
+    this.ensureRoundActive();
+    this.readInput();
+    this.recoverActionInput();
+    vibrate(VIBE.button);
+
+    if(down){
+      down();
+    }
+  });
+
+  hit.on("pointerup",p=>{
+    if(p && p.event && p.event.preventDefault){
+      p.event.preventDefault();
+    }
+
+    if(up){
+      up();
+    }
+  });
+
+  hit.on("pointerout",()=>{
+    if(up){
+      up();
+    }
+  });
+}
+}
 const config={
   parent:"game",
   type:Phaser.AUTO,
