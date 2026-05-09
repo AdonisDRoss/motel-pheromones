@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 686;
+const VERSION = 687;
 const W = 960;
 const H = 540;
 const MOVE_FRAME_W = 204;
@@ -893,11 +893,6 @@ getPlayerAnim(action){
   return this.getSafeAnimKey(key,"jt_"+action);
 }
 
-  return this.getSafeAnimKey(key,"jt_"+action);
-}
-
-    return this.getSafeAnimKey(key,"jt_"+action);
-  }
   getPlayerSpeedMod(){
     return selectedFighter==="HEW" ? 0.94 : 1;
   }
