@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 687;
+const VERSION = 688;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -287,19 +287,13 @@ const HEW_BASE = "assets/sprites/player/hew";
 const DONNY_BASE = "assets/sprites/player/donny";
 const JACKSON_BASE = "assets/sprites/player/jackson";
 const ENEMY_BASE = "assets/sprites/enemies";
-const JT_BASE = "assets/sprites/player/jt";
-const HEW_BASE = "assets/sprites/player/hew";
-const DONNY_BASE = "assets/sprites/player/donny";
-const JACKSON_BASE = "assets/sprites/player/jackson";
-const ENEMY_BASE = "assets/sprites/enemies";
+
 let selectedFighter = "DONNY";
+
 const JACKSON_FRAME_W = 256;
 const JACKSON_FRAME_H = 256;
 const JACKSON_SCALE = 0.30;
-let selectedFighter = "DONNY";
-const JACKSON_FRAME_W = 256;
-const JACKSON_FRAME_H = 256;
-const JACKSON_SCALE = 0.30;
+
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
 const ENEMY_NAMES = [
@@ -571,6 +565,12 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,"jackson_getup","jackson_reactions",30,35,8,0);
 }
 function loadAssets(scene){
+scene.load.on("loaderror", function(file){
+  const msg = "ASSET LOAD ERROR: " + file.key + " / " + file.src;
+  window.__MP_LAST_ERROR = msg;
+  alert(msg);
+  console.error(msg);
+});
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
   scene.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
@@ -737,13 +737,6 @@ function createAllAnims(scene){
       repeat:-1
     });
   }
-
-  makeEnemyAnimSet(scene,"corpo_sellout","enemy");
-  makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
-  makeEnemyAnimSet(scene,"sellout","sellout");
-  makeEnemyAnimSet(scene,"feral","feral");
-  makeEnemyAnimSet(scene,"doorman","doorman");
-}
 
   makeEnemyAnimSet(scene,"corpo_sellout","enemy");
   makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
@@ -1253,7 +1246,7 @@ class Game extends Phaser.Scene{
   // Do not follow in arena mode. The full arena should stay visible.
   cam.stopFollow();
 }
-  getPlayerPrefix(){
+getPlayerPrefix(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "HEW") return "hew";
@@ -1262,9 +1255,11 @@ class Game extends Phaser.Scene{
 
   return "jt";
 }
-  playerUsesHewStatic(){
-    return selectedFighter==="HEW" && HEW_USE_STATIC_IMAGE && hasTex(this,"hew_static");
-  }
+
+playerUsesHewStatic(){
+  return getSelectedFighterId() === "HEW" && HEW_USE_STATIC_IMAGE && hasTex(this,"hew_static");
+}
+
 getPlayerMoveScale(){
   const fighter = getSelectedFighterId();
 
@@ -1275,14 +1270,7 @@ getPlayerMoveScale(){
   return PLAYER_MOVE_SCALE;
 }
 
-  if(selectedFighter==="DONNY"){
-    return DONNY_SCALE;
-  }
-
-  return PLAYER_MOVE_SCALE;
-}
-
-  getPlayerAttackScale(){
+getPlayerAttackScale(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "DONNY") return DONNY_SCALE;
@@ -1309,13 +1297,15 @@ getPlayerReactionScale(){
   return PLAYER_REACTION_SCALE;
 }
 
-  getSafeTextureKey(key,fallback){
-    return hasTex(this,key) ? key : fallback;
-  }
-  getSafeAnimKey(key,fallback){
-    return hasAnim(this,key) ? key : fallback;
-  }
-  getPlayerMoveSheet(){
+getSafeTextureKey(key,fallback){
+  return hasTex(this,key) ? key : fallback;
+}
+
+getSafeAnimKey(key,fallback){
+  return hasAnim(this,key) ? key : fallback;
+}
+
+getPlayerMoveSheet(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "HEW") return "hew_movement";
@@ -1325,21 +1315,38 @@ getPlayerReactionScale(){
   return "jt_movement";
 }
 
-  if(selectedFighter==="DONNY"){
-    return "donny_movement";
+getPlayerAttackSheet(){
+  const fighter = getSelectedFighterId();
+  const key = this.getPlayerPrefix() + "_attacks";
+
+  if(fighter === "JT"){
+    return this.getSafeTextureKey(key,"jt_attacks");
   }
 
-  return "jt_movement";
+  return key;
 }
-  getPlayerAttackSheet(){
-    return this.getSafeTextureKey(this.getPlayerPrefix()+"_attacks","jt_attacks");
+
+getPlayerActionSheet(){
+  const fighter = getSelectedFighterId();
+  const key = this.getPlayerPrefix() + "_actions";
+
+  if(fighter === "JT"){
+    return this.getSafeTextureKey(key,"jt_actions");
   }
-  getPlayerActionSheet(){
-    return this.getSafeTextureKey(this.getPlayerPrefix()+"_actions","jt_actions");
+
+  return key;
+}
+
+getPlayerReactionSheet(){
+  const fighter = getSelectedFighterId();
+  const key = this.getPlayerPrefix() + "_reactions";
+
+  if(fighter === "JT"){
+    return this.getSafeTextureKey(key,"jt_reactions");
   }
-  getPlayerReactionSheet(){
-    return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
-  }
+
+  return key;
+}
 getPlayerAnim(action){
   const fighter = getSelectedFighterId();
   const prefix = this.getPlayerPrefix();
@@ -1353,12 +1360,13 @@ getPlayerAnim(action){
   return this.getSafeAnimKey(key,"jt_" + action);
 }
 
-  getPlayerSpeedMod(){
-    return selectedFighter==="HEW" ? 0.94 : 1;
-  }
-  getPlayerDamageMod(){
-    return selectedFighter==="HEW" ? 1.05 : 1;
-  }
+ getPlayerSpeedMod(){
+  return getSelectedFighterId() === "HEW" ? 0.94 : 1;
+}
+
+getPlayerDamageMod(){
+  return getSelectedFighterId() === "HEW" ? 1.05 : 1;
+}
   getAttackData(type){
   const base={
   light:{anim:this.getPlayerAnim("attack_light"),damage:8,stagger:false,range:54},
@@ -1431,8 +1439,7 @@ getPlayerAnim(action){
     this.busyUntil=0;
     this.addRain();
     this.addBottomFog();
- this.addRain();
-this.addBottomFog();
+
 
 /* SAFE HUD POSITIONING */
 this.add.text(20,SAFE_TOP,"CHAR: "+selectedFighter,{
