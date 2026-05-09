@@ -83,6 +83,9 @@ const REACTION_FRAME_H = 236;
 const HEW_MOVE_FRAME_W = 227;
 const HEW_MOVE_FRAME_H = 188;
 const HEW_MOVE_SCALE = 0.40;
+const DONNY_FRAME_W = 210;
+const DONNY_FRAME_H = 212;
+const DONNY_SCALE = 0.36;
 const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 const PLAYER_MOVE_SCALE = 0.44;
@@ -276,6 +279,7 @@ function stopFightMusic(){
 
 const JT_BASE = "assets/sprites/player/jt";
 const HEW_BASE = "assets/sprites/player/hew";
+const DONNY_BASE = "assets/sprites/player/donny";
 const ENEMY_BASE = "assets/sprites/enemies";
 let selectedFighter = "JT";
 let selectedLevel = "outdoor";
@@ -470,6 +474,41 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,prefix+"_ko",prefix+"_reactions",8,11,6,0);
   makeAnim(scene,prefix+"_getup",prefix+"_reactions",12,15,8,0);
 }
+  function makeDonnyAnimSet(scene){
+  // movement sheet: 6 columns x 4 rows
+  makeAnim(scene,"donny_idle_down","donny_movement",0,5,6,-1);
+  makeAnim(scene,"donny_idle_up","donny_movement",0,5,6,-1);
+  makeAnim(scene,"donny_idle_side","donny_movement",0,5,6,-1);
+
+  makeAnim(scene,"donny_walk_down","donny_movement",6,11,8,-1);
+  makeAnim(scene,"donny_walk_up","donny_movement",6,11,8,-1);
+  makeAnim(scene,"donny_walk_side","donny_movement",6,11,8,-1);
+
+  makeAnim(scene,"donny_run_down","donny_movement",12,17,12,-1);
+  makeAnim(scene,"donny_run_up","donny_movement",12,17,12,-1);
+  makeAnim(scene,"donny_run_side","donny_movement",12,17,12,-1);
+
+  makeAnim(scene,"donny_jump","donny_movement",18,23,10,0);
+
+  // attacks sheet
+  makeAnim(scene,"donny_attack_light","donny_attacks",0,5,10,0);
+  makeAnim(scene,"donny_attack_heavy","donny_attacks",6,11,9,0);
+  makeAnim(scene,"donny_kick","donny_attacks",12,17,10,0);
+  makeAnim(scene,"donny_special","donny_attacks",18,23,10,0);
+  makeAnim(scene,"donny_block","donny_actions",0,5,8,-1);
+
+  // actions sheet
+  makeAnim(scene,"donny_crouch","donny_actions",6,11,8,-1);
+  makeAnim(scene,"donny_climb","donny_actions",12,17,8,-1);
+  makeAnim(scene,"donny_taunt","donny_actions",18,23,8,0);
+  makeAnim(scene,"donny_carry","donny_actions",18,23,8,-1);
+
+  // reactions sheet
+  makeAnim(scene,"donny_hurt","donny_reactions",0,5,8,0);
+  makeAnim(scene,"donny_knockback","donny_reactions",6,11,8,0);
+  makeAnim(scene,"donny_ko","donny_reactions",12,17,6,0);
+  makeAnim(scene,"donny_getup","donny_reactions",18,23,8,0);
+}
 function loadAssets(scene){
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
@@ -538,6 +577,33 @@ function loadAssets(scene){
     margin:0,
     spacing:0
   });
+  scene.load.spritesheet("donny_movement", DONNY_BASE + "/movement.png?v=" + VERSION,{
+  frameWidth:DONNY_FRAME_W,
+  frameHeight:DONNY_FRAME_H,
+  margin:0,
+  spacing:0
+});
+
+scene.load.spritesheet("donny_attacks", DONNY_BASE + "/attacks/donny_attacks.png?v=" + VERSION,{
+  frameWidth:DONNY_FRAME_W,
+  frameHeight:DONNY_FRAME_H,
+  margin:0,
+  spacing:0
+});
+
+scene.load.spritesheet("donny_actions", DONNY_BASE + "/actions/donny_actions.png?v=" + VERSION,{
+  frameWidth:DONNY_FRAME_W,
+  frameHeight:DONNY_FRAME_H,
+  margin:0,
+  spacing:0
+});
+
+scene.load.spritesheet("donny_reactions", DONNY_BASE + "/reactions/donny_reactions.png?v=" + VERSION,{
+  frameWidth:DONNY_FRAME_W,
+  frameHeight:DONNY_FRAME_H,
+  margin:0,
+  spacing:0
+});
   scene.load.spritesheet("corpo_sellout",ENEMY_BASE + "/corpo_sellout.png?v=" + VERSION,{
     frameWidth:ENEMY_FRAME_W,
     frameHeight:ENEMY_FRAME_H,
@@ -570,8 +636,10 @@ function loadAssets(scene){
   });
 }
 function createAllAnims(scene){
+  function createAllAnims(scene){
   makePlayerAnimSet(scene,"jt");
   makePlayerAnimSet(scene,"hew");
+  makeDonnyAnimSet(scene);
   if(hasTex(scene,"hew_static") && !hasAnim(scene,"hew_static_idle")){
     scene.anims.create({
       key:"hew_static_idle",
@@ -654,10 +722,10 @@ class CharacterSelect extends Phaser.Scene{
       }).setOrigin(0.5);
     }
     const fighters=[
-      {name:"DOTTIE",x:260,y:300,w:170,h:260,unlocked:false},
-      {name:"JT",x:480,y:300,w:170,h:260,unlocked:true},
-      {name:"HEW",x:700,y:300,w:170,h:260,unlocked:true,collectible:true}
-    ];
+  {name:"DONNY",x:220,y:300,w:150,h:260,unlocked:true},
+  {name:"JT",x:420,y:300,w:150,h:260,unlocked:true},
+  {name:"HEW",x:780,y:300,w:150,h:260,unlocked:true,collectible:true}
+];
     const outline=this.add.rectangle(480,300,170,260,0xff4fc3,0)
       .setStrokeStyle(5,0xff4fc3)
       .setDepth(50);
@@ -753,18 +821,40 @@ class Game extends Phaser.Scene{
     super("Game");
   }
   getPlayerPrefix(){
-    return selectedFighter==="HEW" ? "hew" : "jt";
-  }
+  if(selectedFighter==="HEW") return "hew";
+  if(selectedFighter==="DONNY") return "donny";
+  return "jt";
+}
   playerUsesHewStatic(){
     return selectedFighter==="HEW" && HEW_USE_STATIC_IMAGE && hasTex(this,"hew_static");
   }
   getPlayerMoveScale(){
-  if(selectedFighter === "HEW"){
+  if(selectedFighter==="HEW"){
     return HEW_MOVE_SCALE;
+  }
+
+  if(selectedFighter==="DONNY"){
+    return DONNY_SCALE;
   }
 
   return PLAYER_MOVE_SCALE;
 }
+
+  getPlayerAttackScale(){
+  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  return PLAYER_ATTACK_SCALE;
+}
+
+getPlayerActionScale(){
+  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  return PLAYER_ACTION_SCALE;
+}
+
+getPlayerReactionScale(){
+  if(selectedFighter==="DONNY") return DONNY_SCALE;
+  return PLAYER_REACTION_SCALE;
+}
+
   getSafeTextureKey(key,fallback){
     return hasTex(this,key) ? key : fallback;
   }
@@ -772,11 +862,16 @@ class Game extends Phaser.Scene{
     return hasAnim(this,key) ? key : fallback;
   }
   getPlayerMoveSheet(){
-    if(selectedFighter==="HEW"){
-      return "hew_movement";
-    }
-    return "jt_movement";
+  if(selectedFighter==="HEW"){
+    return "hew_movement";
   }
+
+  if(selectedFighter==="DONNY"){
+    return "donny_movement";
+  }
+
+  return "jt_movement";
+}
   getPlayerAttackSheet(){
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_attacks","jt_attacks");
   }
@@ -787,12 +882,15 @@ class Game extends Phaser.Scene{
     return this.getSafeTextureKey(this.getPlayerPrefix()+"_reactions","jt_reactions");
   }
   getPlayerAnim(action){
-    const prefix = this.getPlayerPrefix();
-    const key = prefix + "_" + action;
+  const prefix = this.getPlayerPrefix();
+  const key = prefix + "_" + action;
 
-    if(selectedFighter==="HEW"){
-      return key;
-    }
+  if(selectedFighter==="HEW" || selectedFighter==="DONNY"){
+    return key;
+  }
+
+  return this.getSafeAnimKey(key,"jt_"+action);
+}
 
     return this.getSafeAnimKey(key,"jt_"+action);
   }
@@ -901,16 +999,18 @@ class Game extends Phaser.Scene{
     }).setDepth(50000);
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
-    this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
-    this.player.setOrigin(0.5,1);
-    this.player.setScale(this.getPlayerMoveScale());
-    this.player.setDepth(200);
-    safePlay(this.player,this.getPlayerAnim("idle_down"));
-    this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
-    this.poseSprite.setDepth(201);
-    this.poseSprite.setVisible(false);
+   this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
+this.player.setOrigin(0.5,1);
+this.player.setScale(this.getPlayerMoveScale());
+this.player.setDepth(200);
+
+safePlay(this.player,this.getPlayerAnim("idle_down"));
+
+this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
+this.poseSprite.setOrigin(0.5,1);
+this.poseSprite.setScale(this.getPlayerAttackScale());
+this.poseSprite.setDepth(201);
+this.poseSprite.setVisible(false);
     this.poseSprite.loadTexture = this.poseSprite.setTexture.bind(this.poseSprite);
     this.createPlatformZones();
     this.createEnemies();
@@ -928,8 +1028,8 @@ class Game extends Phaser.Scene{
     this.input.keyboard.on("keydown-E",()=>this.startGrab());
     this.input.keyboard.on("keydown-G",()=>this.startGrab());
     this.input.keyboard.on("keydown-C",()=>this.startCrouch(true));
-    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose(this.getPlayerAnim("taunt"),700,PLAYER_ACTION_SCALE));
-    this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,PLAYER_ACTION_SCALE));
+    this.input.keyboard.on("keydown-T",()=>this.playPlayerPose(this.getPlayerAnim("taunt"),700,this.getPlayerActionScale()));
+this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("special"),750,this.getPlayerActionScale()));
     this.input.keyboard.on("keydown-H",()=>this.showReaction("hurt",350));
     this.input.keyboard.on("keydown-N",()=>this.showReaction("knockback",500));
     this.input.keyboard.on("keydown-M",()=>this.showReaction("ko",9999));
@@ -3081,7 +3181,7 @@ getNearestSpecialLadder(){
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ATTACK_SCALE);
+    this.poseSprite.setScale(this.getPlayerAttackScale());
   }
   forcePlayerReady(){
     if(this.playerHealth<=0) return;
