@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 684;
+const VERSION = 685;
 const W = 960;
 const H = 540;
 const MOVE_FRAME_W = 204;
@@ -636,10 +636,10 @@ scene.load.spritesheet("donny_reactions", DONNY_BASE + "/reactions/donny_reactio
   });
 }
 function createAllAnims(scene){
-  function createAllAnims(scene){
   makePlayerAnimSet(scene,"jt");
   makePlayerAnimSet(scene,"hew");
   makeDonnyAnimSet(scene);
+
   if(hasTex(scene,"hew_static") && !hasAnim(scene,"hew_static_idle")){
     scene.anims.create({
       key:"hew_static_idle",
@@ -648,6 +648,7 @@ function createAllAnims(scene){
       repeat:-1
     });
   }
+
   makeEnemyAnimSet(scene,"corpo_sellout","enemy");
   makeEnemyAnimSet(scene,"corpo_wannabe","wannabe");
   makeEnemyAnimSet(scene,"sellout","sellout");
