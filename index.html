@@ -821,6 +821,23 @@ class Game extends Phaser.Scene{
   constructor(){
     super("Game");
   }
+  setupCameraFollow(){
+  const cam = this.cameras.main;
+
+  // Zoom amount
+  cam.setZoom(1.18);
+
+  // Camera bounds.
+  // For a normal 960x540 screen, keep this 960x540.
+  // For a long story-mode level, increase width later.
+  cam.setBounds(0, 0, 960, 540);
+
+  // Follow the player smoothly
+  cam.startFollow(this.player, true, 0.08, 0.08);
+
+  // Keeps the player slightly low-center like a brawler
+  cam.followOffset.set(0, 35);
+}
   getPlayerPrefix(){
   if(selectedFighter==="HEW") return "hew";
   if(selectedFighter==="DONNY") return "donny";
@@ -970,32 +987,32 @@ getPlayerAnim(action){
     this.busyUntil=0;
     this.addRain();
     this.addBottomFog();
-    this.add.text(20,20,"CHAR: "+selectedFighter,{
-      font:"16px monospace",
-      fill:"#fff"
-    }).setDepth(1000);
+ this.add.text(20,20,"CHAR: "+selectedFighter,{
+  font:"16px monospace",
+  fill:"#fff"
+}).setDepth(1000).setScrollFactor(0); 
     this.add.text(20,45,"LEVEL: "+selectedLevelName,{
-      font:"16px monospace",
-      fill:"#ff4fc3"
-    }).setDepth(1000);
+  font:"16px monospace",
+  fill:"#ff4fc3"
+}).setDepth(1000).setScrollFactor(0);
     this.zoneText=this.add.text(480,25,"MIDDLE PLATFORM",{
-      font:"16px monospace",
-      fill:"#ffff00"
-    }).setOrigin(0.5).setDepth(1000);
+  font:"16px monospace",
+  fill:"#ffff00"
+}).setOrigin(0.5).setDepth(1000).setScrollFactor(0);
     this.comboText=this.add.text(20,70,"COMBO: 0  RHYTHM: 0",{
-      font:"16px monospace",
-      fill:"#00eaff"
-    }).setDepth(1000);
+  font:"16px monospace",
+  fill:"#00eaff"
+}).setDepth(1000).setScrollFactor(0);
     this.playerHealthText=this.add.text(20,95,"HP: 100",{
-      font:"16px monospace",
-      fill:"#ffffff",
-      backgroundColor:"#000000"
-    }).setDepth(1000);
+  font:"16px monospace",
+  fill:"#ffffff",
+  backgroundColor:"#000000"
+}).setDepth(1000).setScrollFactor(0);
     this.debugInputText=this.add.text(20,120,"",{
-      font:"13px monospace",
-      fill:"#7CFF6B",
-      backgroundColor:"#000000"
-    }).setDepth(50000);
+  font:"13px monospace",
+  fill:"#7CFF6B",
+  backgroundColor:"#000000"
+}).setDepth(50000).setScrollFactor(0);
     this.shadow=this.add.ellipse(470,395,42,12,0x000000,0.38)
       .setDepth(199);
    this.player=this.add.sprite(470,390,this.getPlayerMoveSheet());
@@ -1004,7 +1021,7 @@ this.player.setScale(this.getPlayerMoveScale());
 this.player.setDepth(200);
 
 safePlay(this.player,this.getPlayerAnim("idle_down"));
-
+this.setupCameraFollow();
 this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
 this.poseSprite.setOrigin(0.5,1);
 this.poseSprite.setScale(this.getPlayerAttackScale());
@@ -3621,8 +3638,12 @@ getNearestSpecialLadder(){
     const bx=115;
     const by=420;
     const r=58;
-    this.add.circle(bx,by,r,0xffffff,0.16).setDepth(9000);
-    const knob=this.add.circle(bx,by,25,0xffffff,0.38).setDepth(9001);
+    this.add.circle(bx,by,r,0xffffff,0.16)
+  .setDepth(9000)
+  .setScrollFactor(0);
+    const knob=this.add.circle(bx,by,25,0xffffff,0.38)
+  .setDepth(9001)
+  .setScrollFactor(0);
     let dragging=false;
     const move=p=>{
       let dx=p.x-bx;
@@ -3663,46 +3684,59 @@ getNearestSpecialLadder(){
       this.startCrouch(true);
     });
     const menuHit=this.add.rectangle(480,505,120,38,0x000000,0.35)
-      .setInteractive()
-      .setDepth(9500);
+  .setInteractive()
+  .setDepth(9500)
+  .setScrollFactor(0);
     this.add.rectangle(480,505,120,38,0xffffff,0.16)
-      .setStrokeStyle(2,0xffffff,0.45)
-      .setDepth(9501);
+  .setStrokeStyle(2,0xffffff,0.45)
+  .setDepth(9501)
+  .setScrollFactor(0);
     this.add.text(480,505,"MENU",{
-      font:"16px monospace",
-      fill:"#fff"
-    }).setOrigin(0.5).setDepth(9502);
+  font:"16px monospace",
+  fill:"#fff"
+}).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
     menuHit.on("pointerdown",()=>this.togglePauseMenu());
   }
   mobileButton(x,y,label,down,up=null){
     const hit=this.add.circle(x,y,42,0x00ff00,0.01)
       .setInteractive()
-      .setDepth(9500);
-    this.add.circle(x,y,34,0xffffff,0.24).setDepth(9501);
+      .setDepth(9500)
+      .setScrollFactor(0);
+
+    this.add.circle(x,y,34,0xffffff,0.24)
+      .setDepth(9501)
+      .setScrollFactor(0);
+
     this.add.text(x,y,label,{
       font:"18px monospace",
       fill:"#fff"
-    }).setOrigin(0.5).setDepth(9502);
+    }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+
     hit.on("pointerdown",p=>{
       if(p && p.event && p.event.preventDefault){
         p.event.preventDefault();
       }
+
       this.ensureRoundActive();
       this.readInput();
       this.recoverActionInput();
       vibrate(VIBE.button);
+
       if(down){
         down();
       }
     });
+
     hit.on("pointerup",p=>{
       if(p && p.event && p.event.preventDefault){
         p.event.preventDefault();
       }
+
       if(up){
         up();
       }
     });
+
     hit.on("pointerout",()=>{
       if(up){
         up();
@@ -3710,6 +3744,7 @@ getNearestSpecialLadder(){
     });
   }
 }
+
 const config={
   parent:"game",
   type:Phaser.AUTO,
