@@ -123,6 +123,9 @@ const VAN_FRAME_W = 366;
 const VAN_FRAME_H = 352;
 const VAN_SCALE = 0.82;
 const VAN_ORIGIN_Y = 0.38;
+const HELI_FRAME_W = 384;
+const HELI_FRAME_H = 512;
+const HELI_SCALE = 0.42;
 const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
   top:{       minX:305, maxX:860, minY:253, maxY:253 },
@@ -610,7 +613,12 @@ scene.load.on("loaderror", function(file){
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
-  
+  scene.load.spritesheet("corpo_helicopter","assets/sprites/vehicles/corpo_helicopter_sheet.png?v="+VERSION,{
+  frameWidth: HELI_FRAME_W,
+  frameHeight: HELI_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
   scene.load.spritesheet("corpo_van","assets/sprites/vehicles/corpo_van_sheet.png?v="+VERSION,{
   frameWidth: VAN_FRAME_W,
   frameHeight: VAN_FRAME_H,
@@ -3404,7 +3412,9 @@ spawnWaveFromHelicopter(wave,index,onDone){
   const heliY = 100;
 
   const heli = this.makeHelicopter(startX,heliY);
-
+if(heli.play && hasAnim(this,"corpo_helicopter_hover")){
+  safePlay(heli,"corpo_helicopter_hover");
+}
   this.tweens.add({
     targets:heli,
     x:stopX,
@@ -3414,7 +3424,9 @@ spawnWaveFromHelicopter(wave,index,onDone){
       this.cameras.main.shake(120,0.003);
 
       let longest = 0;
-
+if(heli.play && hasAnim(this,"corpo_helicopter_open")){
+  heli.play("corpo_helicopter_open");
+}
       wave.forEach((spawn,i)=>{
         const delay = i * 260;
         longest = Math.max(longest,delay + 820);
@@ -3532,7 +3544,20 @@ makeVan(x, y){
 
 
 makeHelicopter(x,y){
-  const heli = this.add.container(x,y).setDepth(15000);
+  if(hasTex(this, "corpo_helicopter")){
+    const heli = this.add.sprite(x, y, "corpo_helicopter", 0)
+      .setOrigin(0.5, 0.62)
+      .setScale(HELI_SCALE)
+      .setDepth(15000);
+
+    if(hasAnim(this, "corpo_helicopter_hover")){
+      safePlay(heli, "corpo_helicopter_hover");
+    }
+
+    return heli;
+  }
+
+  const fallback = this.add.container(x,y).setDepth(15000);
 
   const body = this.add.ellipse(0,0,120,42,0x181818,0.98)
     .setStrokeStyle(3,0xffffff,0.25);
@@ -3553,7 +3578,7 @@ makeHelicopter(x,y){
   const rotor2 = this.add.rectangle(0,-35,145,5,0xffffff,0.32);
   rotor2.rotation = Math.PI / 2;
 
-  heli.add([
+  fallback.add([
     body,
     cockpit,
     tail,
@@ -3573,7 +3598,7 @@ makeHelicopter(x,y){
     ease:"Linear"
   });
 
-  return heli;
+  return fallback;
 }
 getAliveNormalEnemyCount(){
   if(!this.enemies) return 0;
