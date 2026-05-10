@@ -5130,7 +5130,219 @@ mobileButton(x, y, label, color, down, up = null){
   };
 }
 } // THIS CLOSES class Game
+/* =========================================================
+   FAST BUTTON ANIMATION FIX PATCH
+   Paste this after:
+   } // THIS CLOSES class Game
 
+   And before:
+   const config = {
+========================================================= */
+
+function replayAnim(sprite,key){
+  if(!sprite || !sprite.scene) return false;
+  if(!hasAnim(sprite.scene,key)) return false;
+
+  sprite.stop();
+  sprite.play(key,false);
+
+  return true;
+}
+
+/* Force one-shot pose animations to restart cleanly */
+Game.prototype.showReaction = function(type="hurt",duration=350){
+  if(!this.player || !this.poseSprite) return false;
+
+  const animMap = {
+    hurt:this.getPlayerAnim("hurt"),
+    knockback:this.getPlayerAnim("knockback"),
+    ko:this.getPlayerAnim("ko"),
+    getup:this.getPlayerAnim("getup")
+  };
+
+  const animKey = animMap[type];
+
+  if(!animKey || !hasAnim(this,animKey)) return false;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + duration + 250;
+  this.isBlocking = false;
+
+  this.poseSprite.setTexture(this.getPlayerReactionSheet());
+  this.poseSprite.x = this.player.x;
+  this.poseSprite.y = this.player.y;
+  this.poseSprite.flipX = this.player.flipX;
+  this.poseSprite.setOrigin(0.5,1);
+  this.poseSprite.setScale(this.getPlayerReactionScale());
+  this.poseSprite.setVisible(true);
+
+  this.player.setVisible(false);
+
+  replayAnim(this.poseSprite,animKey);
+
+  if(type !== "ko"){
+    this.time.delayedCall(duration,()=>{
+      this.forcePlayerReady();
+    });
+  }
+
+  return true;
+};
+
+/* Force block animation to restart */
+Game.prototype.startBlock = function(){
+  if(this.pauseMenuOpen) return;
+  if(!this.matchStarted || this.matchOver) return;
+  if(this.playerBusy || this.isClimbing || this.playerHealth <= 0) return;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 700;
+  this.isBlocking = true;
+
+  vibrate(VIBE.block);
+
+  this.positionAttackSprite("block");
+  this.poseSprite.setVisible(true);
+  this.player.setVisible(false);
+
+  replayAnim(this.poseSprite,this.getPlayerAnim("block"));
+
+  this.time.delayedCall(600,()=>{
+    if(this.isBlocking){
+      this.forcePlayerReady();
+    }
+  });
+};
+
+/* Force sweep / crouch kick animation to restart */
+Game.prototype.startSweep = function(){
+  if(this.pauseMenuOpen) return;
+  if(!this.matchStarted || this.matchOver) return;
+  if(this.playerBusy || this.isClimbing || this.playerHealth <= 0) return;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 700;
+  this.isCrouching = false;
+
+  vibrate(VIBE.sweep);
+
+  const kickAnim = this.getPlayerAnim("kick");
+  const attackSheet = this.getPlayerAttackSheet();
+
+  if(hasAnim(this,kickAnim) && hasTex(this,attackSheet)){
+    this.positionAttackSprite("kick");
+    this.poseSprite.setVisible(true);
+    this.player.setVisible(false);
+    replayAnim(this.poseSprite,kickAnim);
+  }else{
+    this.player.setVisible(true);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setTint(0x66ccff);
+  }
+
+  this.time.delayedCall(90,()=>{
+    this.applyPlayerHit({
+      damage:Number((SWEEP_DAMAGE * this.getPlayerDamageMod()).toFixed(1)),
+      stagger:true,
+      range:92
+    });
+  });
+
+  this.time.delayedCall(430,()=>{
+    this.forcePlayerReady();
+  });
+
+  this.time.delayedCall(700,()=>{
+    if(this.playerBusy){
+      this.forcePlayerReady();
+    }
+  });
+};
+
+/* Force attack animation to restart every button press */
+Game.prototype.startAttack = function(type){
+  if(!this.ensureRoundActive()) return;
+
+  this.recoverActionInput();
+
+  if(this.grabbedEnemy) return;
+  if(this.pauseMenuOpen) return;
+  if(!this.matchStarted || this.matchOver) return;
+  if(this.playerBusy || this.isClimbing || this.playerHealth <= 0) return;
+
+  const data = this.getAttackData(type);
+  if(!data) return;
+
+  this.attackToken = (this.attackToken || 0) + 1;
+  const attackToken = this.attackToken;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 700;
+
+  if(type === "heavy"){
+    vibrate(VIBE.heavy);
+  }else if(type === "kick"){
+    vibrate(VIBE.kick);
+  }else{
+    vibrate(VIBE.attack);
+  }
+
+  const attackAnimExists = hasAnim(this,data.anim);
+  const attackSheet = this.getPlayerAttackSheet();
+  const attackSheetExists = hasTex(this,attackSheet);
+
+  if(!attackAnimExists || !attackSheetExists){
+    this.player.setVisible(true);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setTint(0xffff66);
+
+    this.time.delayedCall(80,()=>{
+      if(attackToken !== this.attackToken) return;
+      this.applyPlayerHit(data);
+    });
+
+    this.time.delayedCall(180,()=>{
+      if(this.player){
+        this.player.clearTint();
+      }
+
+      if(attackToken === this.attackToken){
+        this.forcePlayerReady();
+      }
+    });
+
+    return;
+  }
+
+  this.positionAttackSprite(type);
+  this.poseSprite.setVisible(true);
+  this.player.setVisible(false);
+
+  replayAnim(this.poseSprite,data.anim);
+
+  this.time.delayedCall(100,()=>{
+    if(attackToken !== this.attackToken) return;
+    if(!this.poseSprite || !this.poseSprite.visible) return;
+
+    this.applyPlayerHit(data);
+  });
+
+  this.time.delayedCall(420,()=>{
+    if(attackToken === this.attackToken){
+      this.forcePlayerReady();
+    }
+  });
+
+  this.time.delayedCall(700,()=>{
+    if(attackToken === this.attackToken && this.playerBusy){
+      this.forcePlayerReady();
+    }
+  });
+};
+
+/* =========================================================
+   END FAST BUTTON ANIMATION FIX PATCH
+========================================================= */
 const config = {
   parent: "game",
   type: Phaser.AUTO,
