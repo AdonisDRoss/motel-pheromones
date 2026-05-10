@@ -124,12 +124,12 @@ const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
   top:{       minX:305, maxX:860, minY:253, maxY:253 },
 
-  // Locked to the middle sidewalk so he does NOT drift below the front edge
+  // IMPORTANT:
+  // Middle layer is locked to the sidewalk line.
+  // Player cannot walk below this line unless using stairs.
   middle:{    minX:120, maxX:860, minY:392, maxY:392 },
 
-  // Small lower-left strip behind the car / barricade
   behindCar:{ minX:120, maxX:295, minY:443, maxY:443 },
-
   bottom:{    minX:120, maxX:860, minY:505, maxY:505 }
 };
 
@@ -4360,144 +4360,121 @@ checkVictory(){
     }
   }
 makeMobileControls(){
-  const camZoom = this.cameras.main.zoom || 1;
+  const size = v => v * CONTROL_ZOOM;
+  const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  // Use fixed UI space so buttons stay at the screen edges
-  const UI_W = 960;
-  const UI_H = 540;
+  // LEFT SIDE: movement stick
+  const bx = 115;
+  const by = H - 120;
+  const r = size(58);
 
-  const ux = v => v / camZoom;
-  const uy = v => v / camZoom;
-  const size = v => (v * CONTROL_ZOOM) / camZoom;
-  const font = v => Math.round((v * CONTROL_ZOOM) / camZoom) + "px monospace";
-
-  // --------------------------
-  // LEFT STICK / D-PAD AREA
-  // --------------------------
-  const bx = ux(110);
-  const by = uy(UI_H - 105);
-  const r = size(54);
-
-  this.add.circle(bx,by,r,0xffffff,0.16)
+  this.add.circle(bx, by, r, 0xffffff, 0.16)
     .setDepth(9000)
     .setScrollFactor(0);
 
-  const knob=this.add.circle(bx,by,size(24),0xffffff,0.38)
+  const knob = this.add.circle(bx, by, size(25), 0xffffff, 0.38)
     .setDepth(9001)
     .setScrollFactor(0);
 
-  let dragging=false;
+  let dragging = false;
 
-  const move=p=>{
-    const px = ux(p.x);
-    const py = uy(p.y);
+  const move = p => {
+    let dx = p.x - bx;
+    let dy = p.y - by;
+    const d = Math.sqrt(dx * dx + dy * dy);
 
-    let dx=px-bx;
-    let dy=py-by;
-    const d=Math.sqrt(dx*dx+dy*dy);
-
-    if(d>r){
-      dx=dx/d*r;
-      dy=dy/d*r;
+    if(d > r){
+      dx = dx / d * r;
+      dy = dy / d * r;
     }
 
-    knob.x=bx+dx;
-    knob.y=by+dy;
-    this.stickX=dx/r;
-    this.stickY=dy/r;
+    knob.x = bx + dx;
+    knob.y = by + dy;
+
+    this.stickX = dx / r;
+    this.stickY = dy / r;
   };
 
-  this.input.on("pointerdown",p=>{
-    const px = ux(p.x);
-    const py = uy(p.y);
-
-    if(Phaser.Math.Distance.Between(px,py,bx,by)<size(95)){
-      dragging=true;
+  this.input.on("pointerdown", p => {
+    if(Phaser.Math.Distance.Between(p.x, p.y, bx, by) < size(95)){
+      dragging = true;
       move(p);
     }
   });
 
-  this.input.on("pointermove",p=>{
+  this.input.on("pointermove", p => {
     if(dragging){
       move(p);
     }
   });
 
-  this.input.on("pointerup",()=>{
-    dragging=false;
-    knob.x=bx;
-    knob.y=by;
-    this.stickX=0;
-    this.stickY=0;
+  this.input.on("pointerup", () => {
+    dragging = false;
+    knob.x = bx;
+    knob.y = by;
+    this.stickX = 0;
+    this.stickY = 0;
   });
 
-  // --------------------------
-  // RIGHT BUTTON DIAMOND
-  // SNES style: Y top, X left, A right, B bottom
-  // --------------------------
-  const diamondX = ux(UI_W - 120);
-  const diamondY = uy(UI_H - 110);
+  // RIGHT SIDE: SNES-style diamond
+  const diamondX = W - 155;
+  const diamondY = H - 112;
 
-  this.mobileButton(diamondX, uy(UI_H - 170), "Y", ()=>this.startContextY());
-  this.mobileButton(ux(UI_W - 180), diamondY, "X", ()=>this.startAttack("light"));
-  this.mobileButton(ux(UI_W - 60),  diamondY, "A", ()=>this.startContextKick());
-  this.mobileButton(diamondX, uy(UI_H - 50), "B", ()=>this.startContextB());
+  this.mobileButton(diamondX,      diamondY - 68, "X", () => this.startAttack("light"));
+  this.mobileButton(diamondX - 68, diamondY,      "Y", () => this.startContextY());
+  this.mobileButton(diamondX + 68, diamondY,      "A", () => this.startContextKick());
+  this.mobileButton(diamondX,      diamondY + 68, "B", () => this.startContextB());
 
-  // --------------------------
-  // EXTRA ACTION BUTTONS
-  // Keep them near the right side, but outside the main diamond
-  // --------------------------
-  this.mobileButton(ux(UI_W - 245), uy(UI_H - 170), "SP", ()=>this.startAttack("heavy"));
+  // Specials above the diamond
+  this.mobileButton(diamondX - 92, diamondY - 118, "SP", () => this.startAttack("heavy"));
 
-  this.mobileButton(ux(UI_W - 245), uy(UI_H - 105), "CR", ()=>{
+  // Crouch button between stick and diamond, lower middle-left
+  this.mobileButton(W - 355, H - 100, "CR", () => {
     this.recoverActionInput();
     this.startCrouch(true);
   });
 
-  // --------------------------
-  // MENU CENTER BOTTOM
-  // --------------------------
-  const menuX = ux(UI_W / 2);
-  const menuY = uy(UI_H - 28);
+  // CENTER BOTTOM: menu
+  const menuX = CX;
+  const menuY = MENU_Y;
 
-  const menuHit=this.add.rectangle(menuX,menuY,size(120),size(38),0x000000,0.35)
+  const menuHit = this.add.rectangle(menuX, menuY, size(120), size(38), 0x000000, 0.35)
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.rectangle(menuX,menuY,size(120),size(38),0xffffff,0.16)
-    .setStrokeStyle(2,0xffffff,0.45)
+  this.add.rectangle(menuX, menuY, size(120), size(38), 0xffffff, 0.16)
+    .setStrokeStyle(2, 0xffffff, 0.45)
     .setDepth(9501)
     .setScrollFactor(0);
 
-  this.add.text(menuX,menuY,"MENU",{
-    font:font(16),
-    fill:"#fff"
+  this.add.text(menuX, menuY, "MENU", {
+    font: font(16),
+    fill: "#fff"
   }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
 
-  menuHit.on("pointerdown",()=>this.togglePauseMenu());
+  menuHit.on("pointerdown", () => this.togglePauseMenu());
 }
-mobileButton(x,y,label,down,up=null){
-  const camZoom = this.cameras.main.zoom || 1;
 
-  const size = v => (v * CONTROL_ZOOM) / camZoom;
-  const font = v => Math.round((v * CONTROL_ZOOM) / camZoom) + "px monospace";
+mobileButton(x, y, label, down, up = null){
+  const size = v => v * CONTROL_ZOOM;
+  const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  const hit=this.add.circle(x,y,size(42),0x00ff00,0.01)
+  const hit = this.add.circle(x, y, size(42), 0x00ff00, 0.01)
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.circle(x,y,size(34),0xffffff,0.24)
+  this.add.circle(x, y, size(34), 0xffffff, 0.22)
     .setDepth(9501)
     .setScrollFactor(0);
 
-  this.add.text(x,y,label,{
-    font:font(18),
-    fill:"#fff"
+  this.add.text(x, y, label, {
+    font: font(18),
+    fill: "#fff"
   }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
 
-  hit.on("pointerdown",p=>{
+  hit.on("pointerdown", p => {
     if(p && p.event && p.event.preventDefault){
       p.event.preventDefault();
     }
@@ -4512,7 +4489,7 @@ mobileButton(x,y,label,down,up=null){
     }
   });
 
-  hit.on("pointerup",p=>{
+  hit.on("pointerup", p => {
     if(p && p.event && p.event.preventDefault){
       p.event.preventDefault();
     }
@@ -4522,14 +4499,11 @@ mobileButton(x,y,label,down,up=null){
     }
   });
 
-  hit.on("pointerout",()=>{
+  hit.on("pointerout", () => {
     if(up){
       up();
     }
   });
-}
-
-// closes class Game
 }
 const config={
   parent:"game",
@@ -4547,7 +4521,7 @@ const config={
     disableWebAudio:false
   }
 };
-
+}
 new Phaser.Game(config);
 
 </script>
