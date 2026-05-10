@@ -119,7 +119,10 @@ const RUN_SPEED = 270;
 const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
-
+const VAN_FRAME_W = 512;
+const VAN_FRAME_H = 512;
+const VAN_SCALE = 0.72;
+const VAN_ORIGIN_Y = 0.80;
 
 const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
@@ -609,6 +612,12 @@ scene.load.on("loaderror", function(file){
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
   scene.load.image("enemy_van","assets/vehicles/enemy_van.png?v="+VERSION);
+  scene.load.spritesheet("corpo_van","assets/sprites/vehicles/corpo_van_sheet.png?v="+VERSION,{
+  frameWidth: VAN_FRAME_W,
+  frameHeight: VAN_FRAME_H,
+  margin: 0,
+  spacing: 0
+});
   scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);
   scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
@@ -2986,6 +2995,7 @@ getNearestSpecialLadder(){
       }
     }
     return false;
+    
   }
   lockEnemyKOFrame(e){
     if(!e || !e.sprite) return;
@@ -3014,6 +3024,39 @@ getNearestSpecialLadder(){
     }
     this.updateEnemyVisuals(e);
   }
+  if(hasTex(scene,"corpo_van") && !hasAnim(scene,"corpo_van_idle")){
+  scene.anims.create({
+    key:"corpo_van_idle",
+    frames:[{key:"corpo_van",frame:0}],
+    frameRate:1,
+    repeat:-1
+  });
+
+  scene.anims.create({
+    key:"corpo_van_open",
+    frames:[
+      {key:"corpo_van",frame:0},
+      {key:"corpo_van",frame:1},
+      {key:"corpo_van",frame:2},
+      {key:"corpo_van",frame:3},
+      {key:"corpo_van",frame:4},
+      {key:"corpo_van",frame:5}
+    ],
+    frameRate:8,
+    repeat:0
+  });
+
+  scene.anims.create({
+    key:"corpo_van_close",
+    frames:[
+      {key:"corpo_van",frame:5},
+      {key:"corpo_van",frame:6},
+      {key:"corpo_van",frame:7}
+    ],
+    frameRate:8,
+    repeat:0
+  });
+}
   playVanWaveIntro(index){
   const wave = this.enemyWaves && this.enemyWaves[index];
   if(!wave || !wave.length){
@@ -3262,30 +3305,42 @@ spawnWaveFromVan(wave,index,onDone){
   const avgX = wave.reduce((sum,spawn)=>sum + spawn.x,0) / wave.length;
   const fromLeft = index % 2 === 0;
 
-  const startX = fromLeft ? -150 : W + 150;
-  const exitX = fromLeft ? W + 180 : -180;
-  const stopX = Phaser.Math.Clamp(avgX,230,W - 230);
-  const vanY = getPlatformY("bottom") - 36;
+  const startX = fromLeft ? -220 : W + 220;
+  const exitX = fromLeft ? W + 260 : -260;
+  const stopX = Phaser.Math.Clamp(avgX,260,W - 260);
+
+  // Lower = closer to street.
+  const vanY = getPlatformY("bottom") + 18;
 
   const van = this.makeVan(startX,vanY);
+
+  if(!fromLeft && van.setFlipX){
+    van.setFlipX(true);
+  }
 
   this.tweens.add({
     targets:van,
     x:stopX,
-    duration:850,
+    duration:950,
     ease:"Sine.easeOut",
     onComplete:()=>{
       this.cameras.main.shake(100,0.003);
 
+      if(van.play && hasAnim(this,"corpo_van_open")){
+        van.play("corpo_van_open");
+      }else if(van.setFrame){
+        van.setFrame(5);
+      }
+
       let longest = 0;
 
       wave.forEach((spawn,i)=>{
-        const delay = i * 230;
+        const delay = 420 + (i * 260);
         longest = Math.max(longest,delay + 720);
 
         this.spawnIntroEnemy(
           stopX + ((i - wave.length / 2) * 18),
-          vanY - 8,
+          vanY - 75,
           spawn,
           delay,
           "van"
@@ -3293,21 +3348,28 @@ spawnWaveFromVan(wave,index,onDone){
       });
 
       this.time.delayedCall(longest + 220,()=>{
-        this.tweens.add({
-          targets:van,
-          x:exitX,
-          duration:750,
-          ease:"Sine.easeIn",
-          onComplete:()=>{
-            van.destroy();
-            if(onDone) onDone();
-          }
+        if(van.play && hasAnim(this,"corpo_van_close")){
+          van.play("corpo_van_close");
+        }else if(van.setFrame){
+          van.setFrame(7);
+        }
+
+        this.time.delayedCall(350,()=>{
+          this.tweens.add({
+            targets:van,
+            x:exitX,
+            duration:800,
+            ease:"Sine.easeIn",
+            onComplete:()=>{
+              van.destroy();
+              if(onDone) onDone();
+            }
+          });
         });
       });
     }
   });
 }
-
 spawnWaveFromHelicopter(wave,index,onDone){
   const avgX = wave.reduce((sum,spawn)=>sum + spawn.x,0) / wave.length;
 
@@ -3423,14 +3485,25 @@ spawnIntroEnemy(sourceX,sourceY,spawn,delay,sourceKind){
 }
 
 makeVan(x,y){
-  if(hasTex(this,"enemy_van")){
-    const van = this.add.image(x,y,"enemy_van")
-      .setOrigin(0.5,1)
-      .setScale(0.28)
-      .setDepth(15000);
+  if(hasTex(this,"corpo_van")){
+    const van = this.add.sprite(x,y,"corpo_van",0)
+      .setOrigin(0.5,VAN_ORIGIN_Y)
+      .setScale(VAN_SCALE)
+      .setDepth(y + 260);
+
+    if(hasAnim(this,"corpo_van_idle")){
+      safePlay(van,"corpo_van_idle");
+    }
 
     return van;
   }
+
+  const fallback = this.add.rectangle(x,y,210,72,0x111111,0.95)
+    .setStrokeStyle(3,0xffffff,0.35)
+    .setDepth(y + 260);
+
+  return fallback;
+}
 
   // Emergency fallback if enemy_van.png is missing
   const van = this.add.container(x,y).setDepth(15000);
