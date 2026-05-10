@@ -2695,6 +2695,31 @@ this.activeJumpTween=this.tweens.add({
     };
     return map[action] || map.idle;
   }
+  hideEnemyUI(e){
+  if(!e) return;
+
+  [
+    e.authBadge,
+    e.authText,
+    e.nameText,
+    e.hpBack,
+    e.hpFill,
+    e.speechBox,
+    e.speechText
+  ].forEach(obj=>{
+    if(obj && obj.destroy){
+      obj.destroy();
+    }
+  });
+
+  e.authBadge = null;
+  e.authText = null;
+  e.nameText = null;
+  e.hpBack = null;
+  e.hpFill = null;
+  e.speechBox = null;
+  e.speechText = null;
+}
   applyEnemyPersonality(e){
     if(!e) return;
     e.laneOffset=Phaser.Math.Between(-18,18);
@@ -3787,6 +3812,9 @@ advanceEnemyWaveOrBoss(){
     if(e.hpFill){
       e.hpFill.setVisible(false);
     }
+    this.time.delayedCall(650,()=>{
+  this.hideEnemyUI(e);
+});
   }
   damageEnemy(e,damage,stagger=false){
     if(!e || e.dead || e.invulnerable) return;
