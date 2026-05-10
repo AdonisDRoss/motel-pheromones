@@ -172,7 +172,7 @@ const HEW_STATIC_SCALE = 0.095;
 const DISABLE_DOORMAN_FOR_TEST = false;
 const VIBRATION_ENABLED = true;
 const CAMERA_ZOOM = 1.45;
-const CONTROL_ZOOM = 1.30;
+  const CONTROL_ZOOM = 0.82;
 const JUMP_LINKS = [ ];
 const VIBE = {
   button:8,
@@ -4322,16 +4322,21 @@ makeMobileControls(){
   const size = v => v * CONTROL_ZOOM;
   const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  // LEFT SIDE: movement stick
-  const bx = 115;
-  const by = H - 120;
-  const r = size(58);
+  // -------------------------
+  // LEFT SIDE: smaller stick
+  // -------------------------
+  const bx = 92;
+  const by = H - 96;
+  const baseR = size(44);
+  const knobR = size(18);
 
-  this.add.circle(bx, by, r, 0xffffff, 0.16)
+  this.add.circle(bx, by, baseR, 0xffffff, 0.10)
+    .setStrokeStyle(2, 0xffffff, 0.18)
     .setDepth(9000)
     .setScrollFactor(0);
 
-  const knob = this.add.circle(bx, by, size(25), 0xffffff, 0.38)
+  const knob = this.add.circle(bx, by, knobR, 0xffffff, 0.28)
+    .setStrokeStyle(2, 0xffffff, 0.25)
     .setDepth(9001)
     .setScrollFactor(0);
 
@@ -4342,20 +4347,20 @@ makeMobileControls(){
     let dy = p.y - by;
     const d = Math.sqrt(dx * dx + dy * dy);
 
-    if(d > r){
-      dx = dx / d * r;
-      dy = dy / d * r;
+    if(d > baseR){
+      dx = (dx / d) * baseR;
+      dy = (dy / d) * baseR;
     }
 
     knob.x = bx + dx;
     knob.y = by + dy;
 
-    this.stickX = dx / r;
-    this.stickY = dy / r;
+    this.stickX = dx / baseR;
+    this.stickY = dy / baseR;
   };
 
   this.input.on("pointerdown", p => {
-    if(Phaser.Math.Distance.Between(p.x, p.y, bx, by) < size(95)){
+    if(Phaser.Math.Distance.Between(p.x, p.y, bx, by) < size(72)){
       dragging = true;
       move(p);
     }
@@ -4375,63 +4380,136 @@ makeMobileControls(){
     this.stickY = 0;
   });
 
-  // RIGHT SIDE: SNES-style diamond
-  const diamondX = W - 155;
-  const diamondY = H - 112;
+  // --------------------------------
+  // RIGHT SIDE: tighter SNES diamond
+  // --------------------------------
+  const diamondX = W - 92;
+  const diamondY = H - 88;
+  const gap = size(46);
 
-  this.mobileButton(diamondX,      diamondY - 68, "X", () => this.startAttack("light"));
-  this.mobileButton(diamondX - 68, diamondY,      "Y", () => this.startContextY());
-  this.mobileButton(diamondX + 68, diamondY,      "A", () => this.startContextKick());
-  this.mobileButton(diamondX,      diamondY + 68, "B", () => this.startContextB());
+  // SNES / Super Famicom style colors
+  // X = blue, Y = green, A = red, B = yellow
+  this.mobileButton(
+    diamondX,
+    diamondY - gap,
+    "X",
+    0x4d7cff,
+    () => this.startAttack("light")
+  );
 
-  // Specials above the diamond
-  this.mobileButton(diamondX - 92, diamondY - 118, "SP", () => this.startAttack("heavy"));
+  this.mobileButton(
+    diamondX - gap,
+    diamondY,
+    "Y",
+    0x4fd35d,
+    () => this.startContextY()
+  );
 
-  // Crouch button between stick and diamond, lower middle-left
-  this.mobileButton(W - 355, H - 100, "CR", () => {
-    this.recoverActionInput();
-    this.startCrouch(true);
-  });
+  this.mobileButton(
+    diamondX + gap,
+    diamondY,
+    "A",
+    0xff5a5a,
+    () => this.startContextKick()
+  );
 
-  // CENTER BOTTOM: menu
+  this.mobileButton(
+    diamondX,
+    diamondY + gap,
+    "B",
+    0xffd84d,
+    () => this.startContextB()
+  );
+
+  // SP above-left of the diamond
+  this.mobileButton(
+    diamondX - size(58),
+    diamondY - size(74),
+    "SP",
+    0x8f72ff,
+    () => this.startAttack("heavy")
+  );
+
+  // CR lower-middle, out of the main fight space
+  this.mobileButton(
+    W - 285,
+    H - 72,
+    "CR",
+    0x8a8a8a,
+    () => {
+      this.recoverActionInput();
+      this.startCrouch(true);
+    }
+  );
+
+  // -------------------------
+  // CENTER BOTTOM: smaller menu
+  // -------------------------
   const menuX = CX;
   const menuY = MENU_Y;
 
-  const menuHit = this.add.rectangle(menuX, menuY, size(120), size(38), 0x000000, 0.35)
+  const menuHit = this.add.rectangle(
+    menuX,
+    menuY,
+    size(92),
+    size(28),
+    0x000000,
+    0.28
+  )
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.rectangle(menuX, menuY, size(120), size(38), 0xffffff, 0.16)
-    .setStrokeStyle(2, 0xffffff, 0.45)
+  this.add.rectangle(menuX, menuY, size(92), size(28), 0xffffff, 0.10)
+    .setStrokeStyle(2, 0xffffff, 0.30)
     .setDepth(9501)
     .setScrollFactor(0);
 
   this.add.text(menuX, menuY, "MENU", {
-    font: font(16),
+    font: font(13),
     fill: "#fff"
-  }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+  })
+    .setOrigin(0.5)
+    .setDepth(9502)
+    .setScrollFactor(0);
 
   menuHit.on("pointerdown", () => this.togglePauseMenu());
 }
 
-mobileButton(x, y, label, down, up = null){
+mobileButton(x, y, label, color, down, up = null){
   const size = v => v * CONTROL_ZOOM;
   const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  const hit = this.add.circle(x, y, size(42), 0x00ff00, 0.01)
+  const hitR = size(28);
+  const faceR = size(22);
+
+  const hit = this.add.circle(x, y, hitR, 0xffffff, 0.01)
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.circle(x, y, size(34), 0xffffff, 0.22)
+  this.add.circle(x + 2, y + 3, faceR, 0x000000, 0.18)
+    .setDepth(9500)
+    .setScrollFactor(0);
+
+  this.add.circle(x, y, faceR, color, 0.78)
+    .setStrokeStyle(2, 0xffffff, 0.42)
     .setDepth(9501)
     .setScrollFactor(0);
 
+  this.add.circle(x - 5, y - 5, size(8), 0xffffff, 0.14)
+    .setDepth(9502)
+    .setScrollFactor(0);
+
   this.add.text(x, y, label, {
-    font: font(18),
-    fill: "#fff"
-  }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
+    font: font(label.length > 1 ? 12 : 15),
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 3
+  })
+    .setOrigin(0.5)
+    .setDepth(9503)
+    .setScrollFactor(0);
 
   hit.on("pointerdown", p => {
     if(p && p.event && p.event.preventDefault){
@@ -4464,7 +4542,8 @@ mobileButton(x, y, label, down, up = null){
     }
   });
 }
-}
+
+} // THIS CLOSES class Game
 
 const config = {
   parent: "game",
