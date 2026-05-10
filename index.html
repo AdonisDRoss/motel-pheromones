@@ -5555,6 +5555,266 @@ Game.prototype.showRuntimeError = function(err){
 /* =========================================================
    END PRE-MATCH FREEZE FIX
 ========================================================= */
+  /* =========================================================
+   JT ATTACK RANGE / RATE FIX
+   Better hitboxes + faster recovery for JT stick attacks
+========================================================= */
+
+Game.prototype.getAttackData = function(type){
+  const fighter = getSelectedFighterId();
+  const prefix = this.getPlayerPrefix();
+
+  const defaults = {
+    light: {
+      anim: this.getPlayerAnim("attack_light"),
+      damage: 8,
+      stagger: false,
+      range: 54,
+      height: 54,
+      offsetX: 52,
+      offsetY: -42,
+      hitDelay: 100,
+      recoverTime: 420,
+      lockTime: 700
+    },
+    heavy: {
+      anim: this.getPlayerAnim("attack_heavy"),
+      damage: 16,
+      stagger: false,
+      range: 68,
+      height: 58,
+      offsetX: 58,
+      offsetY: -44,
+      hitDelay: 130,
+      recoverTime: 500,
+      lockTime: 760
+    },
+    kick: {
+      anim: this.getPlayerAnim("kick"),
+      damage: 11,
+      stagger: false,
+      range: 60,
+      height: 52,
+      offsetX: 55,
+      offsetY: -34,
+      hitDelay: 115,
+      recoverTime: 430,
+      lockTime: 700
+    }
+  };
+
+  let data = defaults[type];
+  if(!data) return null;
+
+  // JT-specific drumstick reach.
+  if(fighter === "JT"){
+    if(type === "light"){
+      data.range = 92;
+      data.height = 54;
+      data.offsetX = 72;
+      data.offsetY = -50;
+      data.hitDelay = 85;
+      data.recoverTime = 330;
+      data.lockTime = 520;
+      data.damage = 8;
+    }
+
+    if(type === "heavy"){
+      data.range = 124;
+      data.height = 62;
+      data.offsetX = 86;
+      data.offsetY = -52;
+      data.hitDelay = 125;
+      data.recoverTime = 455;
+      data.lockTime = 650;
+      data.damage = 15;
+      data.stagger = true;
+    }
+
+    if(type === "kick"){
+      data.range = 82;
+      data.height = 54;
+      data.offsetX = 70;
+      data.offsetY = -34;
+      data.hitDelay = 105;
+      data.recoverTime = 380;
+      data.lockTime = 590;
+      data.damage = 11;
+    }
+  }
+
+  // Hew keeps heavier stagger identity.
+  if(fighter === "HEW" && type === "heavy"){
+    data.stagger = true;
+  }
+
+  data.damage = Number((data.damage * this.getPlayerDamageMod()).toFixed(1));
+
+  return data;
+};
+
+Game.prototype.applyPlayerHit = function(data){
+  if(!this.player || !this.enemies) return;
+
+  const dir = this.getFacingDir();
+
+  const offsetX = data.offsetX !== undefined ? data.offsetX : 52;
+  const offsetY = data.offsetY !== undefined ? data.offsetY : -42;
+  const width = data.range || 86;
+  const height = data.height || 54;
+
+  const hitX = this.player.x + dir * offsetX;
+  const hitY = this.player.y + offsetY;
+
+  // Set alpha to 0.18 temporarily if you want to see the hitbox.
+  const box = this.add.rectangle(hitX, hitY, width, height, 0xff0000, 0)
+    .setDepth(999);
+
+  const hitSet = new Set();
+
+  this.enemies.forEach(e=>{
+    if(!e || hitSet.has(e)) return;
+    if(e.dead || e.state === "dead") return;
+    if(e.platform !== this.platform) return;
+    if(e.grabbed || e.thrownTime > 0) return;
+    if(e.invulnerable) return;
+
+    const enemyCenterX = e.x;
+    const enemyCenterY = e.y - 48;
+
+    const dx = Math.abs(enemyCenterX - hitX);
+    const dy = Math.abs(enemyCenterY - hitY);
+
+    if(dx < width / 2 + 30 && dy < height / 2 + 28){
+      hitSet.add(e);
+      this.damageEnemy(e, data.damage, data.stagger);
+    }
+  });
+
+  this.time.delayedCall(120, ()=>{
+    if(box && box.destroy) box.destroy();
+  });
+};
+
+Game.prototype.startAttack = function(type){
+  if(!this.ensureRoundActive()) return;
+
+  this.recoverActionInput();
+
+  if(this.grabbedEnemy) return;
+  if(this.pauseMenuOpen) return;
+  if(!this.matchStarted || this.matchOver) return;
+  if(this.playerBusy || this.isClimbing || this.playerHealth <= 0) return;
+
+  const data = this.getAttackData(type);
+  if(!data) return;
+
+  this.attackToken = (this.attackToken || 0) + 1;
+  const attackToken = this.attackToken;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + data.lockTime;
+
+  if(type === "heavy"){
+    vibrate(VIBE.heavy);
+  }else if(type === "kick"){
+    vibrate(VIBE.kick);
+  }else{
+    vibrate(VIBE.attack);
+  }
+
+  const attackAnimExists = hasAnim(this, data.anim);
+  const attackSheet = this.getPlayerAttackSheet();
+  const attackSheetExists = hasTex(this, attackSheet);
+
+  if(!attackAnimExists || !attackSheetExists){
+    this.player.setVisible(true);
+    this.player.setScale(this.getPlayerMoveScale());
+    this.player.setTint(0xffff66);
+
+    this.time.delayedCall(data.hitDelay, ()=>{
+      if(attackToken !== this.attackToken) return;
+      this.applyPlayerHit(data);
+    });
+
+    this.time.delayedCall(data.recoverTime, ()=>{
+      if(this.player){
+        this.player.clearTint();
+      }
+
+      if(attackToken === this.attackToken){
+        this.forcePlayerReady();
+      }
+    });
+
+    return;
+  }
+
+  this.positionAttackSprite(type);
+  this.poseSprite.setVisible(true);
+  this.player.setVisible(false);
+
+  replayAnim(this.poseSprite, data.anim);
+
+  this.time.delayedCall(data.hitDelay, ()=>{
+    if(attackToken !== this.attackToken) return;
+    if(!this.poseSprite || !this.poseSprite.visible) return;
+
+    this.applyPlayerHit(data);
+  });
+
+  this.time.delayedCall(data.recoverTime, ()=>{
+    if(attackToken === this.attackToken){
+      this.forcePlayerReady();
+    }
+  });
+
+  this.time.delayedCall(data.lockTime, ()=>{
+    if(attackToken === this.attackToken && this.playerBusy){
+      this.forcePlayerReady();
+    }
+  });
+};
+
+/* Optional: better JT attack sprite placement */
+Game.prototype.positionAttackSprite = function(type="light"){
+  if(!this.player || !this.poseSprite) return;
+
+  const fighter = getSelectedFighterId();
+  const dir = this.player.flipX ? -1 : 1;
+
+  this.poseSprite.setTexture(this.getPlayerAttackSheet());
+
+  let offsetX = -6 * dir;
+  let offsetY = 0;
+
+  if(fighter === "JT"){
+    if(type === "light"){
+      offsetX = 4 * dir;
+      offsetY = 0;
+    }
+
+    if(type === "heavy"){
+      offsetX = 8 * dir;
+      offsetY = 0;
+    }
+
+    if(type === "kick"){
+      offsetX = 6 * dir;
+      offsetY = 0;
+    }
+  }
+
+  this.poseSprite.x = this.player.x + offsetX;
+  this.poseSprite.y = this.player.y + offsetY;
+  this.poseSprite.flipX = this.player.flipX;
+  this.poseSprite.setOrigin(0.5, 1);
+  this.poseSprite.setScale(this.getPlayerAttackScale());
+};
+
+/* =========================================================
+   END JT ATTACK RANGE / RATE FIX
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
