@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 697;
+const VERSION = 698;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -121,12 +121,22 @@ const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 
 const PLATFORM_BOUNDS = {
-  topLeft:{   minX:305, maxX:440, minY:296, maxY:314 },
-  top:{       minX:305, maxX:860, minY:238, maxY:268 },
-  middle:{    minX:120, maxX:860, minY:365, maxY:420 },
-  behindCar:{ minX:120, maxX:295, minY:425, maxY:460 },
-  bottom:{    minX:120, maxX:860, minY:485, maxY:520 }
+  topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
+  top:{       minX:305, maxX:860, minY:253, maxY:253 },
+
+  // Locked to the middle sidewalk so he does NOT drift below the front edge
+  middle:{    minX:120, maxX:860, minY:392, maxY:392 },
+
+  // Small lower-left strip behind the car / barricade
+  behindCar:{ minX:120, maxX:295, minY:443, maxY:443 },
+
+  bottom:{    minX:120, maxX:860, minY:505, maxY:505 }
 };
+
+function getPlatformY(platform){
+  const p = PLATFORM_BOUNDS[platform] || PLATFORM_BOUNDS.middle;
+  return p.minY;
+}
    const SPECIAL_LADDERS = [
   {
     name:"leftRoof_to_behindCar",
@@ -1919,9 +1929,9 @@ this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("s
   }
 ];
     this.stairs=[
-      {name:"leftStairs",x:118,y:452,w:120,h:120,middleX:150,middleY:390,bottomX:120,bottomY:505},
-      {name:"rightStairs",x:846,y:452,w:120,h:120,middleX:816,middleY:390,bottomX:860,bottomY:505}
-    ];
+  {name:"leftStairs",x:118,y:452,w:120,h:120,middleX:150,middleY:392,bottomX:120,bottomY:505},
+  {name:"rightStairs",x:846,y:452,w:120,h:120,middleX:816,middleY:392,bottomX:860,bottomY:505}
+];
     this.ladders.forEach(l=>{
       l.zone=this.add.rectangle(l.x,l.y,l.w,l.h,0x00ff00,alpha).setDepth(10);
     });
@@ -4352,30 +4362,35 @@ checkVictory(){
 makeMobileControls(){
   const camZoom = this.cameras.main.zoom || 1;
 
-  // Convert screen-space UI positions into zoom-safe world positions.
-  const screen = v => v / camZoom;
+  // Use fixed UI space so buttons stay at the screen edges
+  const UI_W = 960;
+  const UI_H = 540;
 
-  // Make controls visually bigger.
+  const ux = v => v / camZoom;
+  const uy = v => v / camZoom;
   const size = v => (v * CONTROL_ZOOM) / camZoom;
   const font = v => Math.round((v * CONTROL_ZOOM) / camZoom) + "px monospace";
 
-  const bx = screen(115);
-  const by = screen(H - 120);
-  const r = size(58);
+  // --------------------------
+  // LEFT STICK / D-PAD AREA
+  // --------------------------
+  const bx = ux(110);
+  const by = uy(UI_H - 105);
+  const r = size(54);
 
   this.add.circle(bx,by,r,0xffffff,0.16)
     .setDepth(9000)
     .setScrollFactor(0);
 
-  const knob=this.add.circle(bx,by,size(25),0xffffff,0.38)
+  const knob=this.add.circle(bx,by,size(24),0xffffff,0.38)
     .setDepth(9001)
     .setScrollFactor(0);
 
   let dragging=false;
 
   const move=p=>{
-    const px = screen(p.x);
-    const py = screen(p.y);
+    const px = ux(p.x);
+    const py = uy(p.y);
 
     let dx=px-bx;
     let dy=py-by;
@@ -4393,8 +4408,8 @@ makeMobileControls(){
   };
 
   this.input.on("pointerdown",p=>{
-    const px = screen(p.x);
-    const py = screen(p.y);
+    const px = ux(p.x);
+    const py = uy(p.y);
 
     if(Phaser.Math.Distance.Between(px,py,bx,by)<size(95)){
       dragging=true;
@@ -4416,20 +4431,34 @@ makeMobileControls(){
     this.stickY=0;
   });
 
-  this.mobileButton(screen(W-160),screen(340),"X",()=>this.startAttack("light"));
-  this.mobileButton(screen(W-220),screen(410),"Y",()=>this.startContextY());
-  this.mobileButton(screen(W-100),screen(410),"A",()=>this.startContextKick());
-  this.mobileButton(screen(W-160),screen(480),"B",()=>this.startContextB());
+  // --------------------------
+  // RIGHT BUTTON DIAMOND
+  // SNES style: Y top, X left, A right, B bottom
+  // --------------------------
+  const diamondX = ux(UI_W - 120);
+  const diamondY = uy(UI_H - 110);
 
-  this.mobileButton(screen(W-340),screen(320),"SP",()=>this.startAttack("heavy"));
+  this.mobileButton(diamondX, uy(UI_H - 170), "Y", ()=>this.startContextY());
+  this.mobileButton(ux(UI_W - 180), diamondY, "X", ()=>this.startAttack("light"));
+  this.mobileButton(ux(UI_W - 60),  diamondY, "A", ()=>this.startContextKick());
+  this.mobileButton(diamondX, uy(UI_H - 50), "B", ()=>this.startContextB());
 
-  this.mobileButton(screen(W-400),screen(380),"CR",()=>{
+  // --------------------------
+  // EXTRA ACTION BUTTONS
+  // Keep them near the right side, but outside the main diamond
+  // --------------------------
+  this.mobileButton(ux(UI_W - 245), uy(UI_H - 170), "SP", ()=>this.startAttack("heavy"));
+
+  this.mobileButton(ux(UI_W - 245), uy(UI_H - 105), "CR", ()=>{
     this.recoverActionInput();
     this.startCrouch(true);
   });
 
-  const menuX = screen(CX);
-  const menuY = screen(MENU_Y);
+  // --------------------------
+  // MENU CENTER BOTTOM
+  // --------------------------
+  const menuX = ux(UI_W / 2);
+  const menuY = uy(UI_H - 28);
 
   const menuHit=this.add.rectangle(menuX,menuY,size(120),size(38),0x000000,0.35)
     .setInteractive()
