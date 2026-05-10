@@ -81,6 +81,9 @@ const MOVE2_FRAME_W = 324;
 const MOVE2_FRAME_H = 243;
 const ATTACK_FRAME_W = 288;
 const ATTACK_FRAME_H = 232;
+const JT_ACTION_FRAME_W = 204;
+const JT_ACTION_FRAME_H = 170;
+const JT_ACTION_SCALE = 0.44;
 const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
@@ -486,24 +489,53 @@ function makePlayerAnimSet(scene,prefix){
   makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);
   makeAnim(scene,prefix+"_idle_up",prefix+"_movement",5,9,6,-1);
   makeAnim(scene,prefix+"_idle_side",prefix+"_movement",10,14,6,-1);
+
   makeAnim(scene,prefix+"_walk_down",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_up",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_side",prefix+"_movement",15,19,8,-1);
+
   makeRunAnim(scene,prefix+"_run_down",prefix+"_movement",18);
-makeRunAnim(scene,prefix+"_run_up",prefix+"_movement",18);
-makeRunAnim(scene,prefix+"_run_side",prefix+"_movement",18);
+  makeRunAnim(scene,prefix+"_run_up",prefix+"_movement",18);
+  makeRunAnim(scene,prefix+"_run_side",prefix+"_movement",18);
+
   makeAnim(scene,prefix+"_jump",prefix+"_movement2",0,4,10,0);
   makeAnim(scene,prefix+"_combo_setup",prefix+"_movement2",5,9,10,0);
   makeAnim(scene,prefix+"_combo_1",prefix+"_movement2",10,14,12,0);
   makeAnim(scene,prefix+"_combo_2",prefix+"_movement2",15,19,12,0);
-makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,10,0);
-makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,9,0);
-makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+
+  makeAnim(scene,prefix+"_attack_light",prefix+"_attacks",0,3,10,0);
+  makeAnim(scene,prefix+"_attack_heavy",prefix+"_attacks",4,7,9,0);
+  makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0);
+  makeAnim(scene,prefix+"_block",prefix+"_attacks",12,15,8,-1);
+
+  if(prefix === "jt"){
+    // JT actions/reactions sheet:
+    // Row 1 frames 0-4: jump/crouch-style poses
+    // Row 2 frames 5-9: hurt
+    // Row 3 frames 10-14: knockback / KO
+    // Row 4 frames 15-19: get-up / taunt / victory
+    // Row 5 frames 20-24: climb / special
+
+    makeAnim(scene,"jt_climb","jt_actions",20,23,8,-1);
+    makeAnim(scene,"jt_crouch","jt_actions",0,3,8,-1);
+    makeAnim(scene,"jt_taunt","jt_actions",17,19,8,0);
+    makeAnim(scene,"jt_special","jt_actions",24,24,6,0);
+    makeAnim(scene,"jt_carry","jt_actions",15,17,8,-1);
+
+    makeAnim(scene,"jt_hurt","jt_actions",5,9,8,0);
+    makeAnim(scene,"jt_knockback","jt_actions",10,13,8,0);
+    makeAnim(scene,"jt_ko","jt_actions",14,14,6,0);
+    makeAnim(scene,"jt_getup","jt_actions",15,17,8,0);
+
+    return;
+  }
+
   makeAnim(scene,prefix+"_climb",prefix+"_actions",0,3,8,-1);
   makeAnim(scene,prefix+"_crouch",prefix+"_actions",4,7,8,-1);
   makeAnim(scene,prefix+"_taunt",prefix+"_actions",8,11,8,0);
   makeAnim(scene,prefix+"_special",prefix+"_actions",12,15,10,0);
   makeAnim(scene,prefix+"_carry",prefix+"_actions",12,15,8,-1);
+
   makeAnim(scene,prefix+"_hurt",prefix+"_reactions",0,3,8,0);
   makeAnim(scene,prefix+"_knockback",prefix+"_reactions",4,7,8,0);
   makeAnim(scene,prefix+"_ko",prefix+"_reactions",8,11,6,0);
@@ -645,17 +677,19 @@ scene.load.on("loaderror", function(file){
     spacing:0
   });
   scene.load.spritesheet("jt_actions",JT_BASE + "/actions/jt_actions.png?v=" + VERSION,{
-    frameWidth:ACTION_FRAME_W,
-    frameHeight:ACTION_FRAME_H,
-    margin:0,
-    spacing:0
-  });
-  scene.load.spritesheet("jt_reactions",JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
-    frameWidth:REACTION_FRAME_W,
-    frameHeight:REACTION_FRAME_H,
-    margin:0,
-    spacing:0
-  });
+  frameWidth:JT_ACTION_FRAME_W,
+  frameHeight:JT_ACTION_FRAME_H,
+  margin:0,
+  spacing:0
+});
+  /*
+scene.load.spritesheet("jt_reactions",JT_BASE + "/reactions/jt_reactions.png?v=" + VERSION,{
+  frameWidth:REACTION_FRAME_W,
+  frameHeight:REACTION_FRAME_H,
+  margin:0,
+  spacing:0
+});
+*/
   scene.load.spritesheet("hew_movement", HEW_BASE + "/movement.png?v=" + VERSION,{
   frameWidth: HEW_MOVE_FRAME_W,
   frameHeight: HEW_MOVE_FRAME_H,
@@ -1443,6 +1477,7 @@ getPlayerAttackScale(){
 getPlayerActionScale(){
   const fighter = getSelectedFighterId();
 
+  if(fighter === "JT") return JT_ACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_ACTION_SCALE;
 
@@ -1452,6 +1487,7 @@ getPlayerActionScale(){
 getPlayerReactionScale(){
   const fighter = getSelectedFighterId();
 
+  if(fighter === "JT") return JT_ACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_REACTION_SCALE;
 
@@ -1500,12 +1536,12 @@ getPlayerActionSheet(){
 
 getPlayerReactionSheet(){
   const fighter = getSelectedFighterId();
-  const key = this.getPlayerPrefix() + "_reactions";
 
   if(fighter === "JT"){
-    return this.getSafeTextureKey(key,"jt_reactions");
+    return "jt_actions";
   }
 
+  const key = this.getPlayerPrefix() + "_reactions";
   return key;
 }
 getPlayerAnim(action){
