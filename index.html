@@ -88,9 +88,27 @@ const ACTION_FRAME_W = 284;
 const ACTION_FRAME_H = 236;
 const REACTION_FRAME_W = 284;
 const REACTION_FRAME_H = 236;
-const HEW_MOVE_FRAME_W = 227;
-const HEW_MOVE_FRAME_H = 188;
-const HEW_MOVE_SCALE = 0.40;
+// HEW NEW SPRITE SHEET SIZES
+// movement.png is 1254 x 1254, 5 columns x 5 rows.
+// Phaser slices it as 250 x 250 and ignores the tiny extra edge pixels.
+const HEW_MOVE_FRAME_W = 250;
+const HEW_MOVE_FRAME_H = 250;
+const HEW_MOVE_SCALE = 0.34;
+
+// hew_attacks.png is about 1397 x 1126, 4 columns x 4 rows.
+const HEW_ATTACK_FRAME_W = 349;
+const HEW_ATTACK_FRAME_H = 281;
+const HEW_ATTACK_SCALE = 0.27;
+
+// hew_actions.png is exactly 1136 x 944, 4 columns x 4 rows.
+const HEW_ACTION_FRAME_W = 284;
+const HEW_ACTION_FRAME_H = 236;
+const HEW_ACTION_SCALE = 0.32;
+
+// hew_reactions.png is about 1376 x 1143, 4 columns x 4 rows.
+const HEW_REACTION_FRAME_W = 344;
+const HEW_REACTION_FRAME_H = 285;
+const HEW_REACTION_SCALE = 0.27;
 const DONNY_FRAME_W = 210;
 const DONNY_FRAME_H = 212;
 const DONNY_SCALE = 0.36;
@@ -697,25 +715,26 @@ scene.load.spritesheet("jt_reactions",JT_BASE + "/reactions/jt_reactions.png?v="
   spacing: 0
 });
   
-  scene.load.image("hew_static",HEW_BASE + "/hew_static.png?v=" + VERSION);
   scene.load.spritesheet("hew_attacks",HEW_BASE + "/attacks/hew_attacks.png?v=" + VERSION,{
-    frameWidth:ATTACK_FRAME_W,
-    frameHeight:ATTACK_FRAME_H,
-    margin:0,
-    spacing:0
-  });
-  scene.load.spritesheet("hew_actions",HEW_BASE + "/actions/hew_actions.png?v=" + VERSION,{
-    frameWidth:ACTION_FRAME_W,
-    frameHeight:ACTION_FRAME_H,
-    margin:0,
-    spacing:0
-  });
-  scene.load.spritesheet("hew_reactions",HEW_BASE + "/reactions/hew_reactions.png?v=" + VERSION,{
-    frameWidth:REACTION_FRAME_W,
-    frameHeight:REACTION_FRAME_H,
-    margin:0,
-    spacing:0
-  });
+  frameWidth:HEW_ATTACK_FRAME_W,
+  frameHeight:HEW_ATTACK_FRAME_H,
+  margin:0,
+  spacing:0
+});
+
+scene.load.spritesheet("hew_actions",HEW_BASE + "/actions/hew_actions.png?v=" + VERSION,{
+  frameWidth:HEW_ACTION_FRAME_W,
+  frameHeight:HEW_ACTION_FRAME_H,
+  margin:0,
+  spacing:0
+});
+
+scene.load.spritesheet("hew_reactions",HEW_BASE + "/reactions/hew_reactions.png?v=" + VERSION,{
+  frameWidth:HEW_REACTION_FRAME_W,
+  frameHeight:HEW_REACTION_FRAME_H,
+  margin:0,
+  spacing:0
+});
   scene.load.spritesheet("donny_movement", DONNY_BASE + "/movement.png?v=" + VERSION,{
   frameWidth:DONNY_FRAME_W,
   frameHeight:DONNY_FRAME_H,
@@ -1468,6 +1487,7 @@ getPlayerMoveScale(){
 getPlayerAttackScale(){
   const fighter = getSelectedFighterId();
 
+  if(fighter === "HEW") return HEW_ATTACK_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_ATTACK_SCALE;
 
@@ -1477,23 +1497,22 @@ getPlayerAttackScale(){
 getPlayerActionScale(){
   const fighter = getSelectedFighterId();
 
-  if(fighter === "JT") return JT_ACTION_SCALE;
+  if(fighter === "HEW") return HEW_ACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_ACTION_SCALE;
 
   return PLAYER_ACTION_SCALE;
 }
-
+  
 getPlayerReactionScale(){
   const fighter = getSelectedFighterId();
 
-  if(fighter === "JT") return JT_ACTION_SCALE;
+  if(fighter === "HEW") return HEW_REACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_REACTION_SCALE;
 
   return PLAYER_REACTION_SCALE;
 }
-
 getSafeTextureKey(key,fallback){
   return hasTex(this,key) ? key : fallback;
 }
@@ -1777,7 +1796,8 @@ this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("s
         " | ERR: "+window.__MP_LAST_ERROR
       );
     }
-    this.keepForegroundInFront();
+    this.cleanupIdlePoseSprite();
+this.keepForegroundInFront();
   }
   makeKeyboard(){
     this.keys=this.input.keyboard.addKeys({
@@ -1927,7 +1947,13 @@ this.input.keyboard.on("keydown-V",()=>this.playPlayerPose(this.getPlayerAnim("s
     this.playMoveAnim(moving,running);
   }
   playMoveAnim(moving,running){
-    if(this.playerBusy) return;
+  if(this.playerBusy) return;
+
+  if(this.poseSprite && this.poseSprite.visible && !this.grabbedEnemy){
+    this.poseSprite.stop();
+    this.poseSprite.setVisible(false);
+    this.player.setVisible(true);
+  }
     if(this.grabbedEnemy && this.grabMode==="carry"){
       this.showCarryPose();
       return;
@@ -2115,6 +2141,26 @@ this.poseSprite.setScale(this.getPlayerActionScale());
 
   this.forcePlayerReady();
   return;
+}
+    cleanupIdlePoseSprite(){
+  if(!this.player || !this.poseSprite) return;
+
+  // If player is not doing an action, the extra pose sprite should never show.
+  const shouldHidePose =
+    !this.playerBusy &&
+    !this.isClimbing &&
+    !this.isJumping &&
+    !this.isBlocking &&
+    !this.isCrouching &&
+    !this.grabbedEnemy &&
+    this.playerHealth > 0;
+
+  if(shouldHidePose){
+    this.poseSprite.stop();
+    this.poseSprite.setVisible(false);
+    this.player.setVisible(true);
+    this.player.setScale(this.getPlayerMoveScale());
+  }
 }
 }
 
