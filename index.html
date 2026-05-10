@@ -1344,41 +1344,7 @@ class LevelSelect extends Phaser.Scene{
     });
   }
 }
-  const PATHS = {
-  levels: "assets/levels",
-
-  jt: "assets/sprites/player/jt",
-  hew: "assets/sprites/player/hew",
-  jackson: "assets/sprites/player/jackson",
-
-  enemies: "assets/sprites/enemies",
-  audio: "assets/audio"
-};
-const FRAME = {
-  jacksonMove: {
-    w: 256,
-    h: 256,
-    scale: 0.42
-  },
-
-  jacksonAttack: {
-    w: 204,
-    h: 192,
-    scale: 0.52
-  },
-
-  jacksonAction: {
-    w: 256,
-    h: 192,
-    scale: 0.42
-  },
-
-  jacksonReaction: {
-    w: 256,
-    h: 192,
-    scale: 0.42
-  }
-};
+  
 class Game extends Phaser.Scene{
   constructor(){
     super("Game");
@@ -4505,25 +4471,23 @@ mobileButton(x, y, label, down, up = null){
     }
   });
 }
-const config={
-  parent:"game",
-  type:Phaser.AUTO,
-  width:W,
-  height:H,
-  backgroundColor:"#000",
-  pixelArt:true,
-  scale:{
-    mode:Phaser.Scale.FIT,
-    autoCenter:Phaser.Scale.CENTER_BOTH
+}
+
+const config = {
+  parent: "game",
+  type: Phaser.AUTO,
+  width: W,
+  height: H,
+  backgroundColor: "#000",
+  pixelArt: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene:[Boot,Title,CharacterSelect,LevelSelect,Game],
-  audio:{
-    disableWebAudio:false
+  scene: [Boot, Title, CharacterSelect, LevelSelect, Game],
+  audio: {
+    disableWebAudio: false
   }
 };
-}
-new Phaser.Game(config);
 
-</script>
-</body>
-</html>
+new Phaser.Game(config);
