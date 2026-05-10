@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 698;
+const VERSION = 699;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -608,6 +608,7 @@ scene.load.on("loaderror", function(file){
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
+  scene.load.image("enemy_van","assets/vehicles/enemy_van.png?v="+VERSION);
   scene.load.audio("title_music","assets/audio/title-theme.mp3?v="+VERSION);
   scene.load.spritesheet("jt_movement",JT_BASE + "/movement.png?v=" + VERSION,{
     frameWidth:MOVE_FRAME_W,
@@ -3422,6 +3423,16 @@ spawnIntroEnemy(sourceX,sourceY,spawn,delay,sourceKind){
 }
 
 makeVan(x,y){
+  if(hasTex(this,"enemy_van")){
+    const van = this.add.image(x,y,"enemy_van")
+      .setOrigin(0.5,1)
+      .setScale(0.28)
+      .setDepth(15000);
+
+    return van;
+  }
+
+  // Emergency fallback if enemy_van.png is missing
   const van = this.add.container(x,y).setDepth(15000);
 
   const body = this.add.rectangle(0,0,150,52,0x151515,0.96)
@@ -3455,7 +3466,6 @@ makeVan(x,y){
 
   return van;
 }
-
 makeHelicopter(x,y){
   const heli = this.add.container(x,y).setDepth(15000);
 
