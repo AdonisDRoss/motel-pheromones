@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 691;
+const VERSION = 692;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -1369,16 +1369,21 @@ class Game extends Phaser.Scene{
   constructor(){
     super("Game");
   }
-  setupCameraFollow(){
+setupCameraFollow(){
   const cam = this.cameras.main;
 
-  // Arena view: no zoom. Zoom was cutting off the screen.
-  cam.setZoom(1);
-  cam.setBounds(0, 0, W, H);
-  cam.setScroll(0, 0);
+  // Zoomed-in player camera.
+  // Raise to 1.55 or 1.6 if you want it tighter.
+  cam.setZoom(1.45);
 
-  // Do not follow in arena mode. The full arena should stay visible.
-  cam.stopFollow();
+  // Keep camera inside the level image.
+  cam.setBounds(0, 0, W, H);
+
+  // Follow player smoothly.
+  cam.startFollow(this.player, true, 0.12, 0.12);
+
+  // Pixel-game stability.
+  cam.roundPixels = true;
 }
 getPlayerPrefix(){
   const fighter = getSelectedFighterId();
@@ -3037,12 +3042,118 @@ getNearestSpecialLadder(){
     this.updateEnemyVisuals(e);
   }
   createEnemies(){
-    this.enemies=[];
-    this.spawnEnemyType("corpo_wannabe",235,505,"bottom");
-    this.spawnEnemyType("sellout",520,250,"top");
-    this.spawnEnemyType("feral",640,390,"middle");
-    this.spawnEnemyType("corpo_sellout",850,390,"middle");
+  this.enemies = [];
+
+  this.enemyWaveIndex = 0;
+  this.waveSpawning = false;
+
+  // Wave order:
+  // Wave 1 = 2 enemies
+  // Wave 2 = 3 enemies
+  // Wave 3 = 3 enemies
+  // Then boss
+  this.enemyWaves = [
+    [
+      { type:"corpo_wannabe", x:235, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"feral",        x:760, y:getPlatformY("middle"), platform:"middle" }
+    ],
+    [
+      { type:"sellout",       x:520, y:getPlatformY("top"), platform:"top" },
+      { type:"corpo_sellout", x:835, y:getPlatformY("middle"), platform:"middle" },
+      { type:"corpo_wannabe", x:210, y:getPlatformY("bottom"), platform:"bottom" }
+    ],
+    [
+      { type:"feral",         x:640, y:getPlatformY("middle"), platform:"middle" },
+      { type:"sellout",       x:760, y:getPlatformY("top"), platform:"top" },
+      { type:"corpo_sellout", x:840, y:getPlatformY("bottom"), platform:"bottom" }
+    ]
+  ];
+
+  this.spawnEnemyWave(0);
+}
+  spawnEnemyWave(index){
+  if(!this.enemyWaves || index >= this.enemyWaves.length){
+    return false;
   }
+
+  this.enemyWaveIndex = index;
+  this.waveSpawning = false;
+
+  const wave = this.enemyWaves[index];
+
+  if(this.zoneText){
+    this.zoneText.setText("WAVE " + (index + 1));
+  }
+
+  wave.forEach(spawn=>{
+    this.spawnEnemyType(
+      spawn.type,
+      spawn.x,
+      spawn.y,
+      spawn.platform
+    );
+  });
+
+  return true;
+}
+
+getAliveNormalEnemyCount(){
+  if(!this.enemies) return 0;
+
+  return this.enemies.filter(e=>{
+    if(!e) return false;
+    if(e.enemyType === "doorman") return false;
+    if(e.dead || e.state === "dead") return false;
+    if(e.health <= 0) return false;
+    return true;
+  }).length;
+}
+
+getAliveDoormanCount(){
+  if(!this.enemies) return 0;
+
+  return this.enemies.filter(e=>{
+    if(!e) return false;
+    if(e.enemyType !== "doorman") return false;
+    if(e.dead || e.state === "dead") return false;
+    if(e.health <= 0) return false;
+    return true;
+  }).length;
+}
+
+advanceEnemyWaveOrBoss(){
+  if(this.waveSpawning) return;
+
+  const aliveNormalEnemies = this.getAliveNormalEnemyCount();
+
+  if(aliveNormalEnemies > 0){
+    return;
+  }
+
+  const nextWave = this.enemyWaveIndex + 1;
+
+  if(this.enemyWaves && nextWave < this.enemyWaves.length){
+    this.waveSpawning = true;
+
+    if(this.zoneText){
+      this.zoneText.setText("WAVE " + (nextWave + 1) + " INCOMING");
+    }
+
+    this.time.delayedCall(1000,()=>{
+      this.spawnEnemyWave(nextWave);
+    });
+
+    return;
+  }
+
+  if(!this.doormanSpawned){
+    if(DISABLE_DOORMAN_FOR_TEST){
+      this.showVictory();
+    }else{
+      this.spawnDoormanIntro();
+    }
+  }
+}
   spawnEnemyType(type,x,y,platform="middle"){
     const def=this.getEnemyDef(type);
     const textureKey=hasTex(this,def.key) ? def.key : "feral";
@@ -4047,30 +4158,23 @@ safePlay(this.poseSprite, animKey);
     showStep();
     this.time.delayedCall(4800,finish);
   }
-  checkVictory(){
-    if(!this.matchStarted || this.matchOver || this.victoryShown) return;
-    let aliveNormalEnemies=0;
-    let aliveDoorman=0;
-    this.enemies.forEach(e=>{
-      if(!e || e.dead || e.state==="dead" || e.health<=0) return;
-      if(e.enemyType==="doorman"){
-        aliveDoorman++;
-      }else{
-        aliveNormalEnemies++;
-      }
-    });
-    if(aliveNormalEnemies<=0 && !this.doormanSpawned){
-      if(DISABLE_DOORMAN_FOR_TEST){
-        this.showVictory();
-      }else{
-        this.spawnDoormanIntro();
-      }
-      return;
-    }
-    if(this.doormanSpawned && aliveDoorman<=0){
+checkVictory(){
+  if(!this.matchStarted || this.matchOver || this.victoryShown) return;
+
+  // If boss has spawned, only victory after boss is dead.
+  if(this.doormanSpawned){
+    const aliveDoorman = this.getAliveDoormanCount();
+
+    if(aliveDoorman <= 0 && !this.doormanIntroActive){
       this.showVictory();
     }
+
+    return;
   }
+
+  // Otherwise advance waves.
+  this.advanceEnemyWaveOrBoss();
+}
   showVictory(){
     if(this.victoryShown) return;
     this.victoryShown=true;
