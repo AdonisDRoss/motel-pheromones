@@ -120,24 +120,16 @@ const RUN_STICK_THRESHOLD = 0.72;
 const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 
+
 const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
   top:{       minX:305, maxX:860, minY:253, maxY:253 },
-
-  // IMPORTANT:
-  // Middle layer is locked to the sidewalk line.
-  // Player cannot walk below this line unless using stairs.
   middle:{    minX:120, maxX:860, minY:392, maxY:392 },
-
   behindCar:{ minX:120, maxX:295, minY:443, maxY:443 },
   bottom:{    minX:120, maxX:860, minY:505, maxY:505 }
 };
 
-function getPlatformY(platform){
-  const p = PLATFORM_BOUNDS[platform] || PLATFORM_BOUNDS.middle;
-  return p.minY;
-}
-   const SPECIAL_LADDERS = [
+const SPECIAL_LADDERS = [
   {
     name:"leftRoof_to_behindCar",
     x:238,
@@ -147,7 +139,8 @@ function getPlatformY(platform){
     bottomPlatform:"behindCar"
   }
 ];
-  function getPlatformY(platform){
+
+function getPlatformY(platform){
   const p = PLATFORM_BOUNDS[platform] || PLATFORM_BOUNDS.middle;
   return Math.round((p.minY + p.maxY) * 0.5);
 }
@@ -4491,3 +4484,6 @@ const config = {
 };
 
 new Phaser.Game(config);
+  </script>
+</body>
+</html>
