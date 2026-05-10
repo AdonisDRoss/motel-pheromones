@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 692;
+const VERSION = 695;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -168,6 +168,8 @@ const HEW_USE_STATIC_IMAGE = false;
 const HEW_STATIC_SCALE = 0.095;
 const DISABLE_DOORMAN_FOR_TEST = false;
 const VIBRATION_ENABLED = true;
+const CAMERA_ZOOM = 1.45;
+const CONTROL_ZOOM = 1.30;
 const JUMP_LINKS = [ ];
 const VIBE = {
   button:8,
@@ -1374,8 +1376,7 @@ setupCameraFollow(){
 
   // Zoomed-in player camera.
   // Raise to 1.55 or 1.6 if you want it tighter.
-  cam.setZoom(1.45);
-
+ cam.setZoom(CAMERA_ZOOM);
   // Keep camera inside the level image.
   cam.setBounds(0, 0, W, H);
 
@@ -4346,24 +4347,36 @@ checkVictory(){
       this.barricadeFront.setDepth(850);
     }
   }
- makeMobileControls(){
-  const bx=115;
-  const by=420;
-  const r=58;
+makeMobileControls(){
+  const camZoom = this.cameras.main.zoom || 1;
+
+  // Convert screen-space UI positions into zoom-safe world positions.
+  const screen = v => v / camZoom;
+
+  // Make controls visually bigger.
+  const size = v => (v * CONTROL_ZOOM) / camZoom;
+  const font = v => Math.round((v * CONTROL_ZOOM) / camZoom) + "px monospace";
+
+  const bx = screen(115);
+  const by = screen(H - 120);
+  const r = size(58);
 
   this.add.circle(bx,by,r,0xffffff,0.16)
     .setDepth(9000)
     .setScrollFactor(0);
 
-  const knob=this.add.circle(bx,by,25,0xffffff,0.38)
+  const knob=this.add.circle(bx,by,size(25),0xffffff,0.38)
     .setDepth(9001)
     .setScrollFactor(0);
 
   let dragging=false;
 
   const move=p=>{
-    let dx=p.x-bx;
-    let dy=p.y-by;
+    const px = screen(p.x);
+    const py = screen(p.y);
+
+    let dx=px-bx;
+    let dy=py-by;
     const d=Math.sqrt(dx*dx+dy*dy);
 
     if(d>r){
@@ -4378,7 +4391,10 @@ checkVictory(){
   };
 
   this.input.on("pointerdown",p=>{
-    if(Phaser.Math.Distance.Between(p.x,p.y,bx,by)<95){
+    const px = screen(p.x);
+    const py = screen(p.y);
+
+    if(Phaser.Math.Distance.Between(px,py,bx,by)<size(95)){
       dragging=true;
       move(p);
     }
@@ -4398,45 +4414,55 @@ checkVictory(){
     this.stickY=0;
   });
 
-  this.mobileButton(W-160,340,"X",()=>this.startAttack("light"));
-  this.mobileButton(W-220,410,"Y",()=>this.startContextY());
-  this.mobileButton(W-100,410,"A",()=>this.startContextKick());
-  this.mobileButton(W-160,480,"B",()=>this.startContextB());
-  this.mobileButton(W-340,320,"SP",()=>this.startAttack("heavy"));
-  this.mobileButton(W-400,380,"CR",()=>{
+  this.mobileButton(screen(W-160),screen(340),"X",()=>this.startAttack("light"));
+  this.mobileButton(screen(W-220),screen(410),"Y",()=>this.startContextY());
+  this.mobileButton(screen(W-100),screen(410),"A",()=>this.startContextKick());
+  this.mobileButton(screen(W-160),screen(480),"B",()=>this.startContextB());
+
+  this.mobileButton(screen(W-340),screen(320),"SP",()=>this.startAttack("heavy"));
+
+  this.mobileButton(screen(W-400),screen(380),"CR",()=>{
     this.recoverActionInput();
     this.startCrouch(true);
   });
-const menuHit=this.add.rectangle(CX,MENU_Y,120,38,0x000000,0.35)
+
+  const menuX = screen(CX);
+  const menuY = screen(MENU_Y);
+
+  const menuHit=this.add.rectangle(menuX,menuY,size(120),size(38),0x000000,0.35)
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.rectangle(CX,MENU_Y,120,38,0xffffff,0.16)
+  this.add.rectangle(menuX,menuY,size(120),size(38),0xffffff,0.16)
     .setStrokeStyle(2,0xffffff,0.45)
     .setDepth(9501)
     .setScrollFactor(0);
 
-  this.add.text(CX,MENU_Y,"MENU",{
-    font:"16px monospace",
+  this.add.text(menuX,menuY,"MENU",{
+    font:font(16),
     fill:"#fff"
   }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
 
   menuHit.on("pointerdown",()=>this.togglePauseMenu());
 }
-
 mobileButton(x,y,label,down,up=null){
-  const hit=this.add.circle(x,y,42,0x00ff00,0.01)
+  const camZoom = this.cameras.main.zoom || 1;
+
+  const size = v => (v * CONTROL_ZOOM) / camZoom;
+  const font = v => Math.round((v * CONTROL_ZOOM) / camZoom) + "px monospace";
+
+  const hit=this.add.circle(x,y,size(42),0x00ff00,0.01)
     .setInteractive()
     .setDepth(9500)
     .setScrollFactor(0);
 
-  this.add.circle(x,y,34,0xffffff,0.24)
+  this.add.circle(x,y,size(34),0xffffff,0.24)
     .setDepth(9501)
     .setScrollFactor(0);
 
   this.add.text(x,y,label,{
-    font:"18px monospace",
+    font:font(18),
     fill:"#fff"
   }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
 
@@ -4470,7 +4496,6 @@ mobileButton(x,y,label,down,up=null){
       up();
     }
   });
-}
 }
 const config={
   parent:"game",
