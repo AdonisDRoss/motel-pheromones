@@ -4331,104 +4331,86 @@ placeMobileObject(obj, screenX, screenY){
 }
 
 makeMobileControls(){
-  this.mobileButtons = [];
-  this.mobileControlParts = [];
-
   const size = v => v * CONTROL_ZOOM;
   const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
+
+  this.mobileUI = {};
+  this.mobileButtons = [];
 
   // -------------------------
   // LEFT SIDE: joystick
   // -------------------------
-  const stickX = 84;
-  const stickY = H - 82;
-  const baseR = size(42);
+  const bx = 105;
+  const by = H - 145;
+  const baseR = size(44);
   const knobR = size(18);
 
-  const base = this.add.circle(0, 0, baseR, 0xffffff, 0.10)
+  const stickBase = this.add.circle(bx, by, baseR, 0xffffff, 0.10)
     .setStrokeStyle(2, 0xffffff, 0.18)
-    .setDepth(9500);
+    .setDepth(9000)
+    .setScrollFactor(0);
 
-  const knob = this.add.circle(0, 0, knobR, 0xffffff, 0.30)
+  const knob = this.add.circle(bx, by, knobR, 0xffffff, 0.28)
     .setStrokeStyle(2, 0xffffff, 0.25)
-    .setDepth(9501);
+    .setDepth(9001)
+    .setScrollFactor(0);
 
-  this.mobileStick = {
-    screenX: stickX,
-    screenY: stickY,
-    knobScreenX: stickX,
-    knobScreenY: stickY,
-    baseR: baseR,
-    base: base,
-    knob: knob,
-    dragging: false
-  };
+  this.mobileUI.stickBase = stickBase;
+  this.mobileUI.stickKnob = knob;
+
+  let dragging = false;
 
   const moveStick = p => {
-    let dx = p.x - this.mobileStick.screenX;
-    let dy = p.y - this.mobileStick.screenY;
+    let dx = p.x - stickBase.x;
+    let dy = p.y - stickBase.y;
     const d = Math.sqrt(dx * dx + dy * dy);
 
-    if(d > this.mobileStick.baseR){
-      dx = (dx / d) * this.mobileStick.baseR;
-      dy = (dy / d) * this.mobileStick.baseR;
+    if(d > baseR){
+      dx = (dx / d) * baseR;
+      dy = (dy / d) * baseR;
     }
 
-    this.mobileStick.knobScreenX = this.mobileStick.screenX + dx;
-    this.mobileStick.knobScreenY = this.mobileStick.screenY + dy;
+    knob.x = stickBase.x + dx;
+    knob.y = stickBase.y + dy;
 
-    this.stickX = dx / this.mobileStick.baseR;
-    this.stickY = dy / this.mobileStick.baseR;
-
-    this.placeMobileObject(
-      this.mobileStick.knob,
-      this.mobileStick.knobScreenX,
-      this.mobileStick.knobScreenY
-    );
+    this.stickX = dx / baseR;
+    this.stickY = dy / baseR;
   };
 
   this.input.on("pointerdown", p => {
-    const dist = Phaser.Math.Distance.Between(
-      p.x,
-      p.y,
-      this.mobileStick.screenX,
-      this.mobileStick.screenY
-    );
-
-    if(dist < size(76)){
-      this.mobileStick.dragging = true;
+    if(Phaser.Math.Distance.Between(p.x, p.y, stickBase.x, stickBase.y) < size(72)){
+      dragging = true;
       moveStick(p);
     }
   });
 
   this.input.on("pointermove", p => {
-    if(this.mobileStick && this.mobileStick.dragging){
+    if(dragging){
       moveStick(p);
     }
   });
 
   this.input.on("pointerup", () => {
-    if(!this.mobileStick) return;
-
-    this.mobileStick.dragging = false;
-    this.mobileStick.knobScreenX = this.mobileStick.screenX;
-    this.mobileStick.knobScreenY = this.mobileStick.screenY;
-
+    dragging = false;
+    knob.x = stickBase.x;
+    knob.y = stickBase.y;
     this.stickX = 0;
     this.stickY = 0;
-
-    this.placeMobileObject(
-      this.mobileStick.knob,
-      this.mobileStick.knobScreenX,
-      this.mobileStick.knobScreenY
-    );
   });
 
-  // --------------------------------
-  // RIGHT SIDE: SNES-style diamond
-  // --------------------------------
-  const diamondX = W - 104;
-  const diamondY = H - 92;
+  this.input.on("pointerupoutside", () => {
+    dragging = false;
+    knob.x = stickBase.x;
+    knob.y = stickBase.y;
+    this.stickX = 0;
+    this.stickY = 0;
+  });
+
+  // -------------------------
+  // RIGHT SIDE: SNES diamond
+  // -------------------------
+  const diamondX = W - 160;
+  const diamondY = H - 150;
   const gap = size(46);
 
   this.mobileButton(
@@ -4463,19 +4445,19 @@ makeMobileControls(){
     () => this.startContextB()
   );
 
-  // SP above-left of the diamond
+  // SP above-left of diamond
   this.mobileButton(
     diamondX - size(58),
-    diamondY - size(74),
+    diamondY - size(68),
     "SP",
     0x8f72ff,
     () => this.startAttack("heavy")
   );
 
-  // CR lower middle, out of fight space
+  // CR lower-middle, out of fight space
   this.mobileButton(
-    W - 280,
-    H - 72,
+    W - 330,
+    H - 135,
     "CR",
     0x8a8a8a,
     () => {
@@ -4488,117 +4470,81 @@ makeMobileControls(){
   // CENTER BOTTOM: menu
   // -------------------------
   const menuX = CX;
-  const menuY = H - 44;
+  const menuY = H - 105;
 
-  const menuHit = this.add.rectangle(0, 0, size(92), size(28), 0x000000, 0.28)
+  const menuHit = this.add.rectangle(
+    menuX,
+    menuY,
+    size(92),
+    size(28),
+    0x000000,
+    0.28
+  )
     .setInteractive()
-    .setDepth(9600);
+    .setDepth(9500)
+    .setScrollFactor(0);
 
-  const menuFace = this.add.rectangle(0, 0, size(92), size(28), 0xffffff, 0.10)
+  const menuFace = this.add.rectangle(
+    menuX,
+    menuY,
+    size(92),
+    size(28),
+    0xffffff,
+    0.10
+  )
     .setStrokeStyle(2, 0xffffff, 0.30)
-    .setDepth(9601);
+    .setDepth(9501)
+    .setScrollFactor(0);
 
-  const menuText = this.add.text(0, 0, "MENU", {
+  const menuText = this.add.text(menuX, menuY, "MENU", {
     font: font(13),
-    fill: "#ffffff",
-    stroke: "#000000",
-    strokeThickness: 2
+    fill: "#fff"
   })
     .setOrigin(0.5)
-    .setDepth(9602);
+    .setDepth(9502)
+    .setScrollFactor(0);
 
-  this.mobileMenu = {
-    screenX: menuX,
-    screenY: menuY,
-    hit: menuHit,
-    face: menuFace,
-    text: menuText
-  };
+  this.mobileUI.menuHit = menuHit;
+  this.mobileUI.menuFace = menuFace;
+  this.mobileUI.menuText = menuText;
 
   menuHit.on("pointerdown", () => this.togglePauseMenu());
-
-  this.layoutMobileControls();
-}
-
-layoutMobileControls(){
-  if(!this.cameras || !this.cameras.main) return;
-
-  if(this.mobileStick){
-    this.placeMobileObject(
-      this.mobileStick.base,
-      this.mobileStick.screenX,
-      this.mobileStick.screenY
-    );
-
-    this.placeMobileObject(
-      this.mobileStick.knob,
-      this.mobileStick.knobScreenX,
-      this.mobileStick.knobScreenY
-    );
-  }
-
-  if(this.mobileButtons){
-    this.mobileButtons.forEach(btn => {
-      this.placeMobileObject(btn.hit, btn.screenX, btn.screenY);
-      this.placeMobileObject(btn.shadow, btn.screenX + 2, btn.screenY + 3);
-      this.placeMobileObject(btn.face, btn.screenX, btn.screenY);
-      this.placeMobileObject(btn.gloss, btn.screenX - 5, btn.screenY - 5);
-      this.placeMobileObject(btn.text, btn.screenX, btn.screenY);
-    });
-  }
-
-  if(this.mobileMenu){
-    this.placeMobileObject(this.mobileMenu.hit, this.mobileMenu.screenX, this.mobileMenu.screenY);
-    this.placeMobileObject(this.mobileMenu.face, this.mobileMenu.screenX, this.mobileMenu.screenY);
-    this.placeMobileObject(this.mobileMenu.text, this.mobileMenu.screenX, this.mobileMenu.screenY);
-  }
 }
 
 mobileButton(x, y, label, color, down, up = null){
-  if(!this.mobileButtons){
-    this.mobileButtons = [];
-  }
-
   const size = v => v * CONTROL_ZOOM;
   const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  const hitR = size(30);
+  const hitR = size(28);
   const faceR = size(22);
 
-  const hit = this.add.circle(0, 0, hitR, 0xffffff, 0.01)
+  const hit = this.add.circle(x, y, hitR, 0xffffff, 0.01)
     .setInteractive()
-    .setDepth(9700);
+    .setDepth(9500)
+    .setScrollFactor(0);
 
-  const shadow = this.add.circle(0, 0, faceR, 0x000000, 0.20)
-    .setDepth(9701);
+  const shadow = this.add.circle(x + 2, y + 3, faceR, 0x000000, 0.18)
+    .setDepth(9500)
+    .setScrollFactor(0);
 
-  const face = this.add.circle(0, 0, faceR, color, 0.82)
+  const face = this.add.circle(x, y, faceR, color, 0.78)
     .setStrokeStyle(2, 0xffffff, 0.42)
-    .setDepth(9702);
+    .setDepth(9501)
+    .setScrollFactor(0);
 
-  const gloss = this.add.circle(0, 0, size(8), 0xffffff, 0.16)
-    .setDepth(9703);
+  const shine = this.add.circle(x - 5, y - 5, size(8), 0xffffff, 0.14)
+    .setDepth(9502)
+    .setScrollFactor(0);
 
-  const text = this.add.text(0, 0, label, {
+  const text = this.add.text(x, y, label, {
     font: font(label.length > 1 ? 12 : 15),
     fill: "#ffffff",
     stroke: "#000000",
     strokeThickness: 3
   })
     .setOrigin(0.5)
-    .setDepth(9704);
-
-  const btn = {
-    screenX: x,
-    screenY: y,
-    hit: hit,
-    shadow: shadow,
-    face: face,
-    gloss: gloss,
-    text: text
-  };
-
-  this.mobileButtons.push(btn);
+    .setDepth(9503)
+    .setScrollFactor(0);
 
   hit.on("pointerdown", p => {
     if(p && p.event && p.event.preventDefault){
@@ -4631,13 +4577,14 @@ mobileButton(x, y, label, color, down, up = null){
     }
   });
 
-  this.layoutMobileControls();
-
-  return btn;
+  return {
+    hit,
+    shadow,
+    face,
+    shine,
+    text
+  };
 }
-layoutMobileControls(){
-
-}     
 } // THIS CLOSES class Game
 
 const config = {
