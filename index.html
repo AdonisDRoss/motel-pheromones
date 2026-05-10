@@ -3019,11 +3019,6 @@ getNearestSpecialLadder(){
   this.enemyWaveIndex = 0;
   this.waveSpawning = false;
 
-  // Wave order:
-  // Wave 1 = 2 enemies
-  // Wave 2 = 3 enemies
-  // Wave 3 = 3 enemies
-  // Then boss
   this.enemyWaves = [
     [
       { type:"corpo_wannabe", x:235, y:getPlatformY("bottom"), platform:"bottom" },
@@ -3043,32 +3038,278 @@ getNearestSpecialLadder(){
 
   this.spawnEnemyWave(0);
 }
-  spawnEnemyWave(index){
+
+spawnEnemyWave(index){
   if(!this.enemyWaves || index >= this.enemyWaves.length){
     return false;
   }
 
   this.enemyWaveIndex = index;
-  this.waveSpawning = false;
+  this.waveSpawning = true;
 
   const wave = this.enemyWaves[index];
+  const useHelicopter = index % 2 === 1;
 
   if(this.zoneText){
-    this.zoneText.setText("WAVE " + (index + 1));
+    this.zoneText.setText((useHelicopter ? "HELICOPTER" : "VAN") + " WAVE " + (index + 1));
   }
 
-  wave.forEach(spawn=>{
-    this.spawnEnemyType(
-      spawn.type,
-      spawn.x,
-      spawn.y,
-      spawn.platform
-    );
-  });
+  if(useHelicopter){
+    this.spawnWaveFromHelicopter(wave,index,()=>{
+      this.waveSpawning = false;
+    });
+  }else{
+    this.spawnWaveFromVan(wave,index,()=>{
+      this.waveSpawning = false;
+    });
+  }
 
   return true;
 }
 
+spawnWaveFromVan(wave,index,onDone){
+  const avgX = wave.reduce((sum,spawn)=>sum + spawn.x,0) / wave.length;
+  const fromLeft = index % 2 === 0;
+
+  const startX = fromLeft ? -150 : W + 150;
+  const exitX = fromLeft ? W + 180 : -180;
+  const stopX = Phaser.Math.Clamp(avgX,230,W - 230);
+  const vanY = getPlatformY("bottom") - 36;
+
+  const van = this.makeVan(startX,vanY);
+
+  this.tweens.add({
+    targets:van,
+    x:stopX,
+    duration:850,
+    ease:"Sine.easeOut",
+    onComplete:()=>{
+      this.cameras.main.shake(100,0.003);
+
+      let longest = 0;
+
+      wave.forEach((spawn,i)=>{
+        const delay = i * 230;
+        longest = Math.max(longest,delay + 720);
+
+        this.spawnIntroEnemy(
+          stopX + ((i - wave.length / 2) * 18),
+          vanY - 8,
+          spawn,
+          delay,
+          "van"
+        );
+      });
+
+      this.time.delayedCall(longest + 220,()=>{
+        this.tweens.add({
+          targets:van,
+          x:exitX,
+          duration:750,
+          ease:"Sine.easeIn",
+          onComplete:()=>{
+            van.destroy();
+            if(onDone) onDone();
+          }
+        });
+      });
+    }
+  });
+}
+
+spawnWaveFromHelicopter(wave,index,onDone){
+  const avgX = wave.reduce((sum,spawn)=>sum + spawn.x,0) / wave.length;
+
+  const startX = W + 190;
+  const exitX = -230;
+  const stopX = Phaser.Math.Clamp(avgX,280,W - 280);
+  const heliY = 100;
+
+  const heli = this.makeHelicopter(startX,heliY);
+
+  this.tweens.add({
+    targets:heli,
+    x:stopX,
+    duration:1100,
+    ease:"Sine.easeOut",
+    onComplete:()=>{
+      this.cameras.main.shake(120,0.003);
+
+      let longest = 0;
+
+      wave.forEach((spawn,i)=>{
+        const delay = i * 260;
+        longest = Math.max(longest,delay + 820);
+
+        this.spawnIntroEnemy(
+          stopX + ((i - wave.length / 2) * 24),
+          heliY + 38,
+          spawn,
+          delay,
+          "helicopter"
+        );
+      });
+
+      this.time.delayedCall(longest + 260,()=>{
+        this.tweens.add({
+          targets:heli,
+          x:exitX,
+          y:heliY - 25,
+          duration:900,
+          ease:"Sine.easeIn",
+          onComplete:()=>{
+            heli.destroy();
+            if(onDone) onDone();
+          }
+        });
+      });
+    }
+  });
+}
+
+spawnIntroEnemy(sourceX,sourceY,spawn,delay,sourceKind){
+  this.time.delayedCall(delay,()=>{
+    const e = this.spawnEnemyType(
+      spawn.type,
+      sourceX,
+      sourceY,
+      spawn.platform
+    );
+
+    e.busy = true;
+    e.transitioning = true;
+    e.invulnerable = true;
+    e.state = "intro";
+    e.vx = 0;
+    e.attackCooldown = 999999;
+    e.homeY = sourceY;
+
+    this.safeEnemyPlay(e,"knockback");
+
+    const startX = sourceX;
+    const startY = sourceY;
+    const endX = spawn.x;
+    const endY = spawn.y;
+
+    const jumpHeight = sourceKind === "helicopter" ? 35 : 70;
+    const duration = sourceKind === "helicopter" ? 760 : 560;
+
+    this.tweens.addCounter({
+      from:0,
+      to:1,
+      duration:duration,
+      ease:"Linear",
+      onUpdate:tween=>{
+        const t = tween.getValue();
+
+        e.x = Phaser.Math.Linear(startX,endX,t);
+        e.y = Phaser.Math.Linear(startY,endY,t) - Math.sin(t * Math.PI) * jumpHeight;
+        e.homeY = e.y;
+
+        this.updateEnemyVisuals(e);
+      },
+      onComplete:()=>{
+        e.x = endX;
+        e.y = endY;
+        e.homeY = endY;
+        e.platform = spawn.platform;
+        e.vx = 0;
+        e.busy = false;
+        e.transitioning = false;
+        e.invulnerable = false;
+        e.state = "idle";
+        e.attackCooldown = Phaser.Math.Between(
+          e.attackCooldownMin || 500,
+          e.attackCooldownMax || 950
+        );
+
+        this.safeEnemyPlay(e,"idle");
+        this.updateEnemyVisuals(e);
+        this.createHitFX(e.x,e.y - 50,"jump",5);
+      }
+    });
+  });
+}
+
+makeVan(x,y){
+  const van = this.add.container(x,y).setDepth(15000);
+
+  const body = this.add.rectangle(0,0,150,52,0x151515,0.96)
+    .setStrokeStyle(3,0xffffff,0.25);
+
+  const roof = this.add.rectangle(-18,-33,82,34,0x222222,0.96)
+    .setStrokeStyle(2,0xffffff,0.20);
+
+  const windshield = this.add.rectangle(-47,-34,32,18,0x7cdcff,0.55);
+  const sideWindow = this.add.rectangle(-12,-34,34,18,0x7cdcff,0.45);
+  const doorLine = this.add.rectangle(26,0,3,48,0xffffff,0.18);
+
+  const wheel1 = this.add.circle(-48,28,14,0x050505,1)
+    .setStrokeStyle(3,0x777777,1);
+
+  const wheel2 = this.add.circle(50,28,14,0x050505,1)
+    .setStrokeStyle(3,0x777777,1);
+
+  const light = this.add.rectangle(75,-8,8,12,0xfff45c,0.95);
+
+  van.add([
+    body,
+    roof,
+    windshield,
+    sideWindow,
+    doorLine,
+    wheel1,
+    wheel2,
+    light
+  ]);
+
+  return van;
+}
+
+makeHelicopter(x,y){
+  const heli = this.add.container(x,y).setDepth(15000);
+
+  const body = this.add.ellipse(0,0,120,42,0x181818,0.98)
+    .setStrokeStyle(3,0xffffff,0.25);
+
+  const cockpit = this.add.ellipse(-38,-4,42,26,0x7cdcff,0.55)
+    .setStrokeStyle(2,0xffffff,0.18);
+
+  const tail = this.add.rectangle(72,-4,88,12,0x181818,0.98)
+    .setStrokeStyle(2,0xffffff,0.22);
+
+  const tailRotor = this.add.rectangle(120,-4,8,36,0xffffff,0.45);
+
+  const skid1 = this.add.rectangle(-22,32,100,5,0xffffff,0.45);
+  const skid2 = this.add.rectangle(-38,23,5,24,0xffffff,0.35);
+  const skid3 = this.add.rectangle(20,23,5,24,0xffffff,0.35);
+
+  const rotor = this.add.rectangle(0,-35,145,5,0xffffff,0.50);
+  const rotor2 = this.add.rectangle(0,-35,145,5,0xffffff,0.32);
+  rotor2.rotation = Math.PI / 2;
+
+  heli.add([
+    body,
+    cockpit,
+    tail,
+    tailRotor,
+    skid1,
+    skid2,
+    skid3,
+    rotor,
+    rotor2
+  ]);
+
+  this.tweens.add({
+    targets:[rotor,rotor2],
+    rotation:Math.PI * 2,
+    duration:90,
+    repeat:-1,
+    ease:"Linear"
+  });
+
+  return heli;
+}
 getAliveNormalEnemyCount(){
   if(!this.enemies) return 0;
 
