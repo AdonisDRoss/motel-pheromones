@@ -4480,7 +4480,6 @@ mobileButton(x,y,label,down,up=null){
       down();
     }
   });
-}
 
   hit.on("pointerup",p=>{
     if(p && p.event && p.event.preventDefault){
@@ -4497,6 +4496,9 @@ mobileButton(x,y,label,down,up=null){
       up();
     }
   });
+}
+
+// closes class Game
 }
 const config={
   parent:"game",
