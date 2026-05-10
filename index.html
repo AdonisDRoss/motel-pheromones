@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 700;
+const VERSION = 701;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -1497,6 +1497,7 @@ getPlayerAttackScale(){
 getPlayerActionScale(){
   const fighter = getSelectedFighterId();
 
+  if(fighter === "JT") return JT_ACTION_SCALE;
   if(fighter === "HEW") return HEW_ACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_ACTION_SCALE;
@@ -1507,6 +1508,7 @@ getPlayerActionScale(){
 getPlayerReactionScale(){
   const fighter = getSelectedFighterId();
 
+  if(fighter === "JT") return JT_ACTION_SCALE;
   if(fighter === "HEW") return HEW_REACTION_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
   if(fighter === "JACKSON") return JACKSON_REACTION_SCALE;
@@ -2098,54 +2100,61 @@ this.poseSprite.setScale(this.getPlayerActionScale());
     this.zoneText.setText("CLIMBING LADDER");
   }
   updateClimbing(){
-    const l=this.currentLadder;
-    if(!l) return;
-    const dt=(this.frameDelta || 16.67)/1000;
-    this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
-    this.player.y+=this.moveY*this.climbSpeed*dt;
-    this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
-    this.poseSprite.flipX=false;
-    if(this.poseSprite.visible){
-      safePlay(this.poseSprite,this.getPlayerAnim("climb"));
+  const l=this.currentLadder;
+  if(!l) return;
+
+  const dt=(this.frameDelta || 16.67)/1000;
+
+  this.player.x=Phaser.Math.Linear(this.player.x,l.x,0.45);
+  this.player.y+=this.moveY*this.climbSpeed*dt;
+  this.player.y=Phaser.Math.Clamp(this.player.y,l.topY,l.middleY);
+
+  this.poseSprite.x=this.player.x;
+  this.poseSprite.y=this.player.y;
+  this.poseSprite.flipX=false;
+
+  if(this.poseSprite.visible){
+    safePlay(this.poseSprite,this.getPlayerAnim("climb"));
+  }
+
+  if(this.player.y<=l.topY+2 && this.moveY<0){
+    const exitPlatform = l.topPlatform || "top";
+
+    this.isClimbing=false;
+    this.platform=exitPlatform;
+    this.player.y=getPlatformY(exitPlatform);
+    this.player.x=l.topX || l.x;
+    this.currentLadder=null;
+
+    if(this.zoneText){
+      this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
     }
-    if(this.player.y<=l.topY+2 && this.moveY<0){
-  const exitPlatform = l.topPlatform || "top";
 
-  this.isClimbing=false;
-  this.platform=exitPlatform;
-  this.player.y=getPlatformY(exitPlatform);
-  this.player.x=l.topX || l.x;
-  this.currentLadder=null;
-
-  if(this.zoneText){
-    this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
+    this.forcePlayerReady();
+    return;
   }
 
-  this.forcePlayerReady();
-  return;
-}
-    if(this.player.y>=l.middleY-2 && this.moveY>0){
-  const exitPlatform = l.bottomPlatform || "middle";
+  if(this.player.y>=l.middleY-2 && this.moveY>0){
+    const exitPlatform = l.bottomPlatform || "middle";
 
-  this.isClimbing=false;
-  this.platform=exitPlatform;
-  this.player.y=getPlatformY(exitPlatform);
-  this.player.x=l.bottomX || l.x;
-  this.currentLadder=null;
+    this.isClimbing=false;
+    this.platform=exitPlatform;
+    this.player.y=getPlatformY(exitPlatform);
+    this.player.x=l.bottomX || l.x;
+    this.currentLadder=null;
 
-  if(this.zoneText){
-    this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
+    if(this.zoneText){
+      this.zoneText.setText(exitPlatform.toUpperCase()+" PLATFORM");
+    }
+
+    this.forcePlayerReady();
+    return;
   }
-
-  this.forcePlayerReady();
-  return;
 }
-    cleanupIdlePoseSprite(){
+
+cleanupIdlePoseSprite(){
   if(!this.player || !this.poseSprite) return;
 
-  // If player is not doing an action, the extra pose sprite should never show.
   const shouldHidePose =
     !this.playerBusy &&
     !this.isClimbing &&
@@ -2162,8 +2171,6 @@ this.poseSprite.setScale(this.getPlayerActionScale());
     this.player.setScale(this.getPlayerMoveScale());
   }
 }
-}
-
 startStairTravel(stair,direction="down"){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
