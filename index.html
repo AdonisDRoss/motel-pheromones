@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 695;
+const VERSION = 697;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -786,40 +786,42 @@ class Title extends Phaser.Scene{
   }
 
   create(){
-   
-    if(hasTex(this,"title")){
-      this.add.image(480,270,"title").setDisplaySize(960,540);
-    }else{
-      this.add.rectangle(480,270,960,540,0x000000,1);
-      this.add.text(480,220,"MOTEL PHEROMONES",{
-        font:"36px monospace",
-        fill:"#ff4fc3"
-      }).setOrigin(0.5);
-    }
-
-    this.add.text(480,485,"TAP TO START",{
-      font:"24px monospace",
-      fill:"#ffffff",
-      backgroundColor:"#000000"
-    }).setOrigin(0.5).setDepth(9999);
-this.add.text(480,520,"MUSIC TEST",{
-  font:"16px monospace",
-  fill:"#00eaff",
-  backgroundColor:"#000000"
-})
-.setOrigin(0.5)
-.setDepth(10000)
-.setInteractive()
-.on("pointerdown",()=>{
-  startTitleMusic();
-});
-    const titleHit = this.add.rectangle(480,270,960,540,0xffffff,0.001)
-      .setInteractive()
-      .setDepth(9998);
-
-    titleHit.on("pointerdown",()=>goFromTitle(this));
-    this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));
+  if(hasTex(this,"title")){
+    this.add.image(CX,CY,"title")
+      .setDisplaySize(W,H)
+      .setDepth(0);
+  }else{
+    this.add.rectangle(CX,CY,W,H,0x000000,1);
+    this.add.text(CX,220,"MOTEL PHEROMONES",{
+      font:"36px monospace",
+      fill:"#ff4fc3"
+    }).setOrigin(0.5);
   }
+
+  this.add.text(CX,H-52,"TAP TO START",{
+    font:"24px monospace",
+    fill:"#ffffff",
+    backgroundColor:"#000000"
+  }).setOrigin(0.5).setDepth(9999);
+
+  this.add.text(CX,H-22,"MUSIC TEST",{
+    font:"16px monospace",
+    fill:"#00eaff",
+    backgroundColor:"#000000"
+  })
+  .setOrigin(0.5)
+  .setDepth(10000)
+  .setInteractive()
+  .on("pointerdown",()=>{
+    startTitleMusic();
+  });
+
+  const titleHit = this.add.rectangle(CX,CY,W,H,0xffffff,0.001)
+    .setInteractive()
+    .setDepth(9998);
+
+  titleHit.on("pointerdown",()=>goFromTitle(this));
+  this.input.keyboard.once("keydown-ENTER",()=>goFromTitle(this));
 }
 class CharacterSelect extends Phaser.Scene {
   constructor() {
@@ -877,7 +879,7 @@ class CharacterSelect extends Phaser.Scene {
         displayName: "DONNY",
         faction: "MOTEL PHEROMONES",
         role: "FRONTMAN / HYPE LEADER",
-        weapon: "BLACK HOLLOW-BODY GUITAR",
+        weapon: "Anastasia,",
         cardKey: "char_card_donny",
         unlocked: true
       },
