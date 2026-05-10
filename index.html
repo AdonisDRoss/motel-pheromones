@@ -91,6 +91,22 @@ const HEW_MOVE_SCALE = 0.40;
 const DONNY_FRAME_W = 210;
 const DONNY_FRAME_H = 212;
 const DONNY_SCALE = 0.36;
+const JACKSON_MOVE_FRAME_W = 256;
+const JACKSON_MOVE_FRAME_H = 256;
+
+const JACKSON_ATTACK_FRAME_W = 204;
+const JACKSON_ATTACK_FRAME_H = 192;
+
+const JACKSON_ACTION_FRAME_W = 256;
+const JACKSON_ACTION_FRAME_H = 192;
+
+const JACKSON_REACTION_FRAME_W = 256;
+const JACKSON_REACTION_FRAME_H = 192;
+
+const JACKSON_MOVE_SCALE = 0.42;
+const JACKSON_ATTACK_SCALE = 0.52;
+const JACKSON_ACTION_SCALE = 0.42;
+const JACKSON_REACTION_SCALE = 0.42;
 const ENEMY_FRAME_W = 163;
 const ENEMY_FRAME_H = 164;
 const PLAYER_MOVE_SCALE = 0.44;
@@ -290,9 +306,6 @@ const ENEMY_BASE = "assets/sprites/enemies";
 
 let selectedFighter = "DONNY";
 
-const JACKSON_FRAME_W = 256;
-const JACKSON_FRAME_H = 256;
-const JACKSON_SCALE = 0.30;
 
 let selectedLevel = "outdoor";
 let selectedLevelName = "OUTDOOR";
@@ -522,7 +535,9 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,"donny_getup","donny_reactions",18,23,8,0);
 }
   function makeJacksonAnimSet(scene){
-  // movement sheet: 6 columns x 4 rows, 256x256
+  // movement.png
+  // 6 columns x 4 rows
+  // 256x256 frames
   makeAnim(scene,"jackson_idle_down","jackson_movement",0,5,6,-1);
   makeAnim(scene,"jackson_idle_up","jackson_movement",0,5,6,-1);
   makeAnim(scene,"jackson_idle_side","jackson_movement",0,5,6,-1);
@@ -537,18 +552,22 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
 
   makeAnim(scene,"jackson_jump","jackson_movement",18,23,10,0);
 
-  // attacks sheet: 6x6
-  makeAnim(scene,"jackson_attack_light","jackson_attacks",0,5,10,0);
-  makeAnim(scene,"jackson_attack_heavy","jackson_attacks",6,11,9,0);
-  makeAnim(scene,"jackson_kick","jackson_attacks",12,17,10,0);
-  makeAnim(scene,"jackson_sweep","jackson_attacks",18,23,10,0);
-  makeAnim(scene,"jackson_combo_starter","jackson_attacks",24,29,10,0);
-  makeAnim(scene,"jackson_combo_finisher","jackson_attacks",30,35,10,0);
+  // jackson_attacks.png
+  // 6 columns x 5 rows
+  // 204x192 frames
+  makeAnim(scene,"jackson_attack_light","jackson_attacks",6,8,12,0);
+  makeAnim(scene,"jackson_attack_heavy","jackson_attacks",6,11,10,0);
+  makeAnim(scene,"jackson_kick","jackson_attacks",12,13,10,0);
+  makeAnim(scene,"jackson_sweep","jackson_attacks",14,17,10,0);
+  makeAnim(scene,"jackson_special_notes","jackson_attacks",18,23,8,0);
+  makeAnim(scene,"jackson_special_ghost","jackson_attacks",24,29,8,0);
 
-  // fallback block pose using crouch row if no block row exists
+  // fallback block pose
   makeAnim(scene,"jackson_block","jackson_actions",6,11,8,-1);
 
-  // actions sheet: 6x6
+  // jackson_actions.png
+  // 6 columns x 6 rows
+  // 256x192 frames
   makeAnim(scene,"jackson_climb","jackson_actions",0,5,8,-1);
   makeAnim(scene,"jackson_crouch","jackson_actions",6,11,8,-1);
   makeAnim(scene,"jackson_taunt","jackson_actions",12,17,8,0);
@@ -556,7 +575,9 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,"jackson_carry","jackson_actions",24,29,8,-1);
   makeAnim(scene,"jackson_victory","jackson_actions",30,35,8,0);
 
-  // reactions sheet: 6x6
+  // jackson_reactions.png
+  // 6 columns x 6 rows
+  // 256x192 frames
   makeAnim(scene,"jackson_hurt","jackson_reactions",0,5,8,0);
   makeAnim(scene,"jackson_hurt_heavy","jackson_reactions",6,11,8,0);
   makeAnim(scene,"jackson_knockback","jackson_reactions",12,17,8,0);
@@ -564,6 +585,7 @@ makeAnim(scene,prefix+"_kick",prefix+"_attacks",8,11,10,0); makeAnim(scene,prefi
   makeAnim(scene,"jackson_downed","jackson_reactions",24,29,6,-1);
   makeAnim(scene,"jackson_getup","jackson_reactions",30,35,8,0);
 }
+
 function loadAssets(scene){
 scene.load.on("loaderror", function(file){
   const msg = "ASSET LOAD ERROR: " + file.key + " / " + file.src;
@@ -665,30 +687,30 @@ scene.load.spritesheet("donny_reactions", DONNY_BASE + "/reactions/donny_reactio
   margin:0,
   spacing:0
 });
-  scene.load.spritesheet("jackson_movement", JACKSON_BASE + "/movement.png?v=" + VERSION, {
-  frameWidth: JACKSON_FRAME_W,
-  frameHeight: JACKSON_FRAME_H,
+ scene.load.spritesheet("jackson_movement", JACKSON_BASE + "/movement.png?v=" + VERSION, {
+  frameWidth: JACKSON_MOVE_FRAME_W,
+  frameHeight: JACKSON_MOVE_FRAME_H,
   margin: 0,
   spacing: 0
 });
 
 scene.load.spritesheet("jackson_attacks", JACKSON_BASE + "/attacks/jackson_attacks.png?v=" + VERSION, {
-  frameWidth: JACKSON_FRAME_W,
-  frameHeight: JACKSON_FRAME_H,
+  frameWidth: JACKSON_ATTACK_FRAME_W,
+  frameHeight: JACKSON_ATTACK_FRAME_H,
   margin: 0,
   spacing: 0
 });
 
 scene.load.spritesheet("jackson_actions", JACKSON_BASE + "/actions/jackson_actions.png?v=" + VERSION, {
-  frameWidth: JACKSON_FRAME_W,
-  frameHeight: JACKSON_FRAME_H,
+  frameWidth: JACKSON_ACTION_FRAME_W,
+  frameHeight: JACKSON_ACTION_FRAME_H,
   margin: 0,
   spacing: 0
 });
 
 scene.load.spritesheet("jackson_reactions", JACKSON_BASE + "/reactions/jackson_reactions.png?v=" + VERSION, {
-  frameWidth: JACKSON_FRAME_W,
-  frameHeight: JACKSON_FRAME_H,
+  frameWidth: JACKSON_REACTION_FRAME_W,
+  frameHeight: JACKSON_REACTION_FRAME_H,
   margin: 0,
   spacing: 0
 });
@@ -1308,6 +1330,41 @@ class LevelSelect extends Phaser.Scene{
     });
   }
 }
+  const PATHS = {
+  levels: "assets/levels",
+
+  jt: "assets/sprites/player/jt",
+  hew: "assets/sprites/player/hew",
+  jackson: "assets/sprites/player/jackson",
+
+  enemies: "assets/sprites/enemies",
+  audio: "assets/audio"
+};
+const FRAME = {
+  jacksonMove: {
+    w: 256,
+    h: 256,
+    scale: 0.42
+  },
+
+  jacksonAttack: {
+    w: 204,
+    h: 192,
+    scale: 0.52
+  },
+
+  jacksonAction: {
+    w: 256,
+    h: 192,
+    scale: 0.42
+  },
+
+  jacksonReaction: {
+    w: 256,
+    h: 192,
+    scale: 0.42
+  }
+};
 class Game extends Phaser.Scene{
   constructor(){
     super("Game");
@@ -1342,7 +1399,7 @@ getPlayerMoveScale(){
 
   if(fighter === "HEW") return HEW_MOVE_SCALE;
   if(fighter === "DONNY") return DONNY_SCALE;
-  if(fighter === "JACKSON") return JACKSON_SCALE;
+  if(fighter === "JACKSON") return JACKSON_MOVE_SCALE;
 
   return PLAYER_MOVE_SCALE;
 }
@@ -1351,7 +1408,7 @@ getPlayerAttackScale(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "DONNY") return DONNY_SCALE;
-  if(fighter === "JACKSON") return JACKSON_SCALE;
+  if(fighter === "JACKSON") return JACKSON_ATTACK_SCALE;
 
   return PLAYER_ATTACK_SCALE;
 }
@@ -1360,7 +1417,7 @@ getPlayerActionScale(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "DONNY") return DONNY_SCALE;
-  if(fighter === "JACKSON") return JACKSON_SCALE;
+  if(fighter === "JACKSON") return JACKSON_ACTION_SCALE;
 
   return PLAYER_ACTION_SCALE;
 }
@@ -1369,7 +1426,7 @@ getPlayerReactionScale(){
   const fighter = getSelectedFighterId();
 
   if(fighter === "DONNY") return DONNY_SCALE;
-  if(fighter === "JACKSON") return JACKSON_SCALE;
+  if(fighter === "JACKSON") return JACKSON_REACTION_SCALE;
 
   return PLAYER_REACTION_SCALE;
 }
@@ -1940,7 +1997,8 @@ if(direction==="down"){
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=false;
     this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    
+this.poseSprite.setScale(this.getPlayerActionScale());
     this.poseSprite.setVisible(canShowClimbPose);
     if(canShowClimbPose){
       safePlay(this.poseSprite,climbAnim);
@@ -2195,7 +2253,11 @@ for(const link of JUMP_LINKS){
     }
     const jumpAnim=this.getPlayerAnim("jump");
     if(hasAnim(this,jumpAnim)){
-      this.player.setScale(PLAYER_MOVE2_SCALE);
+      if(getSelectedFighterId() === "JACKSON" || getSelectedFighterId() === "DONNY"){
+  this.player.setScale(this.getPlayerMoveScale());
+}else{
+  this.player.setScale(PLAYER_MOVE2_SCALE);
+}
       safePlay(this.player,jumpAnim);
     }else{
       this.player.setScale(this.getPlayerMoveScale());
@@ -2304,7 +2366,7 @@ this.activeJumpTween=this.tweens.add({
       const actionSheet=this.getPlayerActionSheet();
       if(hasAnim(this,crouchAnim) && hasTex(this,actionSheet)){
         this.poseSprite.setTexture(actionSheet);
-        played=this.showPose(crouchAnim,PLAYER_ACTION_SCALE);
+        played=this.showPose(crouchAnim,this.getPlayerActionScale());
       }
     }
     if(!played){
@@ -2430,7 +2492,7 @@ this.activeJumpTween=this.tweens.add({
     this.poseSprite.y=this.player.y;
     this.poseSprite.flipX=this.player.flipX;
     this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_ACTION_SCALE);
+    this.poseSprite.setScale(this.getPlayerActionScale());
     this.poseSprite.setVisible(true);
     this.player.setVisible(false);
     safePlay(this.poseSprite,this.getPlayerAnim("carry"));
@@ -3599,20 +3661,24 @@ getNearestSpecialLadder(){
     });
     this.cameras.main.shake(120,0.004);
   }
-  showPose(animKey,scale=PLAYER_ACTION_SCALE,yOffset=0){
-    if(!this.player || !this.poseSprite) return false;
-    if(!hasAnim(this,animKey)) return false;
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y+yOffset;
-    this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(scale);
-    this.poseSprite.setVisible(true);
-    this.player.setVisible(false);
-    safePlay(this.poseSprite,animKey);
-    return true;
-  }
-  playPlayerPose(animKey,duration=420,scale=PLAYER_ACTION_SCALE){
+  showPose(animKey,scale=null,yOffset=0){
+  if(!this.player || !this.poseSprite) return false;
+  if(!hasAnim(this,animKey)) return false;
+
+  if(scale === null) scale = this.getPlayerActionScale();
+
+  this.poseSprite.x=this.player.x;
+  this.poseSprite.y=this.player.y+yOffset;
+  this.poseSprite.flipX=this.player.flipX;
+  this.poseSprite.setOrigin(0.5,1);
+  this.poseSprite.setScale(scale);
+  this.poseSprite.setVisible(true);
+  this.player.setVisible(false);
+  safePlay(this.poseSprite,animKey);
+
+  return true;
+}
+  playPlayerPose(animKey,duration=420,scale=null){
     if(this.pauseMenuOpen) return;
     if(!this.matchStarted || this.matchOver) return;
     if(this.playerBusy || this.isClimbing || this.playerHealth<=0) return;
@@ -3641,15 +3707,15 @@ getNearestSpecialLadder(){
     this.playerBusy=true;
     this.busyUntil=this.time.now+duration+250;
     this.isBlocking=false;
-    this.poseSprite.setTexture(this.getPlayerReactionSheet());
-    this.poseSprite.x=this.player.x;
-    this.poseSprite.y=this.player.y;
-    this.poseSprite.flipX=this.player.flipX;
-    this.poseSprite.setOrigin(0.5,1);
-    this.poseSprite.setScale(PLAYER_REACTION_SCALE);
-    this.poseSprite.setVisible(true);
-    this.player.setVisible(false);
-    safePlay(this.poseSprite,animKey);
+  this.poseSprite.setTexture(this.getPlayerReactionSheet());
+this.poseSprite.x = this.player.x;
+this.poseSprite.y = this.player.y;
+this.poseSprite.flipX = this.player.flipX;
+this.poseSprite.setOrigin(0.5, 1);
+this.poseSprite.setScale(this.getPlayerReactionScale());
+this.poseSprite.setVisible(true);
+this.player.setVisible(false);
+safePlay(this.poseSprite, animKey);
     if(type!=="ko"){
       this.time.delayedCall(duration,()=>{
         this.forcePlayerReady();
@@ -3908,7 +3974,7 @@ getNearestSpecialLadder(){
     }
     if(this.player){
       this.player.setVisible(true);
-      this.player.setScale(this.getPlayerMoveScale());
+    this.player.setScale(this.getPlayerMoveScale());
       this.player.clearTint();
       if(this.lastDir==="up") safePlay(this.player,this.getPlayerAnim("idle_up"));
       else if(this.lastDir==="side") safePlay(this.player,this.getPlayerAnim("idle_side"));
