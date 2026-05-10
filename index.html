@@ -3013,6 +3013,196 @@ getNearestSpecialLadder(){
     }
     this.updateEnemyVisuals(e);
   }
+  playVanWaveIntro(index){
+  const wave = this.enemyWaves && this.enemyWaves[index];
+  if(!wave || !wave.length){
+    return false;
+  }
+
+  this.enemyWaveIndex = index;
+  this.waveSpawning = true;
+  this.waveIntroRunning = true;
+
+  if(this.zoneText){
+    this.zoneText.setText("WAVE " + (index + 1) + " INCOMING");
+  }
+
+  // Fallback: if van sheet fails to load, use normal direct spawn.
+  if(!hasTex(this,"enemy_van")){
+    this.spawnEnemyWave(index);
+    this.waveSpawning = false;
+    this.waveIntroRunning = false;
+    return true;
+  }
+
+  const vanShadow = this.add.ellipse(VAN_START_X, VAN_ENTRY_Y + 4, 100, 24, 0x000000, 0.24)
+    .setDepth(838);
+
+  const van = this.add.sprite(VAN_START_X, VAN_ENTRY_Y, "enemy_van", 0)
+    .setOrigin(0.5, 1)
+    .setScale(VAN_SCALE)
+    .setDepth(840);
+
+  van.shadowRef = vanShadow;
+  this.activeWaveVehicle = van;
+
+  if(hasAnim(this,"enemy_van_drive")){
+    safePlay(van,"enemy_van_drive");
+  }
+
+  this.tweens.add({
+    targets: [van, vanShadow],
+    x: VAN_STOP_X,
+    duration: 1500,
+    ease: "Sine.easeOut",
+    onComplete: ()=>{
+      this.cameras.main.shake(120, 0.0035);
+
+      if(hasAnim(this,"enemy_van_stop")){
+        van.play("enemy_van_stop");
+      }else{
+        van.setFrame(12);
+      }
+
+      this.time.delayedCall(280, ()=>{
+        if(hasAnim(this,"enemy_van_open")){
+          van.play("enemy_van_open");
+        }else{
+          van.setFrame(28);
+        }
+
+        wave.forEach((spawn, i)=>{
+          this.releaseEnemyFromVan(van, spawn, i, wave.length);
+        });
+
+        const totalDelay = 1200 + (wave.length * 260);
+
+        this.time.delayedCall(totalDelay, ()=>{
+          this.sendVanAway(van);
+
+          this.waveSpawning = false;
+          this.waveIntroRunning = false;
+
+          if(this.zoneText){
+            this.zoneText.setText("WAVE " + (index + 1));
+          }
+        });
+      });
+    }
+  });
+
+  return true;
+}
+
+releaseEnemyFromVan(van, spawn, index, total){
+  const delay = 320 + (index * 260);
+  const landingY = getPlatformY("middle");
+
+  const spreadStart = van.x - 120;
+  const spreadStep = 85;
+  const landingX = Phaser.Math.Clamp(
+    spreadStart + (index * spreadStep),
+    500,
+    845
+  );
+
+  this.time.delayedCall(delay, ()=>{
+    const e = this.spawnEnemyType(
+      spawn.type,
+      van.x - 8,
+      landingY - 78,
+      "middle"
+    );
+
+    e.busy = true;
+    e.state = "landing";
+    e.attackCooldown = 900;
+    e.vx = 0;
+    e.homeY = landingY;
+    e.y = landingY - 78;
+    e.platform = "middle";
+
+    if(e.shadow){
+      e.shadow.setAlpha(0.20);
+    }
+
+    [
+      e.authBadge,
+      e.authText,
+      e.nameText,
+      e.hpBack,
+      e.hpFill
+    ].forEach(obj=>{
+      if(obj) obj.setAlpha(0);
+    });
+
+    this.updateEnemyVisuals(e);
+
+    this.tweens.add({
+      targets: e,
+      x: landingX,
+      y: landingY,
+      duration: 380,
+      ease: "Quad.easeOut",
+      onUpdate: ()=>{
+        this.updateEnemyVisuals(e);
+      },
+      onComplete: ()=>{
+        e.x = landingX;
+        e.y = landingY;
+        e.homeY = landingY;
+        e.platform = "middle";
+        e.busy = false;
+        e.state = "idle";
+        e.attackCooldown = Phaser.Math.Between(450, 900);
+
+        [
+          e.authBadge,
+          e.authText,
+          e.nameText,
+          e.hpBack,
+          e.hpFill
+        ].forEach(obj=>{
+          if(obj) obj.setAlpha(1);
+        });
+
+        if(e.shadow){
+          e.shadow.setAlpha(0.45);
+        }
+
+        this.safeEnemyPlay(e,"idle");
+        this.createHitFX(e.x, e.y - 14, "jump", 6);
+      }
+    });
+  });
+}
+
+sendVanAway(van){
+  if(!van) return;
+
+  const shadow = van.shadowRef || null;
+
+  if(hasAnim(this,"enemy_van_leave")){
+    safePlay(van,"enemy_van_leave");
+  }
+
+  const targets = shadow ? [van, shadow] : [van];
+
+  this.tweens.add({
+    targets: targets,
+    x: VAN_EXIT_X,
+    duration: 1200,
+    ease: "Sine.easeIn",
+    onComplete: ()=>{
+      if(shadow && shadow.destroy) shadow.destroy();
+      if(van && van.destroy) van.destroy();
+
+      if(this.activeWaveVehicle === van){
+        this.activeWaveVehicle = null;
+      }
+    }
+  });
+}
   createEnemies(){
   this.enemies = [];
 
