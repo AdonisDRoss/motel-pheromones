@@ -483,7 +483,19 @@ function textureHasFrame(scene,sheet,frameIndex){
     repeat:-1
   });
 }
-function makeRunAnim(scene,key,sheet,rate){
+function makeSingleFrameAnim(scene,key,sheet,frame){
+  if(!hasTex(scene,sheet)) return;
+  if(hasAnim(scene,key)) return;
+  if(!textureHasFrame(scene,sheet,frame)) return;
+
+  scene.anims.create({
+    key:key,
+    frames:[{key:sheet,frame:frame}],
+    frameRate:1,
+    repeat:-1
+  });
+}
+  function makeRunAnim(scene,key,sheet,rate){
   if(!hasTex(scene,sheet)) return;
   if(hasAnim(scene,key)) return;
 
@@ -517,16 +529,16 @@ makeAnim(scene,prefix+"_kick",sheet,15,19,9,0);
 }
 function makePlayerAnimSet(scene,prefix){
   if(prefix === "jt"){
-  // JT's idle row frames drift left/right, so lock idle to stable frames.
-  // Walking, running, attacks, actions, and reactions still animate normally.
-  makeSingleFrameAnim(scene,"jt_idle_down","jt_movement",0);
-  makeSingleFrameAnim(scene,"jt_idle_up","jt_movement",5);
-  makeSingleFrameAnim(scene,"jt_idle_side","jt_movement",10);
-}else{
-  makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);
-  makeAnim(scene,prefix+"_idle_up",prefix+"_movement",5,9,6,-1);
-  makeAnim(scene,prefix+"_idle_side",prefix+"_movement",10,14,6,-1);
-}
+    // JT's idle row frames drift left/right, so lock idle to stable frames.
+    // Walking, running, attacks, actions, and reactions still animate normally.
+    makeSingleFrameAnim(scene,"jt_idle_down","jt_movement",0);
+    makeSingleFrameAnim(scene,"jt_idle_up","jt_movement",5);
+    makeSingleFrameAnim(scene,"jt_idle_side","jt_movement",10);
+  }else{
+    makeAnim(scene,prefix+"_idle_down",prefix+"_movement",0,4,6,-1);
+    makeAnim(scene,prefix+"_idle_up",prefix+"_movement",5,9,6,-1);
+    makeAnim(scene,prefix+"_idle_side",prefix+"_movement",10,14,6,-1);
+  }
   makeAnim(scene,prefix+"_walk_down",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_up",prefix+"_movement",15,19,8,-1);
   makeAnim(scene,prefix+"_walk_side",prefix+"_movement",15,19,8,-1);
