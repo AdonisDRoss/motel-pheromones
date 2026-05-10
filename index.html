@@ -3412,6 +3412,11 @@ spawnWaveFromHelicopter(wave,index,onDone){
   const heliY = 100;
 
   const heli = this.makeHelicopter(startX,heliY);
+
+// Helicopter starts on the right and flies left, so flip it to face left.
+if(heli.setFlipX){
+  heli.setFlipX(true);
+}
 if(heli.play && hasAnim(this,"corpo_helicopter_hover")){
   safePlay(heli,"corpo_helicopter_hover");
 }
@@ -3441,17 +3446,22 @@ if(heli.play && hasAnim(this,"corpo_helicopter_open")){
       });
 
       this.time.delayedCall(longest + 260,()=>{
-        this.tweens.add({
-          targets:heli,
-          x:exitX,
-          y:heliY - 25,
-          duration:900,
-          ease:"Sine.easeIn",
-          onComplete:()=>{
-            heli.destroy();
-            if(onDone) onDone();
-          }
-        });
+        // Face the correct direction before flying away.
+if(heli.setFlipX){
+  heli.setFlipX(exitX < heli.x);
+}
+
+this.tweens.add({
+  targets:heli,
+  x:exitX,
+  y:heliY - 25,
+  duration:900,
+  ease:"Sine.easeIn",
+  onComplete:()=>{
+    heli.destroy();
+    if(onDone) onDone();
+  }
+});
       });
     }
   });
