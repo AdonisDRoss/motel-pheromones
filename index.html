@@ -611,7 +611,7 @@ scene.load.on("loaderror", function(file){
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
-  scene.load.image("enemy_van","assets/vehicles/enemy_van.png?v="+VERSION);
+  
   scene.load.spritesheet("corpo_van","assets/sprites/vehicles/corpo_van_sheet.png?v="+VERSION,{
   frameWidth: VAN_FRAME_W,
   frameHeight: VAN_FRAME_H,
@@ -780,6 +780,39 @@ function createAllAnims(scene){
   makeEnemyAnimSet(scene,"sellout","sellout");
   makeEnemyAnimSet(scene,"feral","feral");
   makeEnemyAnimSet(scene,"doorman","doorman");
+   if(hasTex(scene,"corpo_van") && !hasAnim(scene,"corpo_van_idle")){
+  scene.anims.create({
+    key:"corpo_van_idle",
+    frames:[{key:"corpo_van",frame:0}],
+    frameRate:1,
+    repeat:-1
+  });
+
+  scene.anims.create({
+    key:"corpo_van_open",
+    frames:[
+      {key:"corpo_van",frame:0},
+      {key:"corpo_van",frame:1},
+      {key:"corpo_van",frame:2},
+      {key:"corpo_van",frame:3},
+      {key:"corpo_van",frame:4},
+      {key:"corpo_van",frame:5}
+    ],
+    frameRate:8,
+    repeat:0
+  });
+
+  scene.anims.create({
+    key:"corpo_van_close",
+    frames:[
+      {key:"corpo_van",frame:5},
+      {key:"corpo_van",frame:6},
+      {key:"corpo_van",frame:7}
+    ],
+    frameRate:8,
+    repeat:0
+  });
+}
 }
 class Boot extends Phaser.Scene{
   constructor(){
@@ -3024,39 +3057,7 @@ getNearestSpecialLadder(){
     }
     this.updateEnemyVisuals(e);
   }
-  if(hasTex(scene,"corpo_van") && !hasAnim(scene,"corpo_van_idle")){
-  scene.anims.create({
-    key:"corpo_van_idle",
-    frames:[{key:"corpo_van",frame:0}],
-    frameRate:1,
-    repeat:-1
-  });
-
-  scene.anims.create({
-    key:"corpo_van_open",
-    frames:[
-      {key:"corpo_van",frame:0},
-      {key:"corpo_van",frame:1},
-      {key:"corpo_van",frame:2},
-      {key:"corpo_van",frame:3},
-      {key:"corpo_van",frame:4},
-      {key:"corpo_van",frame:5}
-    ],
-    frameRate:8,
-    repeat:0
-  });
-
-  scene.anims.create({
-    key:"corpo_van_close",
-    frames:[
-      {key:"corpo_van",frame:5},
-      {key:"corpo_van",frame:6},
-      {key:"corpo_van",frame:7}
-    ],
-    frameRate:8,
-    repeat:0
-  });
-}
+ 
   playVanWaveIntro(index){
   const wave = this.enemyWaves && this.enemyWaves[index];
   if(!wave || !wave.length){
@@ -3498,33 +3499,26 @@ makeVan(x,y){
     return van;
   }
 
-  const fallback = this.add.rectangle(x,y,210,72,0x111111,0.95)
-    .setStrokeStyle(3,0xffffff,0.35)
-    .setDepth(y + 260);
+  // Fallback if corpo_van_sheet.png is missing.
+  const van = this.add.container(x,y).setDepth(y + 260);
 
-  return fallback;
-}
-
-  // Emergency fallback if enemy_van.png is missing
-  const van = this.add.container(x,y).setDepth(15000);
-
-  const body = this.add.rectangle(0,0,150,52,0x151515,0.96)
+  const body = this.add.rectangle(0,0,230,86,0x151515,0.96)
     .setStrokeStyle(3,0xffffff,0.25);
 
-  const roof = this.add.rectangle(-18,-33,82,34,0x222222,0.96)
+  const roof = this.add.rectangle(-20,-48,130,42,0x222222,0.96)
     .setStrokeStyle(2,0xffffff,0.20);
 
-  const windshield = this.add.rectangle(-47,-34,32,18,0x7cdcff,0.55);
-  const sideWindow = this.add.rectangle(-12,-34,34,18,0x7cdcff,0.45);
-  const doorLine = this.add.rectangle(26,0,3,48,0xffffff,0.18);
+  const windshield = this.add.rectangle(70,-35,48,24,0x7cdcff,0.55);
+  const sideWindow = this.add.rectangle(18,-38,46,22,0x7cdcff,0.45);
+  const doorLine = this.add.rectangle(-20,0,4,70,0xffffff,0.18);
 
-  const wheel1 = this.add.circle(-48,28,14,0x050505,1)
-    .setStrokeStyle(3,0x777777,1);
+  const wheel1 = this.add.circle(-72,43,19,0x050505,1)
+    .setStrokeStyle(4,0x777777,1);
 
-  const wheel2 = this.add.circle(50,28,14,0x050505,1)
-    .setStrokeStyle(3,0x777777,1);
+  const wheel2 = this.add.circle(75,43,19,0x050505,1)
+    .setStrokeStyle(4,0x777777,1);
 
-  const light = this.add.rectangle(75,-8,8,12,0xfff45c,0.95);
+  const light = this.add.rectangle(116,-8,10,16,0xff3333,0.95);
 
   van.add([
     body,
