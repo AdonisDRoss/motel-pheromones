@@ -67,7 +67,7 @@ window.addEventListener("error",function(e){
   console.error("Motel runtime error:",e);
 });
 
-const VERSION = 699;
+const VERSION = 700;
 const H = 540;
 const W = Math.max(960, Math.round(H * (window.innerWidth / window.innerHeight)));
 const CX = W / 2;
@@ -121,8 +121,8 @@ const STICK_DEADZONE = 0.08;
 const ACTION_DEADZONE = 0.35;
 const VAN_FRAME_W = 512;
 const VAN_FRAME_H = 512;
-const VAN_SCALE = 0.72;
-const VAN_ORIGIN_Y = 0.80;
+const VAN_SCALE = 0.54;
+const VAN_ORIGIN_Y = 1.0;
 
 const PLATFORM_BOUNDS = {
   topLeft:{   minX:305, maxX:440, minY:305, maxY:305 },
@@ -3311,7 +3311,7 @@ spawnWaveFromVan(wave,index,onDone){
   const stopX = Phaser.Math.Clamp(avgX,260,W - 260);
 
   // Lower = closer to street.
-  const vanY = getPlatformY("bottom") + 18;
+  const vanY = getPlatformY("bottom") + 52;
 
   const van = this.makeVan(startX,vanY);
 
