@@ -7591,7 +7591,7 @@ Game.prototype.makeKeyboard = function(){
    - Pause menu includes Inventory
 ========================================================= */
 
-const MP_INVENTORY_MAX = 5;
+const MP_INVENTORY_MAX = 3;
 
 const MP_WEAPON_DEFS = {
   pipe: {
@@ -7679,7 +7679,8 @@ const MP_WEAPON_DEFS = {
     throwable: true
   }
 };
-
+  // Alias for newer patches that expect MPW_DEFS.
+var MPW_DEFS = MP_WEAPON_DEFS;
 function mpGetWeaponGroundY(scene, platform){
   if(scene && scene.isLeftyLowerScreen && scene.isLeftyLowerScreen()){
     if(typeof getLeftyLowerPlatformY === "function"){
