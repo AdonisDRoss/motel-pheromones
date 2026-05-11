@@ -13838,26 +13838,24 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 })();
 
 /* =========================================================
-   END FOOD VISIBILITY + LEFT MIRROR TOGGLE STICK OVERRIDE
-========================================================= */
-  /* =========================================================
-   LEFTY'S DOWN-TO-LOWER + X-JUMP-TO-THIRD PLATFORM PATCH
-   - DOWN in lower fight lane goes to Lefty's lower screen
-   - JUMP at the marked X sends player to third/top platform
+   LEFTY'S DOWN-TO-LOWER + X-JUMP PATCH V3
+   - Does NOT break ladders/stairs
+   - DOWN goes to lower Lefty's only when NOT near ladder/stairs
+   - JUMP at X sends player to third/top platform
    - Walking in front of X does nothing
-   - HOLD UP no longer triggers the platform jump
    Paste ABOVE: const config = {
 ========================================================= */
 
 (function(){
-  if(window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V2) return;
-  window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V2 = true;
+  if(window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V3) return;
+  window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V3 = true;
 
   if(typeof Game === "undefined") return;
 
   /* =======================================================
      LOWER SCREEN TRIGGER
-     Hold DOWN while in the lower fight lane.
+     This is the normal lower fight lane.
+     DOWN works here unless near ladder/stairs.
   ======================================================= */
 
   var MP_LEFTYS_DOWN_TO_LOWER_ZONE = {
@@ -13869,7 +13867,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 
   /* =======================================================
      X JUMP ZONE
-     Go up to the marked X area, then press JUMP.
+     Press JUMP at the X to go to third/top platform.
   ======================================================= */
 
   var MP_LEFTYS_X_JUMP_ZONE = {
@@ -13879,21 +13877,19 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     maxY: 265
   };
 
-  // Where player lands after pressing JUMP at the X.
   var MP_LEFTYS_THIRD_PLATFORM_SNAP = {
     x: 560,
     y: 182,
     platform: "top"
   };
 
-  // Where player appears on Lefty's lower screen.
   var MP_LEFTYS_LOWER_SPAWN = {
     x: 820,
     y: 390,
     platform: "lower"
   };
 
-  function mpIsLeftysOutdoorScreen(scene){
+  function mpIsLeftysOutdoorScreenV3(scene){
     if(!scene) return false;
 
     var isOutdoor =
@@ -13907,7 +13903,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     return isOutdoor && screen === "leftys_outdoor";
   }
 
-  function mpPlayerInZone(scene, zone){
+  function mpPlayerInZoneV3(scene, zone){
     if(!scene || !scene.player || !zone) return false;
 
     return (
@@ -13918,7 +13914,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     );
   }
 
-  function mpInputDown(scene){
+  function mpInputDownV3(scene){
     return (
       scene.moveY > 0.55 ||
       scene.stickY > 0.55 ||
@@ -13926,7 +13922,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     );
   }
 
-  function mpJumpPressed(scene){
+  function mpJumpPressedV3(scene){
     return (
       scene.jumpPressed ||
       scene.jumpJustPressed ||
@@ -13937,7 +13933,109 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     );
   }
 
-  function mpSnapToThirdPlatform(scene){
+  /* =======================================================
+     LADDER / STAIR SAFETY
+     If player is near a ladder/stair, DOWN belongs to that,
+     not to the lower-screen transition.
+  ======================================================= */
+
+  function mpNearAnyZoneV3(scene, list, padX, padY){
+    if(!scene || !scene.player || !list) return false;
+
+    var px = scene.player.x;
+    var py = scene.player.y;
+
+    for(var i = 0; i < list.length; i++){
+      var z = list[i];
+      if(!z) continue;
+
+      var x = z.x || z.centerX || z.left || z.minX || 0;
+      var y = z.y || z.centerY || z.top || z.minY || 0;
+
+      var w =
+        z.w ||
+        z.width ||
+        ((typeof z.maxX === "number" && typeof z.minX === "number") ? z.maxX - z.minX : 80);
+
+      var h =
+        z.h ||
+        z.height ||
+        ((typeof z.maxY === "number" && typeof z.minY === "number") ? z.maxY - z.minY : 160);
+
+      var minX = typeof z.minX === "number" ? z.minX : x - w * 0.5;
+      var maxX = typeof z.maxX === "number" ? z.maxX : x + w * 0.5;
+      var minY = typeof z.minY === "number" ? z.minY : y - h * 0.5;
+      var maxY = typeof z.maxY === "number" ? z.maxY : y + h * 0.5;
+
+      if(
+        px >= minX - padX &&
+        px <= maxX + padX &&
+        py >= minY - padY &&
+        py <= maxY + padY
+      ){
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function mpNearLadderOrStairsV3(scene){
+    if(!scene || !scene.player) return false;
+
+    // Current state flags.
+    if(scene.isClimbing) return true;
+    if(scene.climbing) return true;
+    if(scene.onLadder) return true;
+    if(scene.nearLadder) return true;
+    if(scene.nearStairs) return true;
+    if(scene.usingStairs) return true;
+    if(scene.stairTraveling) return true;
+    if(scene.onStairs) return true;
+
+    // Known possible zone arrays.
+    var possibleLists = [
+      scene.ladders,
+      scene.ladderZones,
+      scene.climbZones,
+      scene.stairs,
+      scene.stairZones,
+      scene.stairTriggers,
+      scene.platformStairs
+    ];
+
+    for(var i = 0; i < possibleLists.length; i++){
+      if(mpNearAnyZoneV3(scene, possibleLists[i], 28, 34)){
+        return true;
+      }
+    }
+
+    // Manual Lefty's ladder positions as backup.
+    // Main visible ladders in your Lefty's outdoor screen.
+    var px = scene.player.x;
+    var py = scene.player.y;
+
+    var manualZones = [
+      // left roof ladder
+      { minX: 205, maxX: 255, minY: 150, maxY: 405 },
+
+      // middle ladder
+      { minX: 505, maxX: 555, minY: 160, maxY: 405 },
+
+      // right ladder
+      { minX: 805, maxX: 855, minY: 170, maxY: 405 },
+
+      // lower-left stairs
+      { minX: 80, maxX: 180, minY: 355, maxY: 520 },
+
+      // lower-right stairs / stop sign area
+      { minX: 805, maxX: 930, minY: 355, maxY: 520 }
+    ];
+
+    return mpNearAnyZoneV3(scene, manualZones, 8, 8);
+  }
+
+  function mpSnapToThirdPlatformV3(scene){
     if(!scene || !scene.player) return;
 
     scene.player.x = MP_LEFTYS_THIRD_PLATFORM_SNAP.x;
@@ -13972,7 +14070,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     }
   }
 
-  function mpGoToLeftysLower(scene){
+  function mpGoToLeftysLowerV3(scene){
     if(!scene || !scene.player) return;
 
     scene.mpOutdoorScreen = "leftys_lower";
@@ -13980,9 +14078,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
     scene.currentPlatform = "lower";
     scene.lastPlatform = "lower";
 
-    // Try existing screen switcher first if your lower screen is registered.
     if(typeof mpSetOutdoorBg === "function" && hasTex(scene, "leftys_lower")){
-      scene.mpOutdoorScreen = "leftys_lower";
       mpSetOutdoorBg(scene, "leftys_lower");
     }else if(scene.mpOutdoorBg && hasTex(scene, "leftys_lower")){
       scene.mpOutdoorBg.setTexture("leftys_lower").setDisplaySize(W, H).setDepth(1);
@@ -14017,54 +14113,39 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
   }
 
   /* =======================================================
-     Disable old accidental down/cross-street handlers.
-  ======================================================= */
-
-  if(Game.prototype.updateLeftyLowerTransition){
-    Game.prototype.updateLeftyLowerTransition = function(){};
-  }
-
-  if(Game.prototype.checkLeftyLowerTransition){
-    Game.prototype.checkLeftyLowerTransition = function(){
-      return false;
-    };
-  }
-
-  if(Game.prototype.tryLeftyLowerTransition){
-    Game.prototype.tryLeftyLowerTransition = function(){
-      return false;
-    };
-  }
-
-  /* =======================================================
      Main update wrapper
   ======================================================= */
 
-  var MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP = Game.prototype.update;
+  var MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP_V3 = Game.prototype.update;
 
   Game.prototype.update = function(time, delta){
-    if(MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP){
-      MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP.call(this, time, delta);
+    if(MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP_V3){
+      MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP_V3.call(this, time, delta);
     }
 
-    if(!mpIsLeftysOutdoorScreen(this)) return;
+    if(!mpIsLeftysOutdoorScreenV3(this)) return;
     if(!this.player) return;
-    if(this.playerBusy || this.isClimbing) return;
-
-    // DOWN from lower fight lane = lower Lefty's screen.
-    if(mpPlayerInZone(this, MP_LEFTYS_DOWN_TO_LOWER_ZONE) && mpInputDown(this)){
-      mpGoToLeftysLower(this);
-      return;
-    }
+    if(this.playerBusy) return;
 
     // JUMP at the X = third/top platform.
-    if(mpPlayerInZone(this, MP_LEFTYS_X_JUMP_ZONE) && mpJumpPressed(this)){
-      mpSnapToThirdPlatform(this);
+    // This should not affect ladders/stairs.
+    if(mpPlayerInZoneV3(this, MP_LEFTYS_X_JUMP_ZONE) && mpJumpPressedV3(this)){
+      mpSnapToThirdPlatformV3(this);
       return;
     }
 
-    // Walk in front of X with no jump = no trigger.
-    if(mpPlayerInZone(this, MP_LEFTYS_X_JUMP_ZONE) && this.zoneText){
+    // DOWN in lower fight lane = lower Lefty's screen,
+    // BUT NOT near ladders or stairs.
+    if(
+      mpPlayerInZoneV3(this, MP_LEFTYS_DOWN_TO_LOWER_ZONE) &&
+      mpInputDownV3(this) &&
+      !mpNearLadderOrStairsV3(this)
+    ){
+      mpGoToLeftysLowerV3(this);
+      return;
+    }
+
+    if(mpPlayerInZoneV3(this, MP_LEFTYS_X_JUMP_ZONE) && this.zoneText){
       this.zoneText.setText("PRESS JUMP: THIRD PLATFORM");
     }
   };
@@ -14072,7 +14153,7 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 })();
 
 /* =========================================================
-   END LEFTY'S DOWN-TO-LOWER + X-JUMP-TO-THIRD PLATFORM PATCH
+   END LEFTY'S DOWN-TO-LOWER + X-JUMP PATCH V3
 ========================================================= */
   const config = {
   parent: "game",
