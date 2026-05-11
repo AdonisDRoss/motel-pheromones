@@ -14155,6 +14155,21 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 /* =========================================================
    END LEFTY'S DOWN-TO-LOWER + X-JUMP PATCH V3
 ========================================================= */
+  /* =========================================================
+   DISABLE LEFTY TELEPORT OVERRIDES
+   - Removes down/jump teleport behavior
+   - Lets ladders and stairs work normally again
+========================================================= */
+
+if(typeof Game !== "undefined"){
+  Game.prototype.updateLeftyLowerTransition = function(){};
+  Game.prototype.checkLeftyLowerTransition = function(){ return false; };
+  Game.prototype.tryLeftyLowerTransition = function(){ return false; };
+}
+
+/* =========================================================
+   END DISABLE LEFTY TELEPORT OVERRIDES
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
