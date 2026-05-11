@@ -14171,11 +14171,13 @@ if(typeof Game !== "undefined"){
    END DISABLE LEFTY TELEPORT OVERRIDES
 ========================================================= */
 /* =========================================================
-   MODE SELECT MAIN CARD SCREEN PATCH
-   - Uses main mode-select.png slot background
-   - Places 4 mode cards inside slots
-   - On-screen B BACK returns to title
-   - Keyboard B / ESC also return to title
+/* =========================================================
+   MODE SELECT MAIN CARD SCREEN PATCH — FIXED OVERWRITE
+   - Title now goes to ModeSelect
+   - Uses assets/levels/mode-select.png
+   - Keeps all 4 cards locked inside the slots
+   - B BACK returns to title
+   - No setScale() card blow-up bug
 ========================================================= */
 
 window.selectedGameMode = window.selectedGameMode || "story";
@@ -14190,38 +14192,13 @@ function getSelectedGameModeName(){
 }
 
 /* =========================================================
-   LOAD MODE SELECT ART
-========================================================= */
-
-if(typeof loadAssets === "function" && !window.MP_MODE_MAIN_CARD_LOAD_PATCHED){
-  window.MP_MODE_MAIN_CARD_LOAD_PATCHED = true;
-
-  var MP_OLD_LOAD_ASSETS_MODE_MAIN_CARD = loadAssets;
-
-  loadAssets = function(scene){
-    MP_OLD_LOAD_ASSETS_MODE_MAIN_CARD(scene);
-
-    scene.load.image("modeSelectBg", "assets/levels/mode-select.png?v=" + VERSION);
-
-    scene.load.image("mode_story", "assets/ui/modes/story_mode.png?v=" + VERSION);
-    scene.load.image("mode_rumble", "assets/ui/modes/rumble_mode.png?v=" + VERSION);
-    scene.load.image("mode_versus", "assets/ui/modes/versus_mode.png?v=" + VERSION);
-    scene.load.image("mode_coop", "assets/ui/modes/coop_mode.png?v=" + VERSION);
-  };
-}
-
-/* =========================================================
    TITLE -> MODE SELECT
 ========================================================= */
 
-if(typeof goFromTitle === "function" && !window.MP_TITLE_TO_MODE_MAIN_CARD_PATCHED){
-  window.MP_TITLE_TO_MODE_MAIN_CARD_PATCHED = true;
-
-  goFromTitle = function(scene){
-    startTitleMusic();
-    scene.scene.start("ModeSelect");
-  };
-}
+goFromTitle = function(scene){
+  startTitleMusic();
+  scene.scene.start("ModeSelect");
+};
 
 /* =========================================================
    MODE SELECT SCENE
@@ -14234,9 +14211,39 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
     this.selectedIndex = 0;
     this.cards = [];
     this.cardBorders = [];
+    this.cardLabels = [];
+  }
+
+  preload(){
+    const v = typeof VERSION !== "undefined" ? VERSION : Date.now();
+
+    if(!this.textures.exists("modeSelectBg")){
+      this.load.image("modeSelectBg", "assets/levels/mode-select.png?v=" + v);
+    }
+
+    if(!this.textures.exists("mode_story")){
+      this.load.image("mode_story", "assets/ui/modes/story_mode.png?v=" + v);
+    }
+
+    if(!this.textures.exists("mode_rumble")){
+      this.load.image("mode_rumble", "assets/ui/modes/rumble_mode.png?v=" + v);
+    }
+
+    if(!this.textures.exists("mode_versus")){
+      this.load.image("mode_versus", "assets/ui/modes/versus_mode.png?v=" + v);
+    }
+
+    if(!this.textures.exists("mode_coop")){
+      this.load.image("mode_coop", "assets/ui/modes/coop_mode.png?v=" + v);
+    }
   }
 
   create(){
+    this.selectedIndex = 0;
+    this.cards = [];
+    this.cardBorders = [];
+    this.cardLabels = [];
+
     this.modes = [
       { id:"story",  name:"STORY",  key:"mode_story"  },
       { id:"rumble", name:"RUMBLE", key:"mode_rumble" },
@@ -14250,6 +14257,13 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
       this.add.image(CX, CY, "modeSelectBg")
         .setDisplaySize(W, H)
         .setDepth(1);
+    }else{
+      this.add.text(CX, 60, "MODE SELECT", {
+        font:"36px monospace",
+        fill:"#00ffff",
+        stroke:"#000000",
+        strokeThickness:6
+      }).setOrigin(0.5).setDepth(2);
     }
 
     this.buildCards();
@@ -14258,13 +14272,18 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
     this.updateSelection();
   }
 
-  buildCards(){
-    this.cards = [];
-    this.cardBorders = [];
+  sx(x){
+    return x * (W / 960);
+  }
 
+  sy(y){
+    return y * (H / 540);
+  }
+
+  buildCards(){
     /*
-      Slot positions match the numbered boxes in your mode-select background.
-      Tweak only these values if a card needs slight alignment.
+      These positions match the 4 numbered slots on mode-select.png.
+      Only adjust these if the cards need tiny alignment changes.
     */
     const slots = [
       { x:166, y:286 },
@@ -14273,26 +14292,28 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
       { x:811, y:286 }
     ];
 
-    const cardW = 190;
-    const cardH = 300;
+    const cardW = 190 * (W / 960);
+    const cardH = 300 * (H / 540);
 
     this.modes.forEach((mode, index)=>{
       const s = slots[index];
+      const x = this.sx(s.x);
+      const y = this.sy(s.y);
 
       let card;
 
       if(hasTex(this, mode.key)){
-        card = this.add.image(s.x, s.y, mode.key)
+        card = this.add.image(x, y, mode.key)
           .setDisplaySize(cardW, cardH)
           .setDepth(20)
-          .setInteractive({useHandCursor:true});
+          .setInteractive({ useHandCursor:true });
       }else{
-        card = this.add.rectangle(s.x, s.y, cardW, cardH, 0x120012, 0.85)
-          .setStrokeStyle(3, 0x00ffff)
+        card = this.add.rectangle(x, y, cardW, cardH, 0x080808, 0.86)
+          .setStrokeStyle(3, 0x00ffff, 0.65)
           .setDepth(20)
-          .setInteractive({useHandCursor:true});
+          .setInteractive({ useHandCursor:true });
 
-        this.add.text(s.x, s.y, mode.name, {
+        const fallbackLabel = this.add.text(x, y, mode.name, {
           font:"24px monospace",
           fill:"#fff45c",
           stroke:"#000000",
@@ -14300,9 +14321,11 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
         })
           .setOrigin(0.5)
           .setDepth(22);
+
+        this.cardLabels.push(fallbackLabel);
       }
 
-      const border = this.add.rectangle(s.x, s.y, cardW + 10, cardH + 10, 0x000000, 0)
+      const border = this.add.rectangle(x, y, cardW + 10, cardH + 10, 0x000000, 0)
         .setStrokeStyle(4, 0x00ffff, 0.55)
         .setDepth(30);
 
@@ -14321,13 +14344,13 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
   }
 
   buildBackButton(){
-    const bx = 138;
-    const by = H - 55;
+    const bx = this.sx(138);
+    const by = this.sy(486);
 
-    this.backButtonBox = this.add.rectangle(bx, by, 205, 48, 0x000000, 0.72)
+    this.backButtonBox = this.add.rectangle(bx, by, this.sx(205), this.sy(48), 0x000000, 0.72)
       .setStrokeStyle(3, 0x00ffff, 0.75)
       .setDepth(60)
-      .setInteractive({useHandCursor:true});
+      .setInteractive({ useHandCursor:true });
 
     this.backButtonText = this.add.text(bx, by, "B  BACK", {
       font:"20px monospace",
@@ -14372,6 +14395,11 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
   }
 
   updateSelection(){
+    const normalW = 190 * (W / 960);
+    const normalH = 300 * (H / 540);
+    const selectedW = 198 * (W / 960);
+    const selectedH = 310 * (H / 540);
+
     this.cardBorders.forEach((border, index)=>{
       const selected = index === this.selectedIndex;
 
@@ -14379,6 +14407,11 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
         selected ? 7 : 4,
         selected ? 0xfff45c : 0x00ffff,
         selected ? 1 : 0.55
+      );
+
+      border.setSize(
+        selected ? selectedW + 12 : normalW + 10,
+        selected ? selectedH + 12 : normalH + 10
       );
     });
 
@@ -14389,8 +14422,15 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
         card.setAlpha(selected ? 1 : 0.72);
       }
 
-      if(card.setScale){
-        card.setScale(selected ? 1.035 : 1);
+      /*
+        DO NOT use setScale() here.
+        setScale(1) makes image cards jump back to original PNG size.
+      */
+      if(card.setDisplaySize){
+        card.setDisplaySize(
+          selected ? selectedW : normalW,
+          selected ? selectedH : normalH
+        );
       }
     });
   }
@@ -14408,18 +14448,16 @@ var ModeSelect = class ModeSelect extends Phaser.Scene{
 window.ModeSelect = ModeSelect;
 
 /* =========================================================
-   MODE LABELS
+   MODE LABEL ON CHARACTER SELECT
 ========================================================= */
 
-if(typeof CharacterSelect !== "undefined" && !CharacterSelect.prototype.mpModeMainCardLabelPatched){
-  CharacterSelect.prototype.mpModeMainCardLabelPatched = true;
-
-  var MP_OLD_CHARACTER_CREATE_MODE_MAIN_CARD_LABEL = CharacterSelect.prototype.create;
+if(typeof CharacterSelect !== "undefined"){
+  const MP_OLD_CHARACTER_CREATE_MODE_LABEL_FIXED = CharacterSelect.prototype.create;
 
   CharacterSelect.prototype.create = function(){
-    MP_OLD_CHARACTER_CREATE_MODE_MAIN_CARD_LABEL.call(this);
+    MP_OLD_CHARACTER_CREATE_MODE_LABEL_FIXED.call(this);
 
-    this.add.text(480,96,"MODE: " + getSelectedGameModeName(),{
+    this.add.text(480, 96, "MODE: " + getSelectedGameModeName(), {
       fontFamily:"monospace",
       fontSize:"16px",
       color:"#fff45c",
@@ -14431,15 +14469,17 @@ if(typeof CharacterSelect !== "undefined" && !CharacterSelect.prototype.mpModeMa
   };
 }
 
-if(typeof LevelSelect !== "undefined" && !LevelSelect.prototype.mpModeMainCardLabelPatched){
-  LevelSelect.prototype.mpModeMainCardLabelPatched = true;
+/* =========================================================
+   MODE LABEL ON LEVEL SELECT
+========================================================= */
 
-  var MP_OLD_LEVEL_CREATE_MODE_MAIN_CARD_LABEL = LevelSelect.prototype.create;
+if(typeof LevelSelect !== "undefined"){
+  const MP_OLD_LEVEL_CREATE_MODE_LABEL_FIXED = LevelSelect.prototype.create;
 
   LevelSelect.prototype.create = function(){
-    MP_OLD_LEVEL_CREATE_MODE_MAIN_CARD_LABEL.call(this);
+    MP_OLD_LEVEL_CREATE_MODE_LABEL_FIXED.call(this);
 
-    this.add.text(480,42,"MODE: " + getSelectedGameModeName(),{
+    this.add.text(480, 42, "MODE: " + getSelectedGameModeName(), {
       font:"17px monospace",
       fill:"#fff45c",
       stroke:"#000000",
@@ -14451,8 +14491,8 @@ if(typeof LevelSelect !== "undefined" && !LevelSelect.prototype.mpModeMainCardLa
 }
 
 /* =========================================================
-   END MODE SELECT MAIN CARD SCREEN PATCH
-========================================================= */ 
+   END MODE SELECT MAIN CARD SCREEN PATCH — FIXED OVERWRITE
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
