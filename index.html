@@ -8454,6 +8454,1134 @@ Game.prototype.safeUpdate = function(time, delta){
 /* =========================================================
    END WEAPON PICKUP / SWING / THROW / INVENTORY PATCH V2
 ========================================================= */
+/* =========================================================
+   CHAIN SWING SPRITE SWAP PATCH
+   - Curved chain when held
+   - Straight chain during light attack swing
+   - No new player sprites needed
+========================================================= */
+
+if(typeof MP_WEAPON_DEFS !== "undefined" && MP_WEAPON_DEFS.chain){
+  MP_WEAPON_DEFS.chain.swingKey = "weapon_chain_straight";
+  MP_WEAPON_DEFS.chain.swingScale = 0.34;
+  MP_WEAPON_DEFS.chain.swingOffsetX = 72;
+  MP_WEAPON_DEFS.chain.swingOffsetY = -58;
+  MP_WEAPON_DEFS.chain.swingRotation = 0.02;
+  MP_WEAPON_DEFS.chain.rangeBonus = 75;
+  MP_WEAPON_DEFS.chain.damage = 12;
+}
+
+Game.prototype.startChainSwingVisual = function(){
+  if(!this.currentWeapon) return false;
+  if(this.currentWeapon.type !== "chain") return false;
+  if(!this.weaponSprite) return false;
+
+  const def = this.currentWeapon.def;
+
+  this.weaponSwinging = true;
+  this.chainSwinging = true;
+
+  if(hasTex(this, def.swingKey)){
+    this.weaponSprite.setTexture(def.swingKey);
+    this.weaponSprite.setScale(def.swingScale || def.scale);
+  }
+
+  this.time.delayedCall(210, ()=>{
+    this.chainSwinging = false;
+    this.weaponSwinging = false;
+
+    if(this.weaponSprite && this.currentWeapon && hasTex(this, this.currentWeapon.def.key)){
+      this.weaponSprite.setTexture(this.currentWeapon.def.key);
+      this.weaponSprite.setScale(this.currentWeapon.def.scale);
+    }
+  });
+
+  return true;
+};
+
+const MP_ORIGINAL_UPDATE_HELD_WEAPON_CHAIN_SWING = Game.prototype.updateHeldWeaponVisual;
+
+Game.prototype.updateHeldWeaponVisual = function(){
+  if(!this.weaponSprite || !this.currentWeapon || !this.player){
+    return;
+  }
+
+  if(this.currentWeapon.type !== "chain" || !this.chainSwinging){
+    MP_ORIGINAL_UPDATE_HELD_WEAPON_CHAIN_SWING.call(this);
+    return;
+  }
+
+  const def = this.currentWeapon.def;
+  const dir = this.getFacingDir();
+
+  this.weaponSprite.setVisible(true);
+
+  this.weaponSprite.x = this.player.x + (def.swingOffsetX || 72) * dir;
+  this.weaponSprite.y = this.player.y + (def.swingOffsetY || -58);
+
+  if(this.weaponSprite.setRotation){
+    this.weaponSprite.setRotation((def.swingRotation || 0) * dir);
+  }
+
+  if(this.weaponSprite.setFlipX){
+    this.weaponSprite.setFlipX(dir < 0);
+  }
+
+  this.weaponSprite.setDepth(this.player.y + 150);
+};
+
+const MP_ORIGINAL_SHOW_WEAPON_SWING_CHAIN = Game.prototype.showWeaponSwingFX;
+
+Game.prototype.showWeaponSwingFX = function(){
+  if(this.currentWeapon && this.currentWeapon.type === "chain"){
+    this.startChainSwingVisual();
+
+    const dir = this.getFacingDir();
+
+    const arc = this.add.arc(
+      this.player.x + dir * 92,
+      this.player.y - 58,
+      62,
+      -45,
+      45,
+      false,
+      0xfff45c,
+      0.24
+    )
+      .setScale(dir, 1)
+      .setDepth(14000);
+
+    this.tweens.add({
+      targets: arc,
+      alpha: 0,
+      scaleX: dir * 1.25,
+      scaleY: 1.25,
+      duration: 150,
+      onComplete: ()=>{
+        arc.destroy();
+      }
+    });
+
+    return;
+  }
+
+  MP_ORIGINAL_SHOW_WEAPON_SWING_CHAIN.call(this);
+};
+
+/* =========================================================
+   END CHAIN SWING SPRITE SWAP PATCH
+========================================================= */
+  /* =========================================================
+   RANDOM WEAPON POPULATION PATCH
+   - Randomly places 3–4 weapons
+   - Uses pipe, bat, bottle, chain, rock
+   - Main Lefty's screen gets weapons
+   - Lower Lefty's screen gets its own weapons
+   - Weapons only appear on the current screen
+========================================================= */
+
+const MP_RANDOM_WEAPON_MIN = 3;
+const MP_RANDOM_WEAPON_MAX = 4;
+
+const MP_RANDOM_WEAPON_TYPES = [
+  "pipe",
+  "bat",
+  "bottle",
+  "chain",
+  "rock"
+];
+
+Game.prototype.getCurrentWeaponScreenKey = function(){
+  if(this.isLeftyLowerScreen && this.isLeftyLowerScreen()){
+    return "lefty_lower";
+  }
+
+  if(this.isLeftyOutdoorLevel && this.isLeftyOutdoorLevel()){
+    return "lefty_main";
+  }
+
+  return selectedLevel || "default";
+};
+
+Game.prototype.getRandomWeaponSpawnPoints = function(screenKey){
+  if(screenKey === "lefty_lower"){
+    return [
+      { x:180, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+      { x:280, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+      { x:420, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+      { x:560, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+      { x:720, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+      { x:840, y:getLeftyLowerPlatformY("middle"), platform:"middle" },
+
+      { x:230, y:getLeftyLowerPlatformY("bottom"), platform:"bottom" },
+      { x:390, y:getLeftyLowerPlatformY("bottom"), platform:"bottom" },
+      { x:610, y:getLeftyLowerPlatformY("bottom"), platform:"bottom" },
+      { x:790, y:getLeftyLowerPlatformY("bottom"), platform:"bottom" },
+
+      // A couple on the upper street, but not too many because the bus uses this lane.
+      { x:320, y:getLeftyLowerPlatformY("top"), platform:"top" },
+      { x:720, y:getLeftyLowerPlatformY("top"), platform:"top" }
+    ];
+  }
+
+  if(screenKey === "lefty_main"){
+    return [
+      { x:190, y:getPlatformY("middle"), platform:"middle" },
+      { x:310, y:getPlatformY("middle"), platform:"middle" },
+      { x:470, y:getPlatformY("middle"), platform:"middle" },
+      { x:640, y:getPlatformY("middle"), platform:"middle" },
+      { x:800, y:getPlatformY("middle"), platform:"middle" },
+
+      { x:170, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:330, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:545, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:720, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:850, y:getPlatformY("bottom"), platform:"bottom" },
+
+      { x:430, y:getPlatformY("top"), platform:"top" },
+      { x:735, y:getPlatformY("top"), platform:"top" }
+    ];
+  }
+
+  return [
+    { x:240, y:getPlatformY("middle"), platform:"middle" },
+    { x:390, y:getPlatformY("middle"), platform:"middle" },
+    { x:560, y:getPlatformY("middle"), platform:"middle" },
+    { x:740, y:getPlatformY("middle"), platform:"middle" },
+
+    { x:300, y:getPlatformY("bottom"), platform:"bottom" },
+    { x:620, y:getPlatformY("bottom"), platform:"bottom" }
+  ];
+};
+
+Game.prototype.pickRandomWeaponType = function(){
+  const list = MP_RANDOM_WEAPON_TYPES.filter(type=>{
+    return typeof MP_WEAPON_DEFS !== "undefined" && MP_WEAPON_DEFS[type];
+  });
+
+  if(list.length <= 0) return "pipe";
+
+  return list[Phaser.Math.Between(0, list.length - 1)];
+};
+
+Game.prototype.shuffleArrayCopy = function(arr){
+  const copy = arr.slice();
+
+  for(let i = copy.length - 1; i > 0; i--){
+    const j = Phaser.Math.Between(0, i);
+    const temp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = temp;
+  }
+
+  return copy;
+};
+
+Game.prototype.populateRandomWeaponsForScreen = function(screenKey){
+  if(!screenKey) screenKey = this.getCurrentWeaponScreenKey();
+
+  if(!this.weaponPopulatedScreens){
+    this.weaponPopulatedScreens = {};
+  }
+
+  if(this.weaponPopulatedScreens[screenKey]){
+    return;
+  }
+
+  this.weaponPopulatedScreens[screenKey] = true;
+
+  const points = this.shuffleArrayCopy(
+    this.getRandomWeaponSpawnPoints(screenKey)
+  );
+
+  const count = Phaser.Math.Between(
+    MP_RANDOM_WEAPON_MIN,
+    MP_RANDOM_WEAPON_MAX
+  );
+
+  for(let i = 0; i < count && i < points.length; i++){
+    const p = points[i];
+    const type = this.pickRandomWeaponType();
+
+    this.spawnWeaponPickup(
+      type,
+      p.x + Phaser.Math.Between(-18, 18),
+      p.y,
+      p.platform,
+      screenKey
+    );
+  }
+};
+
+/* Override the weapon setup so it no longer uses fixed test placements */
+Game.prototype.setupWeaponSystem = function(){
+  this.weaponPickups = [];
+  this.inventory = [];
+  this.currentWeaponIndex = -1;
+  this.currentWeapon = null;
+  this.weaponSprite = null;
+  this.thrownWeapons = [];
+  this.inventoryOpen = false;
+  this.inventoryItems = [];
+  this.weaponSwinging = false;
+  this.weaponPopulatedScreens = {};
+
+  this.populateRandomWeaponsForScreen(this.getCurrentWeaponScreenKey());
+};
+
+/* Patch spawnWeaponPickup so every pickup knows which screen it belongs to */
+const MP_ORIGINAL_SPAWN_WEAPON_PICKUP_RANDOM = Game.prototype.spawnWeaponPickup;
+
+Game.prototype.spawnWeaponPickup = function(type, x, y, platform="middle", screenKey=null){
+  const pickup = MP_ORIGINAL_SPAWN_WEAPON_PICKUP_RANDOM.call(
+    this,
+    type,
+    x,
+    y,
+    platform
+  );
+
+  if(!pickup) return pickup;
+
+  pickup.screenKey = screenKey || this.getCurrentWeaponScreenKey();
+
+  this.updateWeaponPickupVisibility(pickup);
+
+  return pickup;
+};
+
+Game.prototype.updateWeaponPickupVisibility = function(pickup){
+  if(!pickup) return;
+
+  const visible =
+    !pickup.pickedUp &&
+    pickup.screenKey === this.getCurrentWeaponScreenKey();
+
+  if(pickup.obj){
+    pickup.obj.setVisible(visible);
+  }
+
+  if(pickup.label){
+    pickup.label.setVisible(visible);
+  }
+};
+
+Game.prototype.updateAllWeaponPickupVisibility = function(){
+  if(!this.weaponPickups) return;
+
+  this.weaponPickups.forEach(pickup=>{
+    this.updateWeaponPickupVisibility(pickup);
+  });
+};
+
+/* Patch nearest pickup so you cannot grab hidden weapons from another screen */
+Game.prototype.getNearestWeaponPickup = function(){
+  if(!this.weaponPickups || !this.player) return null;
+
+  const currentScreen = this.getCurrentWeaponScreenKey();
+
+  let best = null;
+  let bestDist = 9999;
+
+  this.weaponPickups.forEach(w=>{
+    if(!w || w.pickedUp) return;
+    if(w.screenKey !== currentScreen) return;
+    if(w.platform !== this.platform) return;
+
+    const dx = Math.abs(this.player.x - w.x);
+    const dy = Math.abs(this.player.y - w.y);
+
+    if(dx < 64 && dy < 48 && dx < bestDist){
+      best = w;
+      bestDist = dx;
+    }
+  });
+
+  return best;
+};
+
+/* When crossing between Lefty's screens, populate that screen once */
+const MP_ORIGINAL_FINISH_LEFTY_SCREEN_SWAP_RANDOM_WEAPONS =
+  Game.prototype.finishLeftyScreenSwap;
+
+Game.prototype.finishLeftyScreenSwap = function(targetScreen){
+  MP_ORIGINAL_FINISH_LEFTY_SCREEN_SWAP_RANDOM_WEAPONS.call(this, targetScreen);
+
+  this.populateRandomWeaponsForScreen(this.getCurrentWeaponScreenKey());
+  this.updateAllWeaponPickupVisibility();
+};
+
+/* Update visibility every frame in case screen changes */
+const MP_ORIGINAL_SAFE_UPDATE_RANDOM_WEAPONS = Game.prototype.safeUpdate;
+
+Game.prototype.safeUpdate = function(time, delta){
+  MP_ORIGINAL_SAFE_UPDATE_RANDOM_WEAPONS.call(this, time, delta);
+
+  if(this.populateRandomWeaponsForScreen){
+    this.populateRandomWeaponsForScreen(this.getCurrentWeaponScreenKey());
+  }
+
+  this.updateAllWeaponPickupVisibility();
+};
+
+/* =========================================================
+   END RANDOM WEAPON POPULATION PATCH
+========================================================= */
+ 
+  /* =========================================================
+   HEALTH / BUFF PICKUP ITEM PATCH
+   - Random food/drink pickups
+   - E / G near item consumes it
+   - Different HP bonuses
+   - Some items add temporary buffs
+   - Separate from weapon inventory
+========================================================= */
+
+const MP_PLAYER_MAX_HEALTH = 100;
+
+const MP_HEALTH_ITEM_MIN = 3;
+const MP_HEALTH_ITEM_MAX = 5;
+
+const MP_HEALTH_ITEM_TYPES = [
+  "taco",
+  "pizza",
+  "chicken",
+  "soda",
+  "energy_drink",
+  "water",
+  "spliff",
+  "hot_sauce",
+  "first_aid"
+];
+
+const MP_HEALTH_ITEM_DEFS = {
+  taco: {
+    key: "item_taco",
+    label: "TACO",
+    heal: 12,
+    scale: 0.28,
+    rarity: 8,
+    buff: null
+  },
+
+  pizza: {
+    key: "item_pizza",
+    label: "PIZZA",
+    heal: 22,
+    scale: 0.30,
+    rarity: 7,
+    buff: null
+  },
+
+  chicken: {
+    key: "item_chicken",
+    label: "CHICKEN",
+    heal: 35,
+    scale: 0.34,
+    rarity: 4,
+    buff: null
+  },
+
+  soda: {
+    key: "item_soda",
+    label: "SODA",
+    heal: 8,
+    scale: 0.26,
+    rarity: 8,
+    buff: {
+      type: "speed",
+      amount: 1.10,
+      duration: 4500,
+      text: "SPEED UP"
+    }
+  },
+
+  energy_drink: {
+    key: "item_energy_drink",
+    label: "ENERGY",
+    heal: 5,
+    scale: 0.26,
+    rarity: 5,
+    buff: {
+      type: "speed",
+      amount: 1.18,
+      duration: 6500,
+      text: "ENERGY BOOST"
+    }
+  },
+
+  water: {
+    key: "item_water",
+    label: "WATER",
+    heal: 6,
+    scale: 0.25,
+    rarity: 9,
+    buff: {
+      type: "rhythm",
+      amount: 1,
+      duration: 0,
+      text: "RHYTHM +1"
+    }
+  },
+
+  spliff: {
+    key: "item_spliff",
+    label: "SPLIFF",
+    heal: 10,
+    scale: 0.24,
+    rarity: 4,
+    buff: {
+      type: "guard",
+      amount: 0.80,
+      duration: 6000,
+      text: "CALM GUARD"
+    }
+  },
+
+  hot_sauce: {
+    key: "item_hot_sauce",
+    label: "HOT SAUCE",
+    heal: 4,
+    scale: 0.23,
+    rarity: 4,
+    buff: {
+      type: "damage",
+      amount: 1.18,
+      duration: 5500,
+      text: "DAMAGE UP"
+    }
+  },
+
+  first_aid: {
+    key: "item_first_aid",
+    label: "FIRST AID",
+    heal: 45,
+    scale: 0.30,
+    rarity: 2,
+    buff: null
+  }
+};
+
+function mpHealthGroundY(scene, platform){
+  if(
+    scene &&
+    scene.isLeftyLowerScreen &&
+    scene.isLeftyLowerScreen() &&
+    typeof getLeftyLowerPlatformY === "function"
+  ){
+    return getLeftyLowerPlatformY(platform);
+  }
+
+  return getPlatformY(platform);
+}
+
+function mpHealthScreenKey(scene){
+  if(scene && scene.isLeftyLowerScreen && scene.isLeftyLowerScreen()){
+    return "lefty_lower";
+  }
+
+  if(scene && scene.isLeftyOutdoorLevel && scene.isLeftyOutdoorLevel()){
+    return "lefty_main";
+  }
+
+  return selectedLevel || "default";
+}
+
+/* =========================================================
+   SETUP
+========================================================= */
+
+Game.prototype.setupHealthItems = function(){
+  this.playerMaxHealth = MP_PLAYER_MAX_HEALTH;
+
+  this.healthItemPickups = [];
+  this.healthItemPopulatedScreens = {};
+
+  this.playerBuffs = {
+    speedUntil: 0,
+    speedMult: 1,
+    damageUntil: 0,
+    damageMult: 1,
+    guardUntil: 0,
+    guardMult: 1
+  };
+
+  this.populateHealthItemsForScreen(mpHealthScreenKey(this));
+};
+
+const MP_ORIGINAL_GAME_CREATE_HEALTH_ITEMS = Game.prototype.create;
+
+Game.prototype.create = function(){
+  MP_ORIGINAL_GAME_CREATE_HEALTH_ITEMS.call(this);
+  this.setupHealthItems();
+};
+
+/* =========================================================
+   SPAWN POINTS
+========================================================= */
+
+Game.prototype.getHealthItemSpawnPoints = function(screenKey){
+  if(screenKey === "lefty_lower"){
+    return [
+      { x:210, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:360, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:520, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:690, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:820, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+
+      { x:260, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:470, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:650, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:810, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+
+      { x:355, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:735, y:mpHealthGroundY(this,"top"), platform:"top" }
+    ];
+  }
+
+  if(screenKey === "lefty_main"){
+    return [
+      { x:220, y:getPlatformY("middle"), platform:"middle" },
+      { x:380, y:getPlatformY("middle"), platform:"middle" },
+      { x:540, y:getPlatformY("middle"), platform:"middle" },
+      { x:700, y:getPlatformY("middle"), platform:"middle" },
+      { x:820, y:getPlatformY("middle"), platform:"middle" },
+
+      { x:210, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:390, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:610, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:790, y:getPlatformY("bottom"), platform:"bottom" },
+
+      { x:430, y:getPlatformY("top"), platform:"top" },
+      { x:735, y:getPlatformY("top"), platform:"top" }
+    ];
+  }
+
+  return [
+    { x:260, y:getPlatformY("middle"), platform:"middle" },
+    { x:440, y:getPlatformY("middle"), platform:"middle" },
+    { x:620, y:getPlatformY("middle"), platform:"middle" },
+    { x:780, y:getPlatformY("middle"), platform:"middle" }
+  ];
+};
+
+Game.prototype.pickWeightedHealthItemType = function(){
+  const weighted = [];
+
+  MP_HEALTH_ITEM_TYPES.forEach(type=>{
+    const def = MP_HEALTH_ITEM_DEFS[type];
+    if(!def) return;
+
+    const weight = def.rarity || 1;
+
+    for(let i = 0; i < weight; i++){
+      weighted.push(type);
+    }
+  });
+
+  if(weighted.length <= 0) return "taco";
+
+  return weighted[Phaser.Math.Between(0, weighted.length - 1)];
+};
+
+Game.prototype.shuffleHealthArrayCopy = function(arr){
+  const copy = arr.slice();
+
+  for(let i = copy.length - 1; i > 0; i--){
+    const j = Phaser.Math.Between(0, i);
+    const temp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = temp;
+  }
+
+  return copy;
+};
+
+Game.prototype.populateHealthItemsForScreen = function(screenKey){
+  if(!screenKey) screenKey = mpHealthScreenKey(this);
+
+  if(!this.healthItemPopulatedScreens){
+    this.healthItemPopulatedScreens = {};
+  }
+
+  if(this.healthItemPopulatedScreens[screenKey]){
+    return;
+  }
+
+  this.healthItemPopulatedScreens[screenKey] = true;
+
+  const points = this.shuffleHealthArrayCopy(
+    this.getHealthItemSpawnPoints(screenKey)
+  );
+
+  const count = Phaser.Math.Between(
+    MP_HEALTH_ITEM_MIN,
+    MP_HEALTH_ITEM_MAX
+  );
+
+  for(let i = 0; i < count && i < points.length; i++){
+    const p = points[i];
+    const type = this.pickWeightedHealthItemType();
+
+    this.spawnHealthItemPickup(
+      type,
+      p.x + Phaser.Math.Between(-14,14),
+      p.y,
+      p.platform,
+      screenKey
+    );
+  }
+};
+
+/* =========================================================
+   PICKUP OBJECTS
+========================================================= */
+
+Game.prototype.makeHealthItemSprite = function(type, x, y){
+  const def = MP_HEALTH_ITEM_DEFS[type];
+  if(!def) return null;
+
+  if(hasTex(this, def.key)){
+    return this.add.image(x, y, def.key)
+      .setOrigin(0.5, 0.5)
+      .setScale(def.scale);
+  }
+
+  // Fallback placeholders if asset is missing.
+  if(type === "pizza"){
+    return this.add.triangle(x, y, -16, 12, 16, 12, 0, -14, 0xffcc55, 1)
+      .setStrokeStyle(2, 0x000000);
+  }
+
+  if(type === "chicken"){
+    return this.add.circle(x, y, 16, 0xd28a3c, 1)
+      .setStrokeStyle(2, 0x000000);
+  }
+
+  if(type === "drink" || type === "soda" || type === "energy_drink" || type === "water"){
+    return this.add.rectangle(x, y, 18, 32, 0x55ccff, 1)
+      .setStrokeStyle(2, 0x000000);
+  }
+
+  if(type === "spliff"){
+    return this.add.rectangle(x, y, 34, 8, 0xe8e0c8, 1)
+      .setStrokeStyle(2, 0x000000)
+      .setRotation(-0.25);
+  }
+
+  return this.add.circle(x, y, 14, 0xffd35a, 1)
+    .setStrokeStyle(2, 0x000000);
+};
+
+Game.prototype.spawnHealthItemPickup = function(type, x, y, platform="middle", screenKey=null){
+  const def = MP_HEALTH_ITEM_DEFS[type];
+  if(!def) return null;
+
+  const obj = this.makeHealthItemSprite(type, x, y - 20);
+  if(!obj) return null;
+
+  obj.setDepth(y + 32);
+
+  const label = this.add.text(x, y - 52, "+" + def.heal + " " + def.label, {
+    font: "11px monospace",
+    fill: "#7CFF6B",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5).setDepth(y + 33);
+
+  const pickup = {
+    type,
+    def,
+    obj,
+    label,
+    x,
+    y,
+    platform,
+    screenKey: screenKey || mpHealthScreenKey(this),
+    pickedUp: false
+  };
+
+  this.healthItemPickups.push(pickup);
+  this.updateHealthItemVisibility(pickup);
+
+  return pickup;
+};
+
+Game.prototype.updateHealthItemVisibility = function(pickup){
+  if(!pickup) return;
+
+  const visible =
+    !pickup.pickedUp &&
+    pickup.screenKey === mpHealthScreenKey(this);
+
+  if(pickup.obj) pickup.obj.setVisible(visible);
+  if(pickup.label) pickup.label.setVisible(visible);
+};
+
+Game.prototype.updateAllHealthItemVisibility = function(){
+  if(!this.healthItemPickups) return;
+
+  this.healthItemPickups.forEach(p=>{
+    this.updateHealthItemVisibility(p);
+  });
+};
+
+Game.prototype.getNearestHealthItemPickup = function(){
+  if(!this.healthItemPickups || !this.player) return null;
+
+  const currentScreen = mpHealthScreenKey(this);
+
+  let best = null;
+  let bestDist = 9999;
+
+  this.healthItemPickups.forEach(item=>{
+    if(!item || item.pickedUp) return;
+    if(item.screenKey !== currentScreen) return;
+    if(item.platform !== this.platform) return;
+
+    const dx = Math.abs(this.player.x - item.x);
+    const dy = Math.abs(this.player.y - item.y);
+
+    if(dx < 62 && dy < 48 && dx < bestDist){
+      best = item;
+      bestDist = dx;
+    }
+  });
+
+  return best;
+};
+
+/* =========================================================
+   CONSUME / APPLY EFFECTS
+========================================================= */
+
+Game.prototype.consumeHealthItemPickup = function(pickup){
+  if(!pickup || pickup.pickedUp) return false;
+
+  pickup.pickedUp = true;
+
+  if(pickup.obj) pickup.obj.setVisible(false);
+  if(pickup.label) pickup.label.setVisible(false);
+
+  const before = this.playerHealth || 0;
+  const maxHp = this.playerMaxHealth || MP_PLAYER_MAX_HEALTH;
+
+  this.playerHealth = Phaser.Math.Clamp(
+    before + pickup.def.heal,
+    0,
+    maxHp
+  );
+
+  this.applyHealthItemBuff(pickup.def);
+
+  this.showHealthItemFX(pickup);
+
+  if(this.zoneText){
+    this.zoneText.setText(
+      pickup.def.label + " +" + pickup.def.heal + " HP"
+    );
+  }
+
+  return true;
+};
+
+Game.prototype.applyHealthItemBuff = function(def){
+  if(!def || !def.buff) return;
+
+  if(!this.playerBuffs){
+    this.playerBuffs = {
+      speedUntil: 0,
+      speedMult: 1,
+      damageUntil: 0,
+      damageMult: 1,
+      guardUntil: 0,
+      guardMult: 1
+    };
+  }
+
+  const buff = def.buff;
+
+  if(buff.type === "speed"){
+    this.playerBuffs.speedUntil = this.time.now + buff.duration;
+    this.playerBuffs.speedMult = buff.amount;
+  }
+
+  if(buff.type === "damage"){
+    this.playerBuffs.damageUntil = this.time.now + buff.duration;
+    this.playerBuffs.damageMult = buff.amount;
+  }
+
+  if(buff.type === "guard"){
+    this.playerBuffs.guardUntil = this.time.now + buff.duration;
+    this.playerBuffs.guardMult = buff.amount;
+  }
+
+  if(buff.type === "rhythm"){
+    this.rhythm = Math.min(10, (this.rhythm || 0) + buff.amount);
+  }
+
+  if(this.zoneText && buff.text){
+    this.time.delayedCall(300, ()=>{
+      this.zoneText.setText(buff.text);
+    });
+  }
+};
+
+Game.prototype.showHealthItemFX = function(pickup){
+  if(!pickup) return;
+
+  const fx = this.add.text(this.player.x, this.player.y - 95, "+" + pickup.def.heal + " HP", {
+    font: "18px monospace",
+    fill: "#7CFF6B",
+    stroke: "#000000",
+    strokeThickness: 4
+  }).setOrigin(0.5).setDepth(15000);
+
+  this.tweens.add({
+    targets: fx,
+    y: fx.y - 32,
+    alpha: 0,
+    duration: 650,
+    onComplete: ()=>{
+      fx.destroy();
+    }
+  });
+
+  const glow = this.add.circle(this.player.x, this.player.y - 54, 24, 0x7CFF6B, 0.35)
+    .setDepth(14999)
+    .setBlendMode(Phaser.BlendModes.ADD);
+
+  this.tweens.add({
+    targets: glow,
+    scale: 2.2,
+    alpha: 0,
+    duration: 360,
+    onComplete: ()=>{
+      glow.destroy();
+    }
+  });
+};
+
+/* =========================================================
+   HOOK PICKUP CONTROL
+   E/G near health item = consume it
+   Otherwise previous startGrab behavior continues
+========================================================= */
+
+const MP_ORIGINAL_START_GRAB_HEALTH_ITEMS = Game.prototype.startGrab;
+
+Game.prototype.startGrab = function(){
+  const healthPickup = this.getNearestHealthItemPickup();
+
+  if(healthPickup){
+    this.consumeHealthItemPickup(healthPickup);
+    return;
+  }
+
+  MP_ORIGINAL_START_GRAB_HEALTH_ITEMS.call(this);
+};
+
+/* =========================================================
+   BUFF HOOKS
+========================================================= */
+
+const MP_ORIGINAL_GET_PLAYER_SPEED_MOD_HEALTH_ITEMS = Game.prototype.getPlayerSpeedMod;
+
+Game.prototype.getPlayerSpeedMod = function(){
+  let base = 1;
+
+  if(MP_ORIGINAL_GET_PLAYER_SPEED_MOD_HEALTH_ITEMS){
+    base = MP_ORIGINAL_GET_PLAYER_SPEED_MOD_HEALTH_ITEMS.call(this);
+  }
+
+  if(this.playerBuffs && this.time.now < this.playerBuffs.speedUntil){
+    base *= this.playerBuffs.speedMult || 1;
+  }
+
+  return base;
+};
+
+const MP_ORIGINAL_GET_PLAYER_DAMAGE_MOD_HEALTH_ITEMS = Game.prototype.getPlayerDamageMod;
+
+Game.prototype.getPlayerDamageMod = function(){
+  let base = 1;
+
+  if(MP_ORIGINAL_GET_PLAYER_DAMAGE_MOD_HEALTH_ITEMS){
+    base = MP_ORIGINAL_GET_PLAYER_DAMAGE_MOD_HEALTH_ITEMS.call(this);
+  }
+
+  if(this.playerBuffs && this.time.now < this.playerBuffs.damageUntil){
+    base *= this.playerBuffs.damageMult || 1;
+  }
+
+  return base;
+};
+
+const MP_ORIGINAL_DAMAGE_PLAYER_HEALTH_ITEMS = Game.prototype.damagePlayer;
+
+Game.prototype.damagePlayer = function(amount, dir){
+  let finalAmount = amount;
+
+  if(this.playerBuffs && this.time.now < this.playerBuffs.guardUntil){
+    finalAmount = Math.ceil(amount * (this.playerBuffs.guardMult || 1));
+  }
+
+  MP_ORIGINAL_DAMAGE_PLAYER_HEALTH_ITEMS.call(this, finalAmount, dir);
+};
+
+/* =========================================================
+   SCREEN / UPDATE HOOKS
+========================================================= */
+
+const MP_ORIGINAL_FINISH_LEFTY_SCREEN_SWAP_HEALTH_ITEMS =
+  Game.prototype.finishLeftyScreenSwap;
+
+if(MP_ORIGINAL_FINISH_LEFTY_SCREEN_SWAP_HEALTH_ITEMS){
+  Game.prototype.finishLeftyScreenSwap = function(targetScreen){
+    MP_ORIGINAL_FINISH_LEFTY_SCREEN_SWAP_HEALTH_ITEMS.call(this, targetScreen);
+
+    this.populateHealthItemsForScreen(mpHealthScreenKey(this));
+    this.updateAllHealthItemVisibility();
+  };
+}
+
+const MP_ORIGINAL_SAFE_UPDATE_HEALTH_ITEMS = Game.prototype.safeUpdate;
+
+Game.prototype.safeUpdate = function(time, delta){
+  MP_ORIGINAL_SAFE_UPDATE_HEALTH_ITEMS.call(this, time, delta);
+
+  this.populateHealthItemsForScreen(mpHealthScreenKey(this));
+  this.updateAllHealthItemVisibility();
+};
+
+/* =========================================================
+   END HEALTH / BUFF PICKUP ITEM PATCH
+=
+
+======================================================== */
+  /* =========================================================
+   QUICK RANDOM HEALTH ITEM SPAWN PATCH
+   - Randomly spawns 6–7 health / food / drink items
+   - Works with taco, pizza, chicken, soda, energy, water,
+     spliff, hot sauce, first aid
+   - Populates each screen once
+========================================================= */
+
+const MP_HEALTH_QUICK_MIN = 6;
+const MP_HEALTH_QUICK_MAX = 7;
+
+Game.prototype.getHealthItemSpawnPoints = function(screenKey){
+  if(screenKey === "lefty_lower"){
+    return [
+      // Upper street / road
+      { x:180, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:300, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:455, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:610, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:760, y:mpHealthGroundY(this,"top"), platform:"top" },
+      { x:875, y:mpHealthGroundY(this,"top"), platform:"top" },
+
+      // Main lower combat floor
+      { x:160, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:270, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:390, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:520, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:650, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:790, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+      { x:890, y:mpHealthGroundY(this,"middle"), platform:"middle" },
+
+      // Front lane
+      { x:210, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:350, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:520, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:690, y:mpHealthGroundY(this,"bottom"), platform:"bottom" },
+      { x:835, y:mpHealthGroundY(this,"bottom"), platform:"bottom" }
+    ];
+  }
+
+  if(screenKey === "lefty_main"){
+    return [
+      // Top roof / upper lane
+      { x:350, y:getPlatformY("top"), platform:"top" },
+      { x:500, y:getPlatformY("top"), platform:"top" },
+      { x:660, y:getPlatformY("top"), platform:"top" },
+      { x:820, y:getPlatformY("top"), platform:"top" },
+
+      // Middle fight lane
+      { x:150, y:getPlatformY("middle"), platform:"middle" },
+      { x:250, y:getPlatformY("middle"), platform:"middle" },
+      { x:360, y:getPlatformY("middle"), platform:"middle" },
+      { x:480, y:getPlatformY("middle"), platform:"middle" },
+      { x:610, y:getPlatformY("middle"), platform:"middle" },
+      { x:740, y:getPlatformY("middle"), platform:"middle" },
+      { x:850, y:getPlatformY("middle"), platform:"middle" },
+
+      // Bottom lane
+      { x:150, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:290, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:440, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:590, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:735, y:getPlatformY("bottom"), platform:"bottom" },
+      { x:860, y:getPlatformY("bottom"), platform:"bottom" }
+    ];
+  }
+
+  return [
+    { x:190, y:getPlatformY("middle"), platform:"middle" },
+    { x:310, y:getPlatformY("middle"), platform:"middle" },
+    { x:450, y:getPlatformY("middle"), platform:"middle" },
+    { x:590, y:getPlatformY("middle"), platform:"middle" },
+    { x:730, y:getPlatformY("middle"), platform:"middle" },
+    { x:850, y:getPlatformY("middle"), platform:"middle" },
+
+    { x:250, y:getPlatformY("bottom"), platform:"bottom" },
+    { x:500, y:getPlatformY("bottom"), platform:"bottom" },
+    { x:760, y:getPlatformY("bottom"), platform:"bottom" }
+  ];
+};
+
+Game.prototype.populateHealthItemsForScreen = function(screenKey){
+  if(!screenKey){
+    screenKey = mpHealthScreenKey(this);
+  }
+
+  if(!this.healthItemPopulatedScreens){
+    this.healthItemPopulatedScreens = {};
+  }
+
+  if(this.healthItemPopulatedScreens[screenKey]){
+    return;
+  }
+
+  this.healthItemPopulatedScreens[screenKey] = true;
+
+  const points = this.shuffleHealthArrayCopy(
+    this.getHealthItemSpawnPoints(screenKey)
+  );
+
+  const count = Phaser.Math.Between(
+    MP_HEALTH_QUICK_MIN,
+    MP_HEALTH_QUICK_MAX
+  );
+
+  for(let i = 0; i < count && i < points.length; i++){
+    const p = points[i];
+    const type = this.pickWeightedHealthItemType();
+
+    this.spawnHealthItemPickup(
+      type,
+      p.x + Phaser.Math.Between(-16,16),
+      p.y,
+      p.platform,
+      screenKey
+    );
+  }
+};
+
+/* =========================================================
+   END QUICK RANDOM HEALTH ITEM SPAWN PATCH
+========================================================= */
+  
   const config = {
   parent: "game",
   type: Phaser.AUTO,
