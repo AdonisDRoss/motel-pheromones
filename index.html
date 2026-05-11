@@ -170,6 +170,7 @@ function getPlatformY(platform){
   const p = PLATFORM_BOUNDS[platform] || PLATFORM_BOUNDS.middle;
   return Math.round((p.minY + p.maxY) * 0.5);
 }
+
 const LADDER_VERTICAL_INPUT = 0.65;
 const STAIR_VERTICAL_INPUT = 0.65;
 const STAIR_TRAVEL_DURATION = 720;
@@ -698,6 +699,15 @@ scene.load.image("weapon_bat", "assets/sprites/weapons/bat.png?v=" + VERSION);
 scene.load.image("weapon_bottle", "assets/sprites/weapons/bottle.png?v=" + VERSION);
 scene.load.image("weapon_chain", "assets/sprites/weapons/chain.png?v=" + VERSION);
 scene.load.image("weapon_rock", "assets/sprites/weapons/rock.png?v=" + VERSION);
+ scene.load.image("item_pizza", "assets/sprites/items/pizza.png?v=" + VERSION);
+scene.load.image("item_taco", "assets/sprites/items/taco.png?v=" + VERSION);
+scene.load.image("item_chicken", "assets/sprites/items/chicken.png?v=" + VERSION);
+scene.load.image("item_soda", "assets/sprites/items/soda.png?v=" + VERSION);
+scene.load.image("item_energy_drink", "assets/sprites/items/energy_drink.png?v=" + VERSION);
+scene.load.image("item_water", "assets/sprites/items/water.png?v=" + VERSION);
+scene.load.image("item_spliff", "assets/sprites/items/spliff.png?v=" + VERSION);
+scene.load.image("item_hot_sauce", "assets/sprites/items/hot_sauce.png?v=" + VERSION);
+scene.load.image("item_first_aid", "assets/sprites/items/first_aid.png?v=" + VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
   scene.load.spritesheet("corpo_helicopter","assets/sprites/vehicles/corpo_helicopter_sheet.png?v="+VERSION,{
@@ -1742,6 +1752,11 @@ this.player.setDepth(200);
 
 safePlay(this.player,this.getPlayerAnim("idle_down"));
 this.setupCameraFollow();
+   this.add.image(300, getPlatformY("middle") - 20, "item_pizza")
+  .setOrigin(0.5)
+  .setScale(0.3)
+  .setDepth(getPlatformY("middle") + 30);
+   
 this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
 this.poseSprite.setOrigin(0.5,1);
 this.poseSprite.setScale(this.getPlayerAttackScale());
