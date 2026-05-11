@@ -13840,6 +13840,240 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 /* =========================================================
    END FOOD VISIBILITY + LEFT MIRROR TOGGLE STICK OVERRIDE
 ========================================================= */
+  /* =========================================================
+   LEFTY'S DOWN-TO-LOWER + X-JUMP-TO-THIRD PLATFORM PATCH
+   - DOWN in lower fight lane goes to Lefty's lower screen
+   - JUMP at the marked X sends player to third/top platform
+   - Walking in front of X does nothing
+   - HOLD UP no longer triggers the platform jump
+   Paste ABOVE: const config = {
+========================================================= */
+
+(function(){
+  if(window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V2) return;
+  window.MP_LEFTYS_DOWN_AND_X_JUMP_PATCH_V2 = true;
+
+  if(typeof Game === "undefined") return;
+
+  /* =======================================================
+     LOWER SCREEN TRIGGER
+     Hold DOWN while in the lower fight lane.
+  ======================================================= */
+
+  var MP_LEFTYS_DOWN_TO_LOWER_ZONE = {
+    minX: 80,
+    maxX: 900,
+    minY: 390,
+    maxY: 520
+  };
+
+  /* =======================================================
+     X JUMP ZONE
+     Go up to the marked X area, then press JUMP.
+  ======================================================= */
+
+  var MP_LEFTYS_X_JUMP_ZONE = {
+    minX: 500,
+    maxX: 625,
+    minY: 145,
+    maxY: 265
+  };
+
+  // Where player lands after pressing JUMP at the X.
+  var MP_LEFTYS_THIRD_PLATFORM_SNAP = {
+    x: 560,
+    y: 182,
+    platform: "top"
+  };
+
+  // Where player appears on Lefty's lower screen.
+  var MP_LEFTYS_LOWER_SPAWN = {
+    x: 820,
+    y: 390,
+    platform: "lower"
+  };
+
+  function mpIsLeftysOutdoorScreen(scene){
+    if(!scene) return false;
+
+    var isOutdoor =
+      typeof selectedLevel !== "undefined" &&
+      selectedLevel === "outdoor";
+
+    var screen =
+      scene.mpOutdoorScreen ||
+      "leftys_outdoor";
+
+    return isOutdoor && screen === "leftys_outdoor";
+  }
+
+  function mpPlayerInZone(scene, zone){
+    if(!scene || !scene.player || !zone) return false;
+
+    return (
+      scene.player.x >= zone.minX &&
+      scene.player.x <= zone.maxX &&
+      scene.player.y >= zone.minY &&
+      scene.player.y <= zone.maxY
+    );
+  }
+
+  function mpInputDown(scene){
+    return (
+      scene.moveY > 0.55 ||
+      scene.stickY > 0.55 ||
+      (scene.keys && scene.keys.down && scene.keys.down.isDown)
+    );
+  }
+
+  function mpJumpPressed(scene){
+    return (
+      scene.jumpPressed ||
+      scene.jumpJustPressed ||
+      scene.mobileJumpPressed ||
+      scene.wantJump ||
+      (scene.keys && scene.keys.jump && scene.keys.jump.isDown) ||
+      (scene.keys && scene.keys.space && scene.keys.space.isDown)
+    );
+  }
+
+  function mpSnapToThirdPlatform(scene){
+    if(!scene || !scene.player) return;
+
+    scene.player.x = MP_LEFTYS_THIRD_PLATFORM_SNAP.x;
+    scene.player.y = MP_LEFTYS_THIRD_PLATFORM_SNAP.y;
+
+    scene.platform = MP_LEFTYS_THIRD_PLATFORM_SNAP.platform;
+    scene.currentPlatform = MP_LEFTYS_THIRD_PLATFORM_SNAP.platform;
+    scene.lastPlatform = MP_LEFTYS_THIRD_PLATFORM_SNAP.platform;
+    scene.playerGroundY = MP_LEFTYS_THIRD_PLATFORM_SNAP.y;
+
+    scene.isJumping = false;
+    scene.playerJumping = false;
+    scene.jumpCount = 0;
+    scene.doubleJumpUsed = false;
+
+    if(scene.player.body && scene.player.body.velocity){
+      scene.player.body.velocity.x = 0;
+      scene.player.body.velocity.y = 0;
+    }
+
+    if(scene.shadow){
+      scene.shadow.x = scene.player.x;
+      scene.shadow.y = scene.player.y + 5;
+    }
+
+    if(scene.forcePlayerReady){
+      scene.forcePlayerReady();
+    }
+
+    if(scene.zoneText){
+      scene.zoneText.setText("THIRD PLATFORM");
+    }
+  }
+
+  function mpGoToLeftysLower(scene){
+    if(!scene || !scene.player) return;
+
+    scene.mpOutdoorScreen = "leftys_lower";
+    scene.platform = "lower";
+    scene.currentPlatform = "lower";
+    scene.lastPlatform = "lower";
+
+    // Try existing screen switcher first if your lower screen is registered.
+    if(typeof mpSetOutdoorBg === "function" && hasTex(scene, "leftys_lower")){
+      scene.mpOutdoorScreen = "leftys_lower";
+      mpSetOutdoorBg(scene, "leftys_lower");
+    }else if(scene.mpOutdoorBg && hasTex(scene, "leftys_lower")){
+      scene.mpOutdoorBg.setTexture("leftys_lower").setDisplaySize(W, H).setDepth(1);
+    }else if(scene.bg && hasTex(scene, "leftys_lower")){
+      scene.bg.setTexture("leftys_lower").setDisplaySize(W, H);
+    }
+
+    scene.player.x = MP_LEFTYS_LOWER_SPAWN.x;
+    scene.player.y = MP_LEFTYS_LOWER_SPAWN.y;
+    scene.playerGroundY = MP_LEFTYS_LOWER_SPAWN.y;
+
+    if(scene.shadow){
+      scene.shadow.x = scene.player.x;
+      scene.shadow.y = scene.player.y + 5;
+    }
+
+    if(scene.zoneText){
+      scene.zoneText.setText("LOWER LEFTY'S");
+    }
+
+    if(scene.populateHealthItemsForScreen){
+      scene.populateHealthItemsForScreen("leftys_lower");
+    }
+
+    if(scene.populateRandomWeaponsForScreen){
+      scene.populateRandomWeaponsForScreen("leftys_lower");
+    }
+
+    if(scene.forcePlayerReady){
+      scene.forcePlayerReady();
+    }
+  }
+
+  /* =======================================================
+     Disable old accidental down/cross-street handlers.
+  ======================================================= */
+
+  if(Game.prototype.updateLeftyLowerTransition){
+    Game.prototype.updateLeftyLowerTransition = function(){};
+  }
+
+  if(Game.prototype.checkLeftyLowerTransition){
+    Game.prototype.checkLeftyLowerTransition = function(){
+      return false;
+    };
+  }
+
+  if(Game.prototype.tryLeftyLowerTransition){
+    Game.prototype.tryLeftyLowerTransition = function(){
+      return false;
+    };
+  }
+
+  /* =======================================================
+     Main update wrapper
+  ======================================================= */
+
+  var MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP = Game.prototype.update;
+
+  Game.prototype.update = function(time, delta){
+    if(MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP){
+      MP_OLD_UPDATE_LEFTYS_DOWN_X_JUMP.call(this, time, delta);
+    }
+
+    if(!mpIsLeftysOutdoorScreen(this)) return;
+    if(!this.player) return;
+    if(this.playerBusy || this.isClimbing) return;
+
+    // DOWN from lower fight lane = lower Lefty's screen.
+    if(mpPlayerInZone(this, MP_LEFTYS_DOWN_TO_LOWER_ZONE) && mpInputDown(this)){
+      mpGoToLeftysLower(this);
+      return;
+    }
+
+    // JUMP at the X = third/top platform.
+    if(mpPlayerInZone(this, MP_LEFTYS_X_JUMP_ZONE) && mpJumpPressed(this)){
+      mpSnapToThirdPlatform(this);
+      return;
+    }
+
+    // Walk in front of X with no jump = no trigger.
+    if(mpPlayerInZone(this, MP_LEFTYS_X_JUMP_ZONE) && this.zoneText){
+      this.zoneText.setText("PRESS JUMP: THIRD PLATFORM");
+    }
+  };
+
+})();
+
+/* =========================================================
+   END LEFTY'S DOWN-TO-LOWER + X-JUMP-TO-THIRD PLATFORM PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
