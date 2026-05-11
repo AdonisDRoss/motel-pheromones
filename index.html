@@ -7316,6 +7316,234 @@ Game.prototype.safeUpdate = function(time, delta){
 /* =========================================================
    END LEFTY LOWER STREET SCREEN PATCH — AREA DEFINED VERSION
 ========================================================= */
+ /* =========================================================
+   ARROW BUS ROAD HAZARD PATCH
+   - Lower Lefty's screen only
+   - Bus drives right -> left every 20 seconds
+   - Hits player only on upper street lane
+   - Causes small damage + knockback
+========================================================= */
+
+const ARROW_BUS_INTERVAL = 20000;
+const ARROW_BUS_DAMAGE = 8;
+const ARROW_BUS_KNOCKBACK_X = -95;
+const ARROW_BUS_KNOCKBACK_Y = 0;
+
+// Match your lower-street road lane.
+// In the area-defined patch, top platform = upper road/street.
+const ARROW_BUS_ROAD_PLATFORM = "top";
+const ARROW_BUS_Y = 150;
+
+// Visual size in-game. Adjust if the bus looks too big/small.
+const ARROW_BUS_DISPLAY_W = 420;
+const ARROW_BUS_DISPLAY_H = 125;
+
+// Hitbox size. Keep smaller than the full sprite so it feels fair.
+const ARROW_BUS_HITBOX_W = 360;
+const ARROW_BUS_HITBOX_H = 70;
+
+Game.prototype.setupArrowBusHazard = function(){
+  if(!this.isLeftyOutdoorLevel || !this.isLeftyOutdoorLevel()) return;
+
+  this.arrowBusActive = false;
+  this.arrowBus = null;
+  this.arrowBusHitbox = null;
+  this.arrowBusLastHitTime = 0;
+
+  if(this.arrowBusTimer){
+    this.arrowBusTimer.remove(false);
+    this.arrowBusTimer = null;
+  }
+
+  this.arrowBusTimer = this.time.addEvent({
+    delay: ARROW_BUS_INTERVAL,
+    loop: true,
+    callback: ()=>{
+      this.spawnArrowBusHazard();
+    }
+  });
+};
+
+const MP_ORIGINAL_GAME_CREATE_ARROW_BUS = Game.prototype.create;
+
+Game.prototype.create = function(){
+  MP_ORIGINAL_GAME_CREATE_ARROW_BUS.call(this);
+  this.setupArrowBusHazard();
+};
+
+Game.prototype.canSpawnArrowBusHazard = function(){
+  if(!this.isLeftyLowerScreen || !this.isLeftyLowerScreen()) return false;
+  if(this.arrowBusActive) return false;
+  if(this.leftyScreenTransitioning) return false;
+  if(this.pauseMenuOpen || this.matchOver) return false;
+
+  return true;
+};
+
+Game.prototype.spawnArrowBusHazard = function(){
+  if(!this.canSpawnArrowBusHazard()) return;
+
+  this.arrowBusActive = true;
+
+  const startX = W + 300;
+  const endX = -300;
+  const y = ARROW_BUS_Y + 12;
+
+  let bus;
+
+  if(hasTex(this,"arrow_bus")){
+    bus = this.add.image(startX, y, "arrow_bus")
+      .setOrigin(0.5, 0.72)
+      .setDisplaySize(ARROW_BUS_DISPLAY_W, ARROW_BUS_DISPLAY_H)
+      .setDepth(900);
+  }else{
+    // Emergency placeholder if asset is missing.
+    bus = this.add.rectangle(startX, y, ARROW_BUS_DISPLAY_W, ARROW_BUS_DISPLAY_H, 0x5c1c7a, 0.95)
+      .setStrokeStyle(4, 0xffffff, 0.35)
+      .setDepth(900);
+
+    this.add.text(startX, y, "ARROW", {
+      font:"24px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:4
+    }).setOrigin(0.5).setDepth(901);
+  }
+
+  this.arrowBus = bus;
+
+  this.arrowBusHitbox = this.add.rectangle(
+    startX,
+    y,
+    ARROW_BUS_HITBOX_W,
+    ARROW_BUS_HITBOX_H,
+    0xff0000,
+    0
+  ).setDepth(999);
+
+  if(this.zoneText){
+    this.zoneText.setText("BUS INCOMING");
+  }
+
+  this.time.delayedCall(700, ()=>{
+    if(this.zoneText && this.isLeftyLowerScreen && this.isLeftyLowerScreen()){
+      this.zoneText.setText("UPPER STREET");
+    }
+  });
+
+  this.tweens.add({
+    targets: [bus, this.arrowBusHitbox],
+    x: endX,
+    duration: 5200,
+    ease: "Linear",
+    onUpdate: ()=>{
+      this.checkArrowBusPlayerHit();
+    },
+    onComplete: ()=>{
+      this.cleanupArrowBusHazard();
+    }
+  });
+};
+
+Game.prototype.checkArrowBusPlayerHit = function(){
+  if(!this.arrowBusActive) return;
+  if(!this.arrowBusHitbox || !this.player) return;
+  if(!this.isLeftyLowerScreen || !this.isLeftyLowerScreen()) return;
+  if(this.playerHealth <= 0 || this.matchOver) return;
+
+  // Bus only hits player on the road / upper street lane.
+  if(this.platform !== ARROW_BUS_ROAD_PLATFORM) return;
+
+  // Prevent repeated damage every frame.
+  if(this.time.now - this.arrowBusLastHitTime < 900) return;
+
+  const busBox = this.arrowBusHitbox.getBounds();
+
+  const playerBox = new Phaser.Geom.Rectangle(
+    this.player.x - 24,
+    this.player.y - 88,
+    48,
+    82
+  );
+
+  if(!Phaser.Geom.Intersects.RectangleToRectangle(busBox, playerBox)){
+    return;
+  }
+
+  this.arrowBusLastHitTime = this.time.now;
+  this.hitPlayerWithArrowBus();
+};
+
+Game.prototype.hitPlayerWithArrowBus = function(){
+  if(!this.player) return;
+
+  const oldInvuln = this.playerInvuln || 0;
+
+  // Force this hit to work even if the normal invuln timer was active.
+  this.playerInvuln = 0;
+
+  this.damagePlayer(ARROW_BUS_DAMAGE, -1);
+
+  // Restore/extend invuln.
+  this.playerInvuln = Math.max(oldInvuln, 1100);
+
+  // Extra knockback.
+  this.player.x += ARROW_BUS_KNOCKBACK_X;
+  this.player.y += ARROW_BUS_KNOCKBACK_Y;
+
+  this.applyPlatformBounds();
+
+  if(this.createHitFX){
+    this.createHitFX(this.player.x, this.player.y - 60, "hit", ARROW_BUS_DAMAGE);
+  }
+
+  if(this.cameras && this.cameras.main){
+    this.cameras.main.shake(180, 0.006);
+  }
+
+  if(typeof vibrate === "function"){
+    vibrate([45, 35, 70]);
+  }
+
+  if(this.zoneText){
+    this.zoneText.setText("HIT BY BUS");
+  }
+
+  this.time.delayedCall(650, ()=>{
+    if(this.zoneText && this.isLeftyLowerScreen && this.isLeftyLowerScreen()){
+      this.zoneText.setText("UPPER STREET");
+    }
+  });
+};
+
+Game.prototype.cleanupArrowBusHazard = function(){
+  if(this.arrowBus && this.arrowBus.destroy){
+    this.arrowBus.destroy();
+  }
+
+  if(this.arrowBusHitbox && this.arrowBusHitbox.destroy){
+    this.arrowBusHitbox.destroy();
+  }
+
+  this.arrowBus = null;
+  this.arrowBusHitbox = null;
+  this.arrowBusActive = false;
+};
+
+/* Optional manual test key: press O to spawn the bus */
+const MP_ORIGINAL_MAKE_KEYBOARD_ARROW_BUS = Game.prototype.makeKeyboard;
+
+Game.prototype.makeKeyboard = function(){
+  MP_ORIGINAL_MAKE_KEYBOARD_ARROW_BUS.call(this);
+
+  this.input.keyboard.on("keydown-O", ()=>{
+    this.spawnArrowBusHazard();
+  });
+};
+
+/* =========================================================
+   END ARROW BUS ROAD HAZARD PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
