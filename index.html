@@ -690,6 +690,7 @@ scene.load.on("loaderror", function(file){
   scene.load.image("house","assets/levels/house-party.png?v="+VERSION);
   scene.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
   scene.load.image("outdoor","assets/levels/outdoor.png?v="+VERSION);
+ scene.load.image("lefty_lower_street","assets/levels/lefty_lower_street.png?v="+VERSION);
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
@@ -6342,6 +6343,978 @@ Game.prototype.safeUpdate = function(time,delta){
 
 /* =========================================================
    END ENEMY CLOSE-RANGE + TACTICAL AI PATCH
+========================================================= */
+  /* =========================================================
+   9-WAVE ENEMY PROGRESSION PATCH
+   - 9 waves before Doorman
+   - Enemies get tougher each wave
+   - Works with van/helicopter intro system
+   - Works with tactical AI patch
+========================================================= */
+
+const WAVE_DIFFICULTY = [
+  { hp:1.00, dmg:1.00, speed:1.00, cooldown:1.00, label:"WAVE 1" },
+  { hp:1.12, dmg:1.04, speed:1.02, cooldown:0.96, label:"WAVE 2" },
+  { hp:1.24, dmg:1.08, speed:1.04, cooldown:0.92, label:"WAVE 3" },
+  { hp:1.38, dmg:1.12, speed:1.06, cooldown:0.88, label:"WAVE 4" },
+  { hp:1.52, dmg:1.16, speed:1.08, cooldown:0.84, label:"WAVE 5" },
+  { hp:1.68, dmg:1.20, speed:1.10, cooldown:0.80, label:"WAVE 6" },
+  { hp:1.86, dmg:1.26, speed:1.12, cooldown:0.76, label:"WAVE 7" },
+  { hp:2.05, dmg:1.32, speed:1.14, cooldown:0.72, label:"WAVE 8" },
+  { hp:2.25, dmg:1.40, speed:1.16, cooldown:0.68, label:"FINAL WAVE" }
+];
+
+Game.prototype.createEnemies = function(){
+  this.enemies = [];
+
+  this.enemyWaveIndex = 0;
+  this.waveSpawning = false;
+  this.initialWaveStarted = false;
+
+  this.enemyWaves = [
+    // WAVE 1 — warmup
+    [
+      { type:"corpo_wannabe", x:235, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"feral",        x:760, y:getPlatformY("middle"), platform:"middle" }
+    ],
+
+    // WAVE 2 — more pressure
+    [
+      { type:"corpo_wannabe", x:245, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"sellout",       x:620, y:getPlatformY("middle"), platform:"middle" },
+      { type:"feral",         x:790, y:getPlatformY("middle"), platform:"middle" }
+    ],
+
+    // WAVE 3 — vertical spread
+    [
+      { type:"sellout",       x:520, y:getPlatformY("top"), platform:"top" },
+      { type:"corpo_wannabe", x:210, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"corpo_sellout", x:830, y:getPlatformY("middle"), platform:"middle" }
+    ],
+
+    // WAVE 4 — tactical mix
+    [
+      { type:"corpo_sellout", x:300, y:getPlatformY("middle"), platform:"middle" },
+      { type:"sellout",       x:640, y:getPlatformY("top"), platform:"top" },
+      { type:"feral",         x:805, y:getPlatformY("bottom"), platform:"bottom" }
+    ],
+
+    // WAVE 5 — first heavy wave
+    [
+      { type:"corpo_wannabe", x:200, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"corpo_sellout", x:440, y:getPlatformY("middle"), platform:"middle" },
+      { type:"sellout",       x:690, y:getPlatformY("middle"), platform:"middle" },
+      { type:"feral",         x:835, y:getPlatformY("top"), platform:"top" }
+    ],
+
+    // WAVE 6 — faster enemies
+    [
+      { type:"feral",         x:245, y:getPlatformY("middle"), platform:"middle" },
+      { type:"feral",         x:720, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"corpo_sellout", x:500, y:getPlatformY("top"), platform:"top" },
+      { type:"sellout",       x:835, y:getPlatformY("middle"), platform:"middle" }
+    ],
+
+    // WAVE 7 — tougher bodies
+    [
+      { type:"corpo_sellout", x:230, y:getPlatformY("bottom"), platform:"bottom", elite:true },
+      { type:"sellout",       x:460, y:getPlatformY("middle"), platform:"middle" },
+      { type:"corpo_wannabe", x:690, y:getPlatformY("top"), platform:"top" },
+      { type:"feral",         x:830, y:getPlatformY("bottom"), platform:"bottom" }
+    ],
+
+    // WAVE 8 — near-boss pressure
+    [
+      { type:"corpo_sellout", x:220, y:getPlatformY("middle"), platform:"middle", elite:true },
+      { type:"corpo_sellout", x:520, y:getPlatformY("top"), platform:"top" },
+      { type:"sellout",       x:720, y:getPlatformY("bottom"), platform:"bottom", elite:true },
+      { type:"feral",         x:845, y:getPlatformY("middle"), platform:"middle" }
+    ],
+
+    // WAVE 9 — final wave before Doorman
+    [
+      { type:"corpo_sellout", x:190, y:getPlatformY("bottom"), platform:"bottom", elite:true },
+      { type:"feral",         x:360, y:getPlatformY("middle"), platform:"middle" },
+      { type:"sellout",       x:560, y:getPlatformY("top"), platform:"top", elite:true },
+      { type:"corpo_wannabe", x:710, y:getPlatformY("bottom"), platform:"bottom" },
+      { type:"corpo_sellout", x:845, y:getPlatformY("middle"), platform:"middle", elite:true }
+    ]
+  ];
+};
+
+Game.prototype.getWaveDifficulty = function(index){
+  return WAVE_DIFFICULTY[index] || WAVE_DIFFICULTY[WAVE_DIFFICULTY.length - 1];
+};
+
+Game.prototype.applyWaveScalingToEnemy = function(e, spawnData){
+  if(!e || e.enemyType === "doorman") return;
+
+  const waveIndex = this.enemyWaveIndex || 0;
+  const diff = this.getWaveDifficulty(waveIndex);
+  const elite = spawnData && spawnData.elite;
+
+  const eliteHpBonus = elite ? 1.25 : 1.0;
+  const eliteDmgBonus = elite ? 1.12 : 1.0;
+
+  const oldMax = e.maxHealth || 20;
+
+  e.maxHealth = Math.round(oldMax * diff.hp * eliteHpBonus);
+  e.health = e.maxHealth;
+
+  e.attackDamage = Math.max(
+    1,
+    Math.round((e.attackDamage || 7) * diff.dmg * eliteDmgBonus)
+  );
+
+  e.chaseSpeed = Math.round((e.chaseSpeed || 70) * diff.speed);
+
+  e.attackCooldownMin = Math.max(
+    220,
+    Math.round((e.attackCooldownMin || 600) * diff.cooldown)
+  );
+
+  e.attackCooldownMax = Math.max(
+    e.attackCooldownMin + 120,
+    Math.round((e.attackCooldownMax || 1200) * diff.cooldown)
+  );
+
+  e.attackCooldown = Phaser.Math.Between(
+    e.attackCooldownMin,
+    e.attackCooldownMax
+  );
+
+  // Elite enemies get a small visual cue.
+  if(elite && e.sprite){
+    e.sprite.setTint(0xfff45c);
+    this.time.delayedCall(800, ()=>{
+      if(e && e.sprite && !e.dead){
+        e.sprite.clearTint();
+      }
+    });
+  }
+
+  if(elite){
+    e.enemyAuth = "ELITE";
+    if(e.authText){
+      e.authText.setText("ELITE");
+      e.authText.setFill("#fff45c");
+    }
+  }
+
+  if(this.updateEnemyHealthBar){
+    this.updateEnemyHealthBar(e);
+  }
+};
+
+/* Override intro enemy spawn so wave scaling applies cleanly */
+Game.prototype.spawnIntroEnemy = function(sourceX, sourceY, spawn, delay, sourceKind){
+  this.time.delayedCall(delay, ()=>{
+    const e = this.spawnEnemyType(
+      spawn.type,
+      sourceX,
+      sourceY,
+      spawn.platform
+    );
+
+    this.applyWaveScalingToEnemy(e, spawn);
+
+    e.busy = true;
+    e.transitioning = true;
+    e.invulnerable = true;
+    e.state = "intro";
+    e.vx = 0;
+    e.attackCooldown = 999999;
+    e.homeY = sourceY;
+
+    this.safeEnemyPlay(e,"knockback");
+
+    const startX = sourceX;
+    const startY = sourceY;
+    const endX = spawn.x;
+    const endY = spawn.y;
+
+    const jumpHeight = sourceKind === "helicopter" ? 35 : 70;
+    const duration = sourceKind === "helicopter" ? 760 : 560;
+
+    this.tweens.addCounter({
+      from:0,
+      to:1,
+      duration:duration,
+      ease:"Linear",
+      onUpdate:tween=>{
+        const t = tween.getValue();
+
+        e.x = Phaser.Math.Linear(startX, endX, t);
+        e.y = Phaser.Math.Linear(startY, endY, t) - Math.sin(t * Math.PI) * jumpHeight;
+        e.homeY = e.y;
+
+        this.updateEnemyVisuals(e);
+      },
+      onComplete:()=>{
+        e.x = endX;
+        e.y = endY;
+        e.homeY = endY;
+        e.platform = spawn.platform;
+        e.vx = 0;
+        e.busy = false;
+        e.transitioning = false;
+        e.invulnerable = false;
+        e.state = "idle";
+
+        e.attackCooldown = Phaser.Math.Between(
+          e.attackCooldownMin || 500,
+          e.attackCooldownMax || 950
+        );
+
+        if(this.assignEnemyTactic){
+          this.assignEnemyTactic(e,true);
+        }
+
+        this.safeEnemyPlay(e,"idle");
+        this.updateEnemyVisuals(e);
+        this.createHitFX(e.x, e.y - 50, "jump", 5);
+      }
+    });
+  });
+};
+
+/* Cleaner wave status text */
+const MP_ORIGINAL_SPAWN_ENEMY_WAVE_9WAVES = Game.prototype.spawnEnemyWave;
+
+Game.prototype.spawnEnemyWave = function(index){
+  if(!this.enemyWaves || index >= this.enemyWaves.length){
+    return false;
+  }
+
+  this.enemyWaveIndex = index;
+
+  const diff = this.getWaveDifficulty(index);
+  const waveName = diff.label || ("WAVE " + (index + 1));
+
+  if(this.zoneText){
+    this.zoneText.setText(waveName + " INCOMING");
+  }
+
+  return MP_ORIGINAL_SPAWN_ENEMY_WAVE_9WAVES.call(this,index);
+};
+
+/* Better transition text between waves */
+Game.prototype.advanceEnemyWaveOrBoss = function(){
+  if(this.waveSpawning) return;
+
+  const aliveNormalEnemies = this.getAliveNormalEnemyCount();
+
+  if(aliveNormalEnemies > 0){
+    return;
+  }
+
+  const nextWave = this.enemyWaveIndex + 1;
+
+  if(this.enemyWaves && nextWave < this.enemyWaves.length){
+    this.waveSpawning = true;
+
+    const diff = this.getWaveDifficulty(nextWave);
+    const waveName = diff.label || ("WAVE " + (nextWave + 1));
+
+    if(this.zoneText){
+      this.zoneText.setText(waveName + " INCOMING");
+    }
+
+    this.time.delayedCall(1000, ()=>{
+      this.spawnEnemyWave(nextWave);
+    });
+
+    return;
+  }
+
+  // After wave 9, spawn Doorman.
+  if(!this.doormanSpawned){
+    if(DISABLE_DOORMAN_FOR_TEST){
+      this.showVictory();
+    }else{
+      if(this.zoneText){
+        this.zoneText.setText("DOORMAN APPROACHING");
+      }
+
+      this.time.delayedCall(900, ()=>{
+        this.spawnDoormanIntro();
+      });
+    }
+  }
+};
+
+/* =========================================================
+   END 9-WAVE ENEMY PROGRESSION PATCH
+========================================================= */
+/* =========================================================
+   LEFTY LOWER STREET SCREEN PATCH — AREA DEFINED VERSION
+   - Main Lefty's/outdoor screen -> lower street screen
+   - Lower screen has defined top/middle/bottom combat areas
+   - Enemies follow between screens and keep fighting
+   - Top area = street for future cars/buses
+   - Middle/bottom = open fighting space
+========================================================= */
+
+const LEFTY_SCREEN_MAIN_V2 = "lefty_main";
+const LEFTY_SCREEN_LOWER_V2 = "lefty_lower";
+
+/*
+  LOWER STREET AREA MAP
+  H = 540
+
+  top:
+    upper street / crossing area
+    wide enough for future cars and buses
+
+  middle:
+    main lower combat floor
+
+  bottom:
+    front lower combat lane
+
+  left stair:
+    connects upper street to lower combat floor
+*/
+function getLeftyLowerBounds(){
+  return {
+    top: {
+      minX: 70,
+      maxX: W - 70,
+      minY: 150,
+      maxY: 150
+    },
+    middle: {
+      minX: 80,
+      maxX: W - 80,
+      minY: 382,
+      maxY: 382
+    },
+    bottom: {
+      minX: 85,
+      maxX: W - 85,
+      minY: 505,
+      maxY: 505
+    }
+  };
+}
+
+function getLeftyLowerPlatformY(platform){
+  const b = getLeftyLowerBounds()[platform] || getLeftyLowerBounds().middle;
+  return Math.round((b.minY + b.maxY) * 0.5);
+}
+
+const LEFTY_LOWER_STAIR = {
+  name: "lower_left_stair",
+  x: 112,
+  y: 285,
+  w: 140,
+  h: 260,
+
+  topX: 115,
+  topY: 150,
+  topPlatform: "top",
+
+  middleX: 145,
+  middleY: 382,
+  bottomPlatform: "middle"
+};
+
+Game.prototype.isLeftyOutdoorLevel = function(){
+  return selectedLevel === "outdoor";
+};
+
+Game.prototype.isLeftyLowerScreen = function(){
+  return this.isLeftyOutdoorLevel && this.isLeftyOutdoorLevel() &&
+    this.leftyScreen === LEFTY_SCREEN_LOWER_V2;
+};
+
+Game.prototype.getLeftyScreenTexture = function(){
+  if(this.leftyScreen === LEFTY_SCREEN_LOWER_V2 && hasTex(this,"lefty_lower_street")){
+    return "lefty_lower_street";
+  }
+
+  return hasTex(this,"outdoor") ? "outdoor" : selectedLevel;
+};
+
+Game.prototype.setupLeftyScreenSystem = function(){
+  if(!this.isLeftyOutdoorLevel()) return;
+
+  this.leftyScreen = LEFTY_SCREEN_MAIN_V2;
+  this.leftyScreenTransitioning = false;
+  this.lowerLaneShiftBusy = false;
+
+  this.leftyScreenBg = this.add.image(CX, CY, this.getLeftyScreenTexture())
+    .setDisplaySize(W, H)
+    .setDepth(1);
+
+  this.leftyScreenPrompt = this.add.text(CX, H - 92, "", {
+    font: "16px monospace",
+    fill: "#7CFF6B",
+    backgroundColor: "#000000",
+    stroke: "#000000",
+    strokeThickness: 3
+  })
+    .setOrigin(0.5)
+    .setDepth(12000)
+    .setScrollFactor(0);
+};
+
+const MP_ORIGINAL_GAME_CREATE_LEFTY_SCREEN_V2 = Game.prototype.create;
+
+Game.prototype.create = function(){
+  MP_ORIGINAL_GAME_CREATE_LEFTY_SCREEN_V2.call(this);
+  this.setupLeftyScreenSystem();
+};
+
+/* =========================================================
+   AREA / BOUNDS OVERRIDES
+========================================================= */
+
+const MP_ORIGINAL_GET_CURRENT_PLATFORM_BOUNDS_V2 = Game.prototype.getCurrentPlatformBounds;
+
+Game.prototype.getCurrentPlatformBounds = function(){
+  if(this.isLeftyLowerScreen()){
+    const bounds = getLeftyLowerBounds();
+    return bounds[this.platform] || bounds.middle;
+  }
+
+  if(MP_ORIGINAL_GET_CURRENT_PLATFORM_BOUNDS_V2){
+    return MP_ORIGINAL_GET_CURRENT_PLATFORM_BOUNDS_V2.call(this);
+  }
+
+  return PLATFORM_BOUNDS[this.platform] || PLATFORM_BOUNDS.middle;
+};
+
+Game.prototype.applyPlatformBounds = function(){
+  const bounds = this.getCurrentPlatformBounds();
+
+  this.player.x = Phaser.Math.Clamp(
+    this.player.x,
+    bounds.minX,
+    bounds.maxX
+  );
+
+  if(this.isLeftyLowerScreen()){
+    this.player.y = getLeftyLowerPlatformY(this.platform);
+  }else{
+    this.player.y = getPlatformY(this.platform);
+  }
+};
+
+/* =========================================================
+   SCREEN TRANSITION
+========================================================= */
+
+Game.prototype.updateLeftyScreenPrompt = function(){
+  if(!this.isLeftyOutdoorLevel()) return;
+  if(!this.leftyScreenPrompt || !this.player) return;
+
+  if(this.leftyScreenTransitioning || this.pauseMenuOpen || this.matchOver){
+    this.leftyScreenPrompt.setText("");
+    return;
+  }
+
+  if(this.leftyScreen === LEFTY_SCREEN_MAIN_V2 && this.platform === "bottom"){
+    this.leftyScreenPrompt.setText("HOLD DOWN: CROSS STREET");
+    return;
+  }
+
+  if(this.leftyScreen === LEFTY_SCREEN_LOWER_V2){
+    if(this.platform === "top"){
+      this.leftyScreenPrompt.setText("HOLD UP: BACK TO LEFTY'S    HOLD DOWN NEAR STAIRS");
+      return;
+    }
+
+    if(this.platform === "middle"){
+      this.leftyScreenPrompt.setText("DOWN: FRONT LANE    UP NEAR STAIRS: STREET");
+      return;
+    }
+
+    if(this.platform === "bottom"){
+      this.leftyScreenPrompt.setText("UP: MAIN FIGHT LANE");
+      return;
+    }
+  }
+
+  this.leftyScreenPrompt.setText("");
+};
+
+Game.prototype.checkLeftyScreenTransition = function(){
+  if(!this.isLeftyOutdoorLevel()) return;
+  if(this.leftyScreenTransitioning) return;
+  if(!this.matchStarted || this.matchOver || this.pauseMenuOpen) return;
+  if(this.waveSpawning || this.doormanIntroActive) return;
+  if(this.playerBusy || this.isClimbing || this.isJumping) return;
+
+  // Main Lefty's screen -> lower street.
+  if(this.leftyScreen === LEFTY_SCREEN_MAIN_V2){
+    if(this.platform === "bottom" && this.moveY > 0.65){
+      this.startLeftyScreenTransition(LEFTY_SCREEN_LOWER_V2);
+      return;
+    }
+  }
+
+  // Lower street -> back to Lefty's screen.
+  if(this.leftyScreen === LEFTY_SCREEN_LOWER_V2){
+    if(this.platform === "top" && this.moveY < -0.65){
+      this.startLeftyScreenTransition(LEFTY_SCREEN_MAIN_V2);
+      return;
+    }
+  }
+};
+
+Game.prototype.startLeftyScreenTransition = function(targetScreen){
+  if(this.leftyScreenTransitioning) return;
+
+  this.leftyScreenTransitioning = true;
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 900;
+
+  if(this.clearGrabTimers){
+    this.clearGrabTimers();
+  }
+
+  if(this.grabbedEnemy){
+    this.grabbedEnemy.grabbed = false;
+    this.grabbedEnemy.busy = false;
+    this.grabbedEnemy = null;
+    this.grabMode = "none";
+  }
+
+  const fade = this.add.rectangle(CX, CY, W, H, 0x000000, 0)
+    .setDepth(30000)
+    .setScrollFactor(0);
+
+  const labelText = targetScreen === LEFTY_SCREEN_LOWER_V2
+    ? "CROSSING STREET"
+    : "LEFTY'S";
+
+  const label = this.add.text(CX, CY, labelText, {
+    font: "42px monospace",
+    fill: "#ff4fc3",
+    stroke: "#000000",
+    strokeThickness: 7
+  })
+    .setOrigin(0.5)
+    .setAlpha(0)
+    .setDepth(30001)
+    .setScrollFactor(0);
+
+  this.tweens.add({
+    targets: [fade, label],
+    alpha: 1,
+    duration: 220,
+    ease: "Linear",
+    onComplete: ()=>{
+      this.finishLeftyScreenSwap(targetScreen);
+
+      this.tweens.add({
+        targets: [fade, label],
+        alpha: 0,
+        duration: 260,
+        delay: 150,
+        ease: "Linear",
+        onComplete: ()=>{
+          fade.destroy();
+          label.destroy();
+
+          this.leftyScreenTransitioning = false;
+          this.forcePlayerReady();
+        }
+      });
+    }
+  });
+};
+
+Game.prototype.finishLeftyScreenSwap = function(targetScreen){
+  this.leftyScreen = targetScreen;
+
+  if(this.leftyScreenBg){
+    this.leftyScreenBg.setTexture(this.getLeftyScreenTexture());
+    this.leftyScreenBg.setDisplaySize(W, H);
+    this.leftyScreenBg.setDepth(1);
+  }
+
+  // Hide original Lefty's foreground-only overlay on lower street.
+  if(this.barricadeFront){
+    this.barricadeFront.setVisible(targetScreen === LEFTY_SCREEN_MAIN_V2);
+  }
+
+  if(targetScreen === LEFTY_SCREEN_LOWER_V2){
+    // Enter on the upper street so it feels like crossing from Lefty's.
+    this.platform = "top";
+    this.player.x = Phaser.Math.Clamp(this.player.x, 180, W - 180);
+    this.player.y = getLeftyLowerPlatformY("top");
+
+    if(this.zoneText){
+      this.zoneText.setText("UPPER STREET");
+    }
+  }else{
+    // Return to original outdoor screen on bottom lane.
+    this.platform = "bottom";
+    this.player.x = Phaser.Math.Clamp(this.player.x, 180, W - 180);
+    this.player.y = getPlatformY("bottom");
+
+    if(this.zoneText){
+      this.zoneText.setText("LEFTY'S OUTSIDE");
+    }
+  }
+
+  if(this.shadow){
+    this.shadow.x = this.player.x;
+    this.shadow.y = this.player.y + 5;
+  }
+
+  this.moveLivingEnemiesToLeftyScreen(targetScreen);
+};
+
+Game.prototype.moveLivingEnemiesToLeftyScreen = function(targetScreen){
+  if(!this.enemies || !this.player) return;
+
+  const aliveEnemies = this.enemies.filter(e=>{
+    return e && !e.dead && e.state !== "dead" && e.health > 0;
+  });
+
+  this.enemies.forEach(e=>{
+    if(!e) return;
+
+    if(e.dead || e.state === "dead" || e.health <= 0){
+      if(this.hideEnemyUI) this.hideEnemyUI(e);
+      if(e.sprite && e.sprite.destroy) e.sprite.destroy();
+      if(e.shadow && e.shadow.destroy) e.shadow.destroy();
+    }
+  });
+
+  this.enemies = aliveEnemies;
+
+  const enemyPlatform = targetScreen === LEFTY_SCREEN_LOWER_V2 ? "top" : "bottom";
+  const enemyY = targetScreen === LEFTY_SCREEN_LOWER_V2
+    ? getLeftyLowerPlatformY("top")
+    : getPlatformY("bottom");
+
+  aliveEnemies.forEach((e, index)=>{
+    const side = index % 2 === 0 ? -1 : 1;
+    const spread = 95 + Math.floor(index / 2) * 58;
+
+    e.platform = enemyPlatform;
+    e.homeY = enemyY;
+    e.y = enemyY;
+    e.x = Phaser.Math.Clamp(this.player.x + side * spread, 140, W - 140);
+
+    e.vx = 0;
+    e.busy = false;
+    e.transitioning = false;
+    e.grabbed = false;
+    e.thrownTime = 0;
+    e.knockbackTime = 0;
+    e.state = "idle";
+    e.attackCooldown = Phaser.Math.Between(650, 1300);
+
+    if(this.assignEnemyTactic){
+      this.assignEnemyTactic(e, true);
+    }
+
+    this.safeEnemyPlay(e, "idle");
+
+    if(this.updateEnemyHealthBar){
+      this.updateEnemyHealthBar(e);
+    }
+
+    this.updateEnemyVisuals(e);
+  });
+};
+
+/* =========================================================
+   LOWER STREET AREA TRANSITIONS
+========================================================= */
+
+Game.prototype.isNearLowerStreetStairs = function(){
+  if(!this.player) return false;
+
+  return (
+    Math.abs(this.player.x - LEFTY_LOWER_STAIR.x) < 75 &&
+    (
+      this.platform === "top" ||
+      this.platform === "middle"
+    )
+  );
+};
+
+Game.prototype.startLowerStreetStairTravel = function(direction){
+  if(!this.isLeftyLowerScreen()) return;
+  if(this.lowerLaneShiftBusy) return;
+  if(this.playerBusy || this.isClimbing || this.isJumping || this.playerHealth <= 0) return;
+
+  this.lowerLaneShiftBusy = true;
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 760;
+
+  const fromX = this.player.x;
+  const fromY = this.player.y;
+
+  const toX = direction === "down"
+    ? LEFTY_LOWER_STAIR.middleX
+    : LEFTY_LOWER_STAIR.topX;
+
+  const toY = direction === "down"
+    ? LEFTY_LOWER_STAIR.middleY
+    : LEFTY_LOWER_STAIR.topY;
+
+  this.lastDir = "side";
+  this.player.setFlipX(direction === "up");
+
+  safePlay(this.player, this.getPlayerAnim("walk_side"));
+
+  this.tweens.addCounter({
+    from: 0,
+    to: 1,
+    duration: 620,
+    ease: "Sine.easeInOut",
+    onUpdate: tween=>{
+      const t = tween.getValue();
+      this.player.x = Phaser.Math.Linear(fromX, toX, t);
+      this.player.y = Phaser.Math.Linear(fromY, toY, t);
+
+      if(this.shadow){
+        this.shadow.x = this.player.x;
+        this.shadow.y = this.player.y + 5;
+      }
+    },
+    onComplete: ()=>{
+      if(direction === "down"){
+        this.platform = "middle";
+        this.player.x = toX;
+        this.player.y = getLeftyLowerPlatformY("middle");
+
+        if(this.zoneText){
+          this.zoneText.setText("LOWER COMBAT FLOOR");
+        }
+      }else{
+        this.platform = "top";
+        this.player.x = toX;
+        this.player.y = getLeftyLowerPlatformY("top");
+
+        if(this.zoneText){
+          this.zoneText.setText("UPPER STREET");
+        }
+      }
+
+      this.lowerLaneShiftBusy = false;
+      this.forcePlayerReady();
+    }
+  });
+};
+
+Game.prototype.startLowerStreetLaneShift = function(targetPlatform){
+  if(!this.isLeftyLowerScreen()) return;
+  if(this.lowerLaneShiftBusy) return;
+  if(this.playerBusy || this.isClimbing || this.isJumping || this.playerHealth <= 0) return;
+
+  this.lowerLaneShiftBusy = true;
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 420;
+
+  const fromY = this.player.y;
+  const toY = getLeftyLowerPlatformY(targetPlatform);
+
+  safePlay(this.player, this.getPlayerAnim("walk_down"));
+
+  this.tweens.add({
+    targets: this.player,
+    y: toY,
+    duration: 320,
+    ease: "Sine.easeInOut",
+    onUpdate: ()=>{
+      if(this.shadow){
+        this.shadow.x = this.player.x;
+        this.shadow.y = this.player.y + 5;
+      }
+    },
+    onComplete: ()=>{
+      this.platform = targetPlatform;
+      this.player.y = toY;
+
+      if(this.zoneText){
+        this.zoneText.setText(
+          targetPlatform === "middle"
+            ? "LOWER COMBAT FLOOR"
+            : "FRONT COMBAT LANE"
+        );
+      }
+
+      this.lowerLaneShiftBusy = false;
+      this.forcePlayerReady();
+    }
+  });
+};
+
+const MP_ORIGINAL_HANDLE_PLATFORM_TRANSITIONS_V2 = Game.prototype.handlePlatformTransitions;
+
+Game.prototype.handlePlatformTransitions = function(){
+  if(this.isLeftyLowerScreen()){
+    if(this.playerBusy || this.isClimbing || this.isJumping){
+      return;
+    }
+
+    // Upper street -> lower combat floor through left stairs.
+    if(this.platform === "top" && this.moveY > 0.65 && this.isNearLowerStreetStairs()){
+      this.startLowerStreetStairTravel("down");
+      return;
+    }
+
+    // Lower combat floor -> upper street through left stairs.
+    if(this.platform === "middle" && this.moveY < -0.65 && this.isNearLowerStreetStairs()){
+      this.startLowerStreetStairTravel("up");
+      return;
+    }
+
+    // Lower open combat floor -> front combat lane.
+    if(this.platform === "middle" && this.moveY > 0.65){
+      this.startLowerStreetLaneShift("bottom");
+      return;
+    }
+
+    // Front combat lane -> lower open combat floor.
+    if(this.platform === "bottom" && this.moveY < -0.65){
+      this.startLowerStreetLaneShift("middle");
+      return;
+    }
+
+    return;
+  }
+
+  MP_ORIGINAL_HANDLE_PLATFORM_TRANSITIONS_V2.call(this);
+};
+
+/* =========================================================
+   ENEMY ROUTING ON LOWER STREET
+========================================================= */
+
+const MP_ORIGINAL_GET_ENEMY_ROUTE_V2 = Game.prototype.getEnemyRoute;
+
+Game.prototype.getEnemyRoute = function(e){
+  if(this.isLeftyLowerScreen()){
+    if(!e || e.platform === this.platform) return null;
+
+    // Enemy on upper street must use the left stairs to reach lower floor.
+    if(e.platform === "top"){
+      return {
+        kind: "stair",
+        x: LEFTY_LOWER_STAIR.x,
+        to: "middle",
+        destY: getLeftyLowerPlatformY("middle")
+      };
+    }
+
+    // Enemy on lower floor needs street: use stairs.
+    if(e.platform === "middle" && this.platform === "top"){
+      return {
+        kind: "stair",
+        x: LEFTY_LOWER_STAIR.x,
+        to: "top",
+        destY: getLeftyLowerPlatformY("top")
+      };
+    }
+
+    // Enemy on front lane needs main lower floor.
+    if(e.platform === "bottom"){
+      return {
+        kind: "lane",
+        x: e.x,
+        to: "middle",
+        destY: getLeftyLowerPlatformY("middle")
+      };
+    }
+
+    // Enemy on middle floor needs front lane.
+    if(e.platform === "middle" && this.platform === "bottom"){
+      return {
+        kind: "lane",
+        x: e.x,
+        to: "bottom",
+        destY: getLeftyLowerPlatformY("bottom")
+      };
+    }
+
+    return null;
+  }
+
+  return MP_ORIGINAL_GET_ENEMY_ROUTE_V2.call(this, e);
+};
+
+const MP_ORIGINAL_GET_PLATFORM_CENTER_Y_V2 = Game.prototype.getPlatformCenterY;
+
+Game.prototype.getPlatformCenterY = function(platform){
+  if(this.isLeftyLowerScreen()){
+    return getLeftyLowerPlatformY(platform);
+  }
+
+  if(MP_ORIGINAL_GET_PLATFORM_CENTER_Y_V2){
+    return MP_ORIGINAL_GET_PLATFORM_CENTER_Y_V2.call(this, platform);
+  }
+
+  return getPlatformY(platform);
+};
+
+const MP_ORIGINAL_FINISH_ENEMY_MOVE_V2 = Game.prototype.finishEnemyMove;
+
+Game.prototype.finishEnemyMove = function(e, dt){
+  if(this.isLeftyLowerScreen()){
+    if(!e) return;
+
+    e.vx = Phaser.Math.Clamp(e.vx || 0, -260, 260);
+    e.x += e.vx * dt;
+
+    const bounds = getLeftyLowerBounds()[e.platform] || getLeftyLowerBounds().middle;
+    e.x = Phaser.Math.Clamp(e.x, bounds.minX, bounds.maxX);
+
+    this.updateEnemyVisuals(e);
+    return;
+  }
+
+  MP_ORIGINAL_FINISH_ENEMY_MOVE_V2.call(this, e, dt);
+};
+
+const MP_ORIGINAL_SYNC_ENEMY_LANE_V2 = Game.prototype.syncEnemyLane;
+
+Game.prototype.syncEnemyLane = function(e, delta){
+  if(this.isLeftyLowerScreen()){
+    if(!e || !this.player) return;
+
+    const bounds = getLeftyLowerBounds()[e.platform] || getLeftyLowerBounds().middle;
+
+    const targetY = Phaser.Math.Clamp(
+      this.player.y + (e.laneOffset || 0),
+      bounds.minY,
+      bounds.maxY
+    );
+
+    const follow = e.enemyType === "corpo_sellout" ? 0.045 : 0.035;
+
+    e.homeY = Phaser.Math.Linear(e.homeY, targetY, follow);
+    e.y = e.homeY;
+
+    return;
+  }
+
+  MP_ORIGINAL_SYNC_ENEMY_LANE_V2.call(this, e, delta);
+};
+
+/* =========================================================
+   UPDATE HOOK
+========================================================= */
+
+const MP_ORIGINAL_SAFE_UPDATE_LEFTY_SCREEN_V2 = Game.prototype.safeUpdate;
+
+Game.prototype.safeUpdate = function(time, delta){
+  MP_ORIGINAL_SAFE_UPDATE_LEFTY_SCREEN_V2.call(this, time, delta);
+
+  this.updateLeftyScreenPrompt();
+  this.checkLeftyScreenTransition();
+};
+
+/* =========================================================
+   END LEFTY LOWER STREET SCREEN PATCH — AREA DEFINED VERSION
 ========================================================= */
   const config = {
   parent: "game",
