@@ -12093,6 +12093,720 @@ if(typeof Game !== "undefined" && !Game.prototype.mpTitleLandingFoodHudBusWrappe
 /* =========================================================
    END PATCH
 ========================================================= */
+  /* =========================================================
+   OUTDOOR MAP CHAIN + TOGGLE STICK PATCH
+   - Lefty's Outdoor -> University Street -> Theater -> Blakefield -> Crestwood
+   - Enemies follow between screens
+   - Pickups/weapons are screen-specific
+   - Adds toggle stick button: FIXED / FLOAT
+   Paste ABOVE: const config = {
+========================================================= */
+
+/* =========================================================
+   1) LOAD MAP ASSETS
+========================================================= */
+
+if(typeof loadAssets === "function" && !window.MP_OUTDOOR_CHAIN_LOAD_WRAPPED){
+  window.MP_OUTDOOR_CHAIN_LOAD_WRAPPED = true;
+
+  var MP_OLD_LOAD_ASSETS_OUTDOOR_CHAIN = loadAssets;
+
+  loadAssets = function(scene){
+    MP_OLD_LOAD_ASSETS_OUTDOOR_CHAIN(scene);
+
+    scene.load.image("university_street", "assets/levels/university_street.png?v=" + VERSION);
+    scene.load.image("theater", "assets/levels/theater.png?v=" + VERSION);
+    scene.load.image("blakefield", "assets/levels/blakefield.png?v=" + VERSION);
+    scene.load.image("crestwood", "assets/levels/crestwood.png?v=" + VERSION);
+  };
+}
+
+/* =========================================================
+   2) SCREEN DEFINITIONS
+========================================================= */
+
+var MP_SCREEN_LEFTYS = "leftys_outdoor";
+var MP_SCREEN_UNIVERSITY = "university_street";
+var MP_SCREEN_THEATER = "theater";
+var MP_SCREEN_BLAKEFIELD = "blakefield";
+var MP_SCREEN_CRESTWOOD = "crestwood";
+
+var MP_OUTDOOR_SCREENS = {
+  leftys_outdoor:{
+    key:"leftys_outdoor",
+    asset:"outdoor",
+    label:"LEFTY'S OUTDOOR",
+    platform:"middle",
+    customBounds:false,
+    leftTo:"university_street",
+    rightTo:null,
+    spawn:{x:135,y:392}
+  },
+
+  university_street:{
+    key:"university_street",
+    asset:"university_street",
+    label:"UNIVERSITY STREET",
+    platform:"university_street",
+    customBounds:true,
+    leftTo:"theater",
+    rightTo:"leftys_outdoor",
+    spawn:{x:850,y:370},
+    returnRight:{x:120,y:370},
+    bounds:{
+      minX:70,
+      maxX:910,
+      minY:325,
+      maxY:505
+    }
+  },
+
+  theater:{
+    key:"theater",
+    asset:"theater",
+    label:"THEATER",
+    platform:"theater",
+    customBounds:true,
+    leftTo:"blakefield",
+    rightTo:"university_street",
+    spawn:{x:885,y:372},
+    returnRight:{x:120,y:372},
+    bounds:{
+      minX:70,
+      maxX:915,
+      minY:258,
+      maxY:405
+    }
+  },
+
+  blakefield:{
+    key:"blakefield",
+    asset:"blakefield",
+    label:"BLAKEFIELD",
+    platform:"blakefield",
+    customBounds:true,
+    leftTo:"crestwood",
+    rightTo:"theater",
+    spawn:{x:875,y:405},
+    returnRight:{x:120,y:405},
+    bounds:{
+      minX:70,
+      maxX:915,
+      minY:315,
+      maxY:452
+    }
+  },
+
+  crestwood:{
+    key:"crestwood",
+    asset:"crestwood",
+    label:"CRESTWOOD",
+    platform:"crestwood",
+    customBounds:true,
+    leftTo:null,
+    rightTo:"blakefield",
+
+    // Spawn at the X on the right side.
+    spawn:{x:875,y:390},
+
+    // Fight lane:
+    // top squiggly line = upper wall
+    // bottom white line = car-lane wall
+    bounds:{
+      minX:70,
+      maxX:915,
+      minY:305,
+      maxY:432
+    }
+  }
+};
+
+/* Add custom platforms to PLATFORM_BOUNDS so enemy/item helpers do not crash. */
+if(typeof PLATFORM_BOUNDS !== "undefined"){
+  Object.keys(MP_OUTDOOR_SCREENS).forEach(function(key){
+    var def = MP_OUTDOOR_SCREENS[key];
+
+    if(def.customBounds && def.bounds){
+      PLATFORM_BOUNDS[def.platform] = {
+        minX:def.bounds.minX,
+        maxX:def.bounds.maxX,
+        minY:def.bounds.minY,
+        maxY:def.bounds.maxY
+      };
+    }
+  });
+}
+
+/* =========================================================
+   3) HELPERS
+========================================================= */
+
+function mpOutdoorIsActiveLevel(scene){
+  return typeof selectedLevel !== "undefined" && selectedLevel === "outdoor";
+}
+
+function mpGetOutdoorScreenKey(scene){
+  if(!scene) return MP_SCREEN_LEFTYS;
+  return scene.mpOutdoorScreen || MP_SCREEN_LEFTYS;
+}
+
+function mpGetOutdoorScreenDef(screenKey){
+  return MP_OUTDOOR_SCREENS[screenKey] || MP_OUTDOOR_SCREENS[MP_SCREEN_LEFTYS];
+}
+
+function mpGetOutdoorBounds(scene){
+  var def = mpGetOutdoorScreenDef(mpGetOutdoorScreenKey(scene));
+  return def && def.customBounds ? def.bounds : null;
+}
+
+function mpEnsureOutdoorBg(scene){
+  if(!scene || !mpOutdoorIsActiveLevel(scene)) return;
+
+  if(scene.mpOutdoorBg && !scene.mpOutdoorBg.destroyed){
+    return;
+  }
+
+  var baseKey = hasTex(scene, "outdoor") ? "outdoor" : selectedLevel;
+
+  scene.mpOutdoorBg = scene.add.image(CX, CY, baseKey)
+    .setDisplaySize(W, H)
+    .setDepth(1);
+}
+
+function mpSetOutdoorBg(scene, screenKey){
+  if(!scene || !mpOutdoorIsActiveLevel(scene)) return;
+
+  mpEnsureOutdoorBg(scene);
+
+  var def = mpGetOutdoorScreenDef(screenKey);
+  var assetKey = def.asset;
+
+  if(scene.mpOutdoorBg){
+    if(hasTex(scene, assetKey)){
+      scene.mpOutdoorBg.setTexture(assetKey);
+    }else{
+      scene.mpOutdoorBg.setTexture(hasTex(scene, "outdoor") ? "outdoor" : selectedLevel);
+    }
+
+    scene.mpOutdoorBg
+      .setDisplaySize(W, H)
+      .setDepth(1);
+  }
+}
+
+function mpSetVisibleDeep(obj, visible){
+  if(!obj) return;
+
+  if(obj.setVisible){
+    obj.setVisible(visible);
+  }
+
+  if(obj.children && obj.children.each){
+    obj.children.each(function(child){
+      if(child && child.setVisible){
+        child.setVisible(visible);
+      }
+    });
+  }
+}
+
+function mpUpdateScreenObjects(scene){
+  if(!scene) return;
+
+  var screenKey = mpGetOutdoorScreenKey(scene);
+  var onLeftys = screenKey === MP_SCREEN_LEFTYS;
+
+  // Hide Lefty's-specific foreground objects on side maps.
+  if(scene.barricadeFront){
+    mpSetVisibleDeep(scene.barricadeFront, onLeftys);
+  }
+
+  // Screen-specific food/drink pickups.
+  if(scene.healthItemPickups){
+    scene.healthItemPickups.forEach(function(p){
+      if(!p) return;
+
+      var visible =
+        !p.pickedUp &&
+        (!p.screenKey || p.screenKey === screenKey);
+
+      if(p.obj) p.obj.setVisible(visible);
+      if(p.label) p.label.setVisible(visible);
+    });
+  }
+
+  // Screen-specific weapons.
+  if(scene.weaponPickups){
+    scene.weaponPickups.forEach(function(p){
+      if(!p) return;
+
+      var visible =
+        !p.pickedUp &&
+        (!p.screenKey || p.screenKey === screenKey);
+
+      if(p.obj) p.obj.setVisible(visible);
+      if(p.label) p.label.setVisible(visible);
+    });
+  }
+}
+
+function mpMoveEnemiesToOutdoorScreen(scene, screenKey, spawn){
+  if(!scene || !scene.enemies || !spawn) return;
+
+  var def = mpGetOutdoorScreenDef(screenKey);
+  var bounds = def.bounds || {minX:120,maxX:860,minY:390,maxY:390};
+
+  scene.enemies.forEach(function(e){
+    if(!e || e.dead || e.state === "dead") return;
+
+    var enemyY = def.customBounds
+      ? Phaser.Math.Clamp(spawn.y + Phaser.Math.Between(-35, 35), bounds.minY + 15, bounds.maxY - 15)
+      : spawn.y;
+
+    e.platform = def.platform;
+    e.homeY = enemyY;
+    e.y = enemyY;
+
+    e.x = Phaser.Math.Clamp(
+      spawn.x + Phaser.Math.Between(-260, 260),
+      bounds.minX + 40,
+      bounds.maxX - 40
+    );
+
+    e.vx = 0;
+    e.busy = false;
+    e.transitioning = false;
+    e.attackCooldown = Phaser.Math.Between(450, 1100);
+
+    if(scene.safeEnemyPlay){
+      scene.safeEnemyPlay(e, "idle");
+    }
+
+    if(scene.updateEnemyVisuals){
+      scene.updateEnemyVisuals(e);
+    }
+  });
+}
+
+function mpSwitchOutdoorScreen(scene, screenKey, spawnOverride){
+  if(!scene || !mpOutdoorIsActiveLevel(scene)) return;
+
+  var def = mpGetOutdoorScreenDef(screenKey);
+  var spawn = spawnOverride || def.spawn || {x:470,y:390};
+
+  scene.mpOutdoorScreen = def.key;
+  scene.platform = def.platform;
+
+  mpSetOutdoorBg(scene, def.key);
+
+  if(scene.player){
+    scene.player.x = spawn.x;
+    scene.player.y = spawn.y;
+  }
+
+  if(scene.shadow){
+    scene.shadow.x = spawn.x;
+    scene.shadow.y = spawn.y + 5;
+  }
+
+  mpMoveEnemiesToOutdoorScreen(scene, def.key, spawn);
+
+  if(scene.zoneText){
+    scene.zoneText.setText(def.label);
+  }
+
+  if(scene.populateHealthItemsForScreen){
+    scene.populateHealthItemsForScreen(def.key);
+  }
+
+  if(scene.populateRandomWeaponsForScreen){
+    scene.populateRandomWeaponsForScreen(def.key);
+  }
+
+  if(scene.forcePlayerReady){
+    scene.forcePlayerReady();
+  }
+
+  mpUpdateScreenObjects(scene);
+}
+
+/* =========================================================
+   4) SPAWN POINTS FOR ITEMS / WEAPONS
+========================================================= */
+
+var MP_HEALTH_POINTS_BY_SCREEN = {
+  university_street:[
+    {x:150,y:392,platform:"university_street"},
+    {x:285,y:375,platform:"university_street"},
+    {x:430,y:365,platform:"university_street"},
+    {x:585,y:370,platform:"university_street"},
+    {x:735,y:392,platform:"university_street"}
+  ],
+
+  theater:[
+    {x:150,y:382,platform:"theater"},
+    {x:260,y:370,platform:"theater"},
+    {x:390,y:360,platform:"theater"},
+    {x:520,y:350,platform:"theater"},
+    {x:650,y:360,platform:"theater"},
+    {x:775,y:372,platform:"theater"}
+  ],
+
+  blakefield:[
+    {x:160,y:410,platform:"blakefield"},
+    {x:300,y:395,platform:"blakefield"},
+    {x:450,y:380,platform:"blakefield"},
+    {x:610,y:390,platform:"blakefield"},
+    {x:760,y:410,platform:"blakefield"}
+  ],
+
+  crestwood:[
+    {x:160,y:396,platform:"crestwood"},
+    {x:295,y:382,platform:"crestwood"},
+    {x:430,y:370,platform:"crestwood"},
+    {x:585,y:376,platform:"crestwood"},
+    {x:735,y:398,platform:"crestwood"}
+  ]
+};
+
+var MP_WEAPON_POINTS_BY_SCREEN = {
+  university_street:[
+    {x:185,y:405,platform:"university_street"},
+    {x:360,y:382,platform:"university_street"},
+    {x:535,y:370,platform:"university_street"},
+    {x:720,y:395,platform:"university_street"}
+  ],
+
+  theater:[
+    {x:185,y:385,platform:"theater"},
+    {x:325,y:368,platform:"theater"},
+    {x:485,y:355,platform:"theater"},
+    {x:640,y:363,platform:"theater"},
+    {x:800,y:378,platform:"theater"}
+  ],
+
+  blakefield:[
+    {x:190,y:418,platform:"blakefield"},
+    {x:365,y:398,platform:"blakefield"},
+    {x:535,y:382,platform:"blakefield"},
+    {x:700,y:398,platform:"blakefield"},
+    {x:835,y:420,platform:"blakefield"}
+  ],
+
+  crestwood:[
+    {x:190,y:405,platform:"crestwood"},
+    {x:340,y:388,platform:"crestwood"},
+    {x:500,y:375,platform:"crestwood"},
+    {x:675,y:392,platform:"crestwood"},
+    {x:825,y:408,platform:"crestwood"}
+  ]
+};
+
+/* =========================================================
+   5) PATCH GAME MAP BEHAVIOR
+========================================================= */
+
+if(typeof Game !== "undefined" && !Game.prototype.mpOutdoorChainWrapped){
+  Game.prototype.mpOutdoorChainWrapped = true;
+
+  var MP_OLD_GAME_CREATE_OUTDOOR_CHAIN = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MP_OLD_GAME_CREATE_OUTDOOR_CHAIN.call(this);
+
+    if(mpOutdoorIsActiveLevel(this)){
+      this.mpOutdoorScreen = MP_SCREEN_LEFTYS;
+      mpEnsureOutdoorBg(this);
+      mpSetOutdoorBg(this, MP_SCREEN_LEFTYS);
+      mpUpdateScreenObjects(this);
+    }
+  };
+
+  var MP_OLD_APPLY_BOUNDS_OUTDOOR_CHAIN = Game.prototype.applyPlatformBounds;
+
+  Game.prototype.applyPlatformBounds = function(){
+    if(mpOutdoorIsActiveLevel(this) && this.player){
+      var bounds = mpGetOutdoorBounds(this);
+
+      if(bounds){
+        this.player.x = Phaser.Math.Clamp(this.player.x, bounds.minX, bounds.maxX);
+        this.player.y = Phaser.Math.Clamp(this.player.y, bounds.minY, bounds.maxY);
+        return;
+      }
+    }
+
+    if(MP_OLD_APPLY_BOUNDS_OUTDOOR_CHAIN){
+      MP_OLD_APPLY_BOUNDS_OUTDOOR_CHAIN.call(this);
+    }
+  };
+
+  var MP_OLD_GAME_UPDATE_OUTDOOR_CHAIN = Game.prototype.update;
+
+  Game.prototype.update = function(time, delta){
+    if(MP_OLD_GAME_UPDATE_OUTDOOR_CHAIN){
+      MP_OLD_GAME_UPDATE_OUTDOOR_CHAIN.call(this, time, delta);
+    }
+
+    if(!mpOutdoorIsActiveLevel(this) || !this.player) return;
+
+    var screenKey = mpGetOutdoorScreenKey(this);
+    var def = mpGetOutdoorScreenDef(screenKey);
+    var bounds = def.customBounds ? def.bounds : null;
+
+    if(this.playerBusy || this.isJumping || this.isClimbing){
+      mpUpdateScreenObjects(this);
+      return;
+    }
+
+    // LEFT transition.
+    if(this.moveX < -0.35){
+      if(screenKey === MP_SCREEN_LEFTYS && this.player.x <= 123 && def.leftTo){
+        mpSwitchOutdoorScreen(this, def.leftTo);
+        return;
+      }
+
+      if(bounds && this.player.x <= bounds.minX + 2 && def.leftTo){
+        mpSwitchOutdoorScreen(this, def.leftTo);
+        return;
+      }
+    }
+
+    // RIGHT transition.
+    if(this.moveX > 0.35 && def.rightTo){
+      if(screenKey !== MP_SCREEN_LEFTYS && bounds && this.player.x >= bounds.maxX - 4){
+        var targetDef = mpGetOutdoorScreenDef(def.rightTo);
+        var returnSpawn = targetDef.returnRight || targetDef.spawn || {x:120,y:390};
+
+        mpSwitchOutdoorScreen(this, def.rightTo, returnSpawn);
+        return;
+      }
+    }
+
+    mpUpdateScreenObjects(this);
+  };
+
+  var MP_OLD_HEALTH_POINTS_OUTDOOR_CHAIN =
+    Game.prototype.getHealthItemSpawnPoints;
+
+  Game.prototype.getHealthItemSpawnPoints = function(screenKey){
+    if(MP_HEALTH_POINTS_BY_SCREEN[screenKey]){
+      return MP_HEALTH_POINTS_BY_SCREEN[screenKey];
+    }
+
+    if(MP_OLD_HEALTH_POINTS_OUTDOOR_CHAIN){
+      return MP_OLD_HEALTH_POINTS_OUTDOOR_CHAIN.call(this, screenKey);
+    }
+
+    return [];
+  };
+
+  var MP_OLD_WEAPON_POINTS_OUTDOOR_CHAIN =
+    Game.prototype.getRandomWeaponSpawnPoints;
+
+  Game.prototype.getRandomWeaponSpawnPoints = function(screenKey){
+    if(MP_WEAPON_POINTS_BY_SCREEN[screenKey]){
+      return MP_WEAPON_POINTS_BY_SCREEN[screenKey];
+    }
+
+    if(MP_OLD_WEAPON_POINTS_OUTDOOR_CHAIN){
+      return MP_OLD_WEAPON_POINTS_OUTDOOR_CHAIN.call(this, screenKey);
+    }
+
+    return [];
+  };
+
+  if(Game.prototype.spawnHealthItemPickup && !Game.prototype.mpOutdoorChainHealthSpawnWrapped){
+    Game.prototype.mpOutdoorChainHealthSpawnWrapped = true;
+
+    var MP_OLD_SPAWN_HEALTH_OUTDOOR_CHAIN =
+      Game.prototype.spawnHealthItemPickup;
+
+    Game.prototype.spawnHealthItemPickup = function(type, x, y, platform, screenKey){
+      if(!screenKey && this.mpOutdoorScreen){
+        screenKey = this.mpOutdoorScreen;
+      }
+
+      return MP_OLD_SPAWN_HEALTH_OUTDOOR_CHAIN.call(this, type, x, y, platform, screenKey);
+    };
+  }
+
+  if(Game.prototype.spawnWeaponPickup && !Game.prototype.mpOutdoorChainWeaponSpawnWrapped){
+    Game.prototype.mpOutdoorChainWeaponSpawnWrapped = true;
+
+    var MP_OLD_SPAWN_WEAPON_OUTDOOR_CHAIN =
+      Game.prototype.spawnWeaponPickup;
+
+    Game.prototype.spawnWeaponPickup = function(type, x, y, platform, screenKey){
+      if(!screenKey && this.mpOutdoorScreen){
+        screenKey = this.mpOutdoorScreen;
+      }
+
+      return MP_OLD_SPAWN_WEAPON_OUTDOOR_CHAIN.call(this, type, x, y, platform, screenKey);
+    };
+  }
+}
+
+/* =========================================================
+   6) TOGGLE STICK PATCH
+   - Adds STICK button near left controls
+   - FIXED = normal joystick
+   - FLOAT = joystick appears where you touch on left side
+========================================================= */
+
+if(typeof window.MP_STICK_FLOATING === "undefined"){
+  try{
+    window.MP_STICK_FLOATING =
+      localStorage.getItem("MP_STICK_FLOATING") === "1";
+  }catch(e){
+    window.MP_STICK_FLOATING = false;
+  }
+}
+
+if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
+  Game.prototype.mpToggleStickWrapped = true;
+
+  var MP_OLD_MAKE_MOBILE_CONTROLS_TOGGLE_STICK =
+    Game.prototype.makeMobileControls;
+
+  Game.prototype.makeMobileControls = function(){
+    MP_OLD_MAKE_MOBILE_CONTROLS_TOGGLE_STICK.call(this);
+
+    var scene = this;
+    var toggleX = 105;
+    var toggleY = H - 245;
+
+    var box = this.add.rectangle(toggleX, toggleY, 112, 32, 0x000000, 0.42)
+      .setStrokeStyle(2, 0xffffff, 0.35)
+      .setDepth(9600)
+      .setScrollFactor(0)
+      .setInteractive();
+
+    var label = this.add.text(toggleX, toggleY, "", {
+      font:"12px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:3
+    })
+      .setOrigin(0.5)
+      .setDepth(9601)
+      .setScrollFactor(0);
+
+    function refreshStickLabel(){
+      label.setText(window.MP_STICK_FLOATING ? "STICK: FLOAT" : "STICK: FIX");
+    }
+
+    refreshStickLabel();
+
+    box.on("pointerdown", function(p){
+      if(p && p.event && p.event.preventDefault){
+        p.event.preventDefault();
+      }
+
+      window.MP_STICK_FLOATING = !window.MP_STICK_FLOATING;
+
+      try{
+        localStorage.setItem("MP_STICK_FLOATING", window.MP_STICK_FLOATING ? "1" : "0");
+      }catch(e){}
+
+      refreshStickLabel();
+    });
+
+    if(!this.mobileUI){
+      this.mobileUI = {};
+    }
+
+    this.mobileUI.stickToggleBox = box;
+    this.mobileUI.stickToggleLabel = label;
+
+    var floatDragging = false;
+
+    function moveFloatingStick(p){
+      if(!scene.mobileUI || !scene.mobileUI.stickBase || !scene.mobileUI.stickKnob) return;
+
+      var base = scene.mobileUI.stickBase;
+      var knob = scene.mobileUI.stickKnob;
+
+      var dx = p.x - base.x;
+      var dy = p.y - base.y;
+
+      var max = 44 * (typeof CONTROL_ZOOM !== "undefined" ? CONTROL_ZOOM : 1);
+      var d = Math.sqrt(dx * dx + dy * dy);
+
+      if(d > max){
+        dx = (dx / d) * max;
+        dy = (dy / d) * max;
+      }
+
+      knob.x = base.x + dx;
+      knob.y = base.y + dy;
+
+      scene.stickX = dx / max;
+      scene.stickY = dy / max;
+    }
+
+    this.input.on("pointerdown", function(p){
+      if(!window.MP_STICK_FLOATING) return;
+      if(!p) return;
+
+      // Only use floating stick on left half of screen.
+      if(p.x > W * 0.42) return;
+
+      // Ignore tap directly on toggle button.
+      if(Math.abs(p.x - toggleX) < 75 && Math.abs(p.y - toggleY) < 45) return;
+
+      if(!scene.mobileUI || !scene.mobileUI.stickBase || !scene.mobileUI.stickKnob) return;
+
+      floatDragging = true;
+
+      scene.mobileUI.stickBase.x = p.x;
+      scene.mobileUI.stickBase.y = p.y;
+      scene.mobileUI.stickKnob.x = p.x;
+      scene.mobileUI.stickKnob.y = p.y;
+
+      scene.stickX = 0;
+      scene.stickY = 0;
+    });
+
+    this.input.on("pointermove", function(p){
+      if(!window.MP_STICK_FLOATING) return;
+      if(!floatDragging) return;
+
+      moveFloatingStick(p);
+    });
+
+    this.input.on("pointerup", function(){
+      if(!window.MP_STICK_FLOATING) return;
+
+      floatDragging = false;
+
+      if(scene.mobileUI && scene.mobileUI.stickBase && scene.mobileUI.stickKnob){
+        scene.mobileUI.stickKnob.x = scene.mobileUI.stickBase.x;
+        scene.mobileUI.stickKnob.y = scene.mobileUI.stickBase.y;
+      }
+
+      scene.stickX = 0;
+      scene.stickY = 0;
+    });
+
+    this.input.on("pointerupoutside", function(){
+      if(!window.MP_STICK_FLOATING) return;
+
+      floatDragging = false;
+
+      if(scene.mobileUI && scene.mobileUI.stickBase && scene.mobileUI.stickKnob){
+        scene.mobileUI.stickKnob.x = scene.mobileUI.stickBase.x;
+        scene.mobileUI.stickKnob.y = scene.mobileUI.stickBase.y;
+      }
+
+      scene.stickX = 0;
+      scene.stickY = 0;
+    });
+  };
+}
+
+/* =========================================================
+   END OUTDOOR MAP CHAIN + TOGGLE STICK PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
