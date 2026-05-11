@@ -10923,9 +10923,375 @@ if(Game.prototype.spawnWeaponPickup){
     return MP_ORIGINAL_SPAWN_WEAPON_ITEM_ARRAY_FIX.apply(this, arguments);
   };
 }
+/* =========================================================
+   FOOD FOUR-ITEM SHEET FIX
+   - Crops food images that are showing 4 items at once
+   - Forces small food display size
+   - Also fixes the test pizza if it exists
+========================================================= */
+
+const MP_FIXED_FOOD_W = 22;
+const MP_FIXED_FOOD_H = 22;
+const MP_FIXED_BIG_FOOD_W = 28;
+const MP_FIXED_BIG_FOOD_H = 28;
+
+function mpFixFoodPickupImage(obj, type){
+  if(!obj || !obj.texture) return obj;
+
+  const key = obj.texture.key || "";
+
+  if(key.indexOf("item_") !== 0) return obj;
+
+  try{
+    const tex = obj.scene.textures.get(key);
+    const src = tex && tex.source && tex.source[0];
+
+    if(src && src.width > 80 && src.height > 80){
+      // Most of your bad food images are 2x2 sheets.
+      const cropW = Math.floor(src.width / 2);
+      const cropH = Math.floor(src.height / 2);
+
+      obj.setCrop(0, 0, cropW, cropH);
+    }
+  }catch(e){}
+
+  const big =
+    type === "pizza" ||
+    type === "chicken" ||
+    type === "first_aid";
+
+  if(obj.setDisplaySize){
+    obj.setDisplaySize(
+      big ? MP_FIXED_BIG_FOOD_W : MP_FIXED_FOOD_W,
+      big ? MP_FIXED_BIG_FOOD_H : MP_FIXED_FOOD_H
+    );
+  }
+
+  return obj;
+}
+
+if(typeof Game !== "undefined"){
+  Game.prototype.makeHealthItemSprite = function(type, x, y){
+    const def = MP_HEALTH_ITEM_DEFS[type];
+    if(!def) return null;
+
+    let obj;
+
+    if(hasTex(this, def.key)){
+      obj = this.add.image(x, y, def.key)
+        .setOrigin(0.5, 0.5);
+
+      return mpFixFoodPickupImage(obj, type);
+    }
+
+    // Fallback placeholders.
+    if(type === "pizza"){
+      return this.add.triangle(x, y, -10, 8, 10, 8, 0, -9, 0xffcc55, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "chicken"){
+      return this.add.circle(x, y, 10, 0xd28a3c, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "soda" || type === "energy_drink" || type === "water"){
+      return this.add.rectangle(x, y, 11, 19, 0x55ccff, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "spliff"){
+      return this.add.rectangle(x, y, 20, 5, 0xe8e0c8, 1)
+        .setStrokeStyle(2, 0x000000)
+        .setRotation(-0.25);
+    }
+
+    return this.add.circle(x, y, 10, 0xffd35a, 1)
+      .setStrokeStyle(2, 0x000000);
+  };
+
+  // Fix any test food image already made inside Game.create().
+  const MP_ORIGINAL_CREATE_FOOD_FOUR_FIX = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MP_ORIGINAL_CREATE_FOOD_FOUR_FIX.call(this);
+
+    this.children.list.forEach(obj=>{
+      if(obj && obj.texture && obj.texture.key && obj.texture.key.indexOf("item_") === 0){
+        mpFixFoodPickupImage(obj, obj.texture.key.replace("item_", ""));
+      }
+    });
+  };
+}
 
 /* =========================================================
+   END FOOD FOUR-ITEM SHEET FIX
+========================================================= */
+/* =========================================================
    END ITEM ARRAY STARTUP FIX
+========================================================= */
+  /* =========================================================
+   PLAYER + ENEMY SPEED TUNING PATCH
+   - Player slower
+   - Enemies slower
+   - Enemies wait slightly longer between attacks
+========================================================= */
+
+const MP_PLAYER_SPEED_MULT = 0.72;
+const MP_ENEMY_SPEED_MULT = 0.68;
+const MP_ENEMY_ATTACK_WAIT_MULT = 1.35;
+
+if(typeof Game !== "undefined"){
+  const MP_ORIGINAL_GET_PLAYER_SPEED_MOD = Game.prototype.getPlayerSpeedMod;
+
+  Game.prototype.getPlayerSpeedMod = function(){
+    const base = MP_ORIGINAL_GET_PLAYER_SPEED_MOD
+      ? MP_ORIGINAL_GET_PLAYER_SPEED_MOD.call(this)
+      : 1;
+
+    return base * MP_PLAYER_SPEED_MULT;
+  };
+
+  function mpTuneEnemySpeed(e){
+    if(!e || e.mpSpeedTuned) return e;
+
+    e.mpSpeedTuned = true;
+
+    if(e.chaseSpeed) e.chaseSpeed *= MP_ENEMY_SPEED_MULT;
+
+    if(e.attackCooldownMin){
+      e.attackCooldownMin = Math.floor(e.attackCooldownMin * MP_ENEMY_ATTACK_WAIT_MULT);
+    }
+
+    if(e.attackCooldownMax){
+      e.attackCooldownMax = Math.floor(e.attackCooldownMax * MP_ENEMY_ATTACK_WAIT_MULT);
+    }
+
+    // Slightly closer hit range.
+    if(e.attackRange) e.attackRange *= 0.82;
+    if(e.stopRange) e.stopRange *= 0.88;
+
+    return e;
+  }
+
+  const MP_ORIGINAL_SPAWN_ENEMY_TYPE_SPEED =
+    Game.prototype.spawnEnemyType;
+
+  Game.prototype.spawnEnemyType = function(type, x, y, platform){
+    const e = MP_ORIGINAL_SPAWN_ENEMY_TYPE_SPEED.call(this, type, x, y, platform);
+    mpTuneEnemySpeed(e);
+    return e;
+  };
+
+  const MP_ORIGINAL_FINISH_ENEMY_MOVE_SPEED =
+    Game.prototype.finishEnemyMove;
+
+  Game.prototype.finishEnemyMove = function(e, dt){
+    if(e && !e.dead && e.state !== "thrown"){
+      e.vx = (e.vx || 0) * MP_ENEMY_SPEED_MULT;
+    }
+
+    return MP_ORIGINAL_FINISH_ENEMY_MOVE_SPEED.call(this, e, dt);
+  };
+}
+
+/* =========================================================
+   END PLAYER + ENEMY SPEED TUNING PATCH
+========================================================= */
+  /* =========================================================
+   MENU BUTTON BACKOUT PATCH
+   - Keeps controller visible over pause/inventory
+   - MENU button backs out of pause/inventory
+   - B drops selected item only inside inventory
+   - B no longer backs out of menu
+========================================================= */
+
+if(typeof Game !== "undefined"){
+
+  /* -----------------------------
+     Track mobile buttons
+  ----------------------------- */
+
+  if(Game.prototype.mobileButton && !Game.prototype.mpMenuBackoutMobileWrapped){
+    Game.prototype.mpMenuBackoutMobileWrapped = true;
+
+    const MP_ORIGINAL_MOBILE_BUTTON_MENU_BACKOUT =
+      Game.prototype.mobileButton;
+
+    Game.prototype.mobileButton = function(x, y, label, color, down, up){
+      const btn = MP_ORIGINAL_MOBILE_BUTTON_MENU_BACKOUT.call(
+        this,
+        x,
+        y,
+        label,
+        color,
+        down,
+        up
+      );
+
+      if(!this.mobileButtons){
+        this.mobileButtons = [];
+      }
+
+      this.mobileButtons.push(btn);
+
+      return btn;
+    };
+  }
+
+  /* -----------------------------
+     Controller depth helper
+  ----------------------------- */
+
+  Game.prototype.mpSetControllerDepth = function(baseDepth){
+    if(this.mobileUI){
+      Object.keys(this.mobileUI).forEach(key=>{
+        const obj = this.mobileUI[key];
+
+        if(obj && obj.setDepth){
+          obj.setDepth(baseDepth + 10);
+        }
+      });
+    }
+
+    if(this.mobileButtons){
+      this.mobileButtons.forEach(btn=>{
+        if(!btn) return;
+
+        if(btn.hit) btn.hit.setDepth(baseDepth + 20);
+        if(btn.shadow) btn.shadow.setDepth(baseDepth + 21);
+        if(btn.face) btn.face.setDepth(baseDepth + 22);
+        if(btn.shine) btn.shine.setDepth(baseDepth + 23);
+        if(btn.text) btn.text.setDepth(baseDepth + 24);
+      });
+    }
+  };
+
+  /* -----------------------------
+     Open pause: controller visible
+  ----------------------------- */
+
+  const MP_ORIGINAL_OPEN_PAUSE_MENU_BACKOUT =
+    Game.prototype.openPauseMenu;
+
+  Game.prototype.openPauseMenu = function(){
+    MP_ORIGINAL_OPEN_PAUSE_MENU_BACKOUT.call(this);
+
+    this.mpSetControllerDepth(50000);
+
+    if(this.zoneText){
+      this.zoneText.setText("PAUSED - MENU TO RETURN");
+    }
+  };
+
+  /* -----------------------------
+     Open inventory: controller visible
+  ----------------------------- */
+
+  const MP_ORIGINAL_OPEN_INVENTORY_MENU_BACKOUT =
+    Game.prototype.openInventoryMenu;
+
+  Game.prototype.openInventoryMenu = function(){
+    MP_ORIGINAL_OPEN_INVENTORY_MENU_BACKOUT.call(this);
+
+    this.mpSetControllerDepth(50000);
+
+    if(this.zoneText){
+      this.zoneText.setText("INVENTORY - A USE/EQUIP  B DROP  MENU BACK");
+    }
+  };
+
+  /* -----------------------------
+     Close pause/inventory safely
+  ----------------------------- */
+
+  const MP_ORIGINAL_CLOSE_PAUSE_MENU_BACKOUT =
+    Game.prototype.closePauseMenu;
+
+  Game.prototype.closePauseMenu = function(){
+    if(this.clearInventoryUI){
+      this.clearInventoryUI();
+    }
+
+    MP_ORIGINAL_CLOSE_PAUSE_MENU_BACKOUT.call(this);
+
+    this.inventoryOpen = false;
+    this.pauseMenuOpen = false;
+
+    this.mpSetControllerDepth(9500);
+
+    if(this.zoneText && this.platform){
+      this.zoneText.setText(String(this.platform).toUpperCase() + " PLATFORM");
+    }
+  };
+
+  /* -----------------------------
+     MENU button behavior
+     MENU opens pause during game.
+     MENU closes pause/inventory if already open.
+  ----------------------------- */
+
+  const MP_ORIGINAL_TOGGLE_PAUSE_MENU_BACKOUT =
+    Game.prototype.togglePauseMenu;
+
+  Game.prototype.togglePauseMenu = function(){
+    if(this.inventoryOpen || this.pauseMenuOpen){
+      this.closePauseMenu();
+      return;
+    }
+
+    MP_ORIGINAL_TOGGLE_PAUSE_MENU_BACKOUT.call(this);
+  };
+
+  /* -----------------------------
+     B button behavior
+     Inventory: B drops selected item.
+     Pause menu: B does NOT back out.
+     Gameplay: normal B behavior.
+  ----------------------------- */
+
+  const MP_ORIGINAL_CONTEXT_B_MENU_BACKOUT =
+    Game.prototype.startContextB;
+
+  Game.prototype.startContextB = function(){
+    if(this.inventoryOpen){
+      if(this.inventory && this.inventory.length > 0 && this.dropSelectedInventoryItem){
+        this.dropSelectedInventoryItem();
+      }
+      return;
+    }
+
+    if(this.pauseMenuOpen){
+      return;
+    }
+
+    MP_ORIGINAL_CONTEXT_B_MENU_BACKOUT.call(this);
+  };
+
+  /* -----------------------------
+     Keyboard ESC can still back out
+     Optional safety for testing on desktop.
+  ----------------------------- */
+
+  const MP_ORIGINAL_MAKE_KEYBOARD_MENU_BACKOUT =
+    Game.prototype.makeKeyboard;
+
+  Game.prototype.makeKeyboard = function(){
+    MP_ORIGINAL_MAKE_KEYBOARD_MENU_BACKOUT.call(this);
+
+    if(this.mpMenuBackoutKeyboardReady) return;
+    this.mpMenuBackoutKeyboardReady = true;
+
+    this.input.keyboard.on("keydown-ESC", ()=>{
+      if(this.inventoryOpen || this.pauseMenuOpen){
+        this.closePauseMenu();
+      }
+    });
+  };
+}
+
+/* =========================================================
+   END MENU BUTTON BACKOUT PATCH
 ========================================================= */
   const config = {
   parent: "game",
