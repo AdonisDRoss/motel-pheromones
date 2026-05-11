@@ -5815,6 +5815,534 @@ Game.prototype.positionAttackSprite = function(type="light"){
 /* =========================================================
    END JT ATTACK RANGE / RATE FIX
 ========================================================= */
+ /* =========================================================
+   ENEMY CLOSE-RANGE + TACTICAL AI PATCH
+   - Enemies must get closer before attacks connect
+   - Enemies pause / strafe / back off instead of all rushing
+   - Only attacks when actually in hitting range
+========================================================= */
+
+const ENEMY_TACTICAL_DEBUG = false;
+
+Game.prototype.getEnemyCloseAttackRange = function(e){
+  if(!e) return 52;
+
+  if(e.enemyType === "feral") return 58;
+  if(e.enemyType === "corpo_sellout") return 62;
+  if(e.enemyType === "corpo_wannabe") return 54;
+  if(e.enemyType === "sellout") return 56;
+  if(e.enemyType === "doorman") return 72;
+
+  return 56;
+};
+
+Game.prototype.getEnemyStopRange = function(e){
+  if(!e) return 70;
+
+  if(e.enemyType === "feral") return 78;
+  if(e.enemyType === "corpo_sellout") return 92;
+  if(e.enemyType === "corpo_wannabe") return 78;
+  if(e.enemyType === "sellout") return 84;
+  if(e.enemyType === "doorman") return 88;
+
+  return 82;
+};
+
+Game.prototype.getEnemyLaneRange = function(e){
+  if(!e) return 34;
+
+  if(e.enemyType === "doorman") return 42;
+  if(e.enemyType === "feral") return 38;
+
+  return 34;
+};
+
+Game.prototype.assignEnemyTactic = function(e, force=false){
+  if(!e || e.dead) return;
+
+  if(!force && e.tacticUntil && this.time.now < e.tacticUntil){
+    return;
+  }
+
+  const roll = Phaser.Math.Between(0, 99);
+
+  if(e.enemyType === "feral"){
+    if(roll < 48){
+      e.tacticState = "circle";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(450, 950);
+    }else if(roll < 78){
+      e.tacticState = "rush";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(350, 700);
+    }else{
+      e.tacticState = "wait";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(280, 650);
+    }
+    return;
+  }
+
+  if(e.enemyType === "corpo_sellout"){
+    if(roll < 35){
+      e.tacticState = "circle";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(700, 1300);
+    }else if(roll < 60){
+      e.tacticState = "backoff";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(420, 850);
+    }else if(roll < 82){
+      e.tacticState = "approach";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(650, 1200);
+    }else{
+      e.tacticState = "wait";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(350, 800);
+    }
+    return;
+  }
+
+  if(roll < 38){
+    e.tacticState = "approach";
+    e.tacticUntil = this.time.now + Phaser.Math.Between(550, 1000);
+  }else if(roll < 62){
+    e.tacticState = "circle";
+    e.tacticUntil = this.time.now + Phaser.Math.Between(550, 1000);
+  }else if(roll < 78){
+    e.tacticState = "wait";
+    e.tacticUntil = this.time.now + Phaser.Math.Between(300, 750);
+  }else{
+    e.tacticState = "backoff";
+    e.tacticUntil = this.time.now + Phaser.Math.Between(350, 750);
+  }
+};
+
+Game.prototype.normalizeEnemyCombatStats = function(e){
+  if(!e) return;
+
+  e.attackRange = this.getEnemyCloseAttackRange(e);
+  e.stopRange = this.getEnemyStopRange(e);
+
+  if(e.enemyType === "feral"){
+    e.chaseSpeed = 118;
+    e.attackCooldownMin = 520;
+    e.attackCooldownMax = 1050;
+  }
+
+  if(e.enemyType === "corpo_sellout"){
+    e.chaseSpeed = 82;
+    e.attackCooldownMin = 650;
+    e.attackCooldownMax = 1300;
+  }
+
+  if(e.enemyType === "corpo_wannabe"){
+    e.chaseSpeed = 70;
+    e.attackCooldownMin = 560;
+    e.attackCooldownMax = 1150;
+  }
+
+  if(e.enemyType === "sellout"){
+    e.chaseSpeed = 68;
+    e.attackCooldownMin = 600;
+    e.attackCooldownMax = 1250;
+  }
+
+  e.tacticState = e.tacticState || "approach";
+  e.tacticUntil = this.time.now + Phaser.Math.Between(350, 900);
+  e.smartSide = e.smartSide || (Phaser.Math.Between(0,1) === 0 ? -1 : 1);
+  e.thinkDelay = Phaser.Math.Between(120, 420);
+};
+
+/* Patch spawn so every enemy gets tactical values */
+const MP_ORIGINAL_SPAWN_ENEMY_TYPE_TACTICAL = Game.prototype.spawnEnemyType;
+
+Game.prototype.spawnEnemyType = function(type,x,y,platform="middle"){
+  const e = MP_ORIGINAL_SPAWN_ENEMY_TYPE_TACTICAL.call(this,type,x,y,platform);
+
+  this.normalizeEnemyCombatStats(e);
+  this.assignEnemyTactic(e,true);
+
+  return e;
+};
+
+/* Replace personality override so old wide ranges do not come back */
+Game.prototype.applyEnemyPersonality = function(e){
+  if(!e) return;
+
+  e.laneOffset = Phaser.Math.Between(-14,14);
+  e.transitioning = false;
+  e.pathCooldown = 0;
+  e.smartSide = Phaser.Math.Between(0,1) === 0 ? -1 : 1;
+  e.smartSwitchTime = this.time.now + Phaser.Math.Between(900,1800);
+
+  this.normalizeEnemyCombatStats(e);
+};
+
+/* Close-range normal attack only */
+Game.prototype.startEnemyAttack = function(e){
+  if(!e || e.dead || e.busy) return;
+  if(e.grabbed || e.thrownTime > 0) return;
+
+  const dx = this.player.x - e.x;
+  const dy = this.player.y - e.y;
+  const dir = dx > 0 ? 1 : -1;
+
+  const closeRange = this.getEnemyCloseAttackRange(e);
+  const laneRange = this.getEnemyLaneRange(e);
+
+  if(Math.abs(dx) > closeRange || Math.abs(dy) > laneRange){
+    e.attackCooldown = Phaser.Math.Between(220, 520);
+    this.assignEnemyTactic(e,true);
+    return;
+  }
+
+  const useKick = Phaser.Math.Between(0,3) === 0;
+
+  e.state = "attack";
+  e.busy = true;
+  e.attackCooldown = Phaser.Math.Between(
+    e.attackCooldownMin || 600,
+    e.attackCooldownMax || 1200
+  );
+  e.vx = 0;
+  e.sprite.setFlipX(dx < 0);
+
+  this.safeEnemyPlay(e, useKick ? "kick" : "punch");
+
+  this.time.delayedCall(245, ()=>{
+    if(!e || e.dead || e.state !== "attack") return;
+
+    const hitDx = Math.abs(this.player.x - e.x);
+    const hitDy = Math.abs(this.player.y - e.y);
+    const finalRange = closeRange + (useKick ? 8 : 0);
+
+    if(hitDx <= finalRange && hitDy <= laneRange){
+      this.damagePlayer((e.attackDamage || 8) + (useKick ? 1 : 0), dir);
+    }
+  });
+
+  this.time.delayedCall(560, ()=>{
+    if(!e || e.dead) return;
+
+    e.busy = false;
+    e.state = "idle";
+    e.vx = 0;
+    this.assignEnemyTactic(e,true);
+    this.safeEnemyPlay(e,"idle");
+  });
+};
+
+/* Smarter corpo attack: close only */
+Game.prototype.startSmartEnemyAttack = function(e){
+  if(!e || e.dead || e.busy) return;
+
+  const dx = this.player.x - e.x;
+  const dy = this.player.y - e.y;
+  const dir = dx > 0 ? 1 : -1;
+
+  const closeRange = this.getEnemyCloseAttackRange(e);
+  const laneRange = this.getEnemyLaneRange(e);
+
+  if(Math.abs(dx) > closeRange || Math.abs(dy) > laneRange){
+    e.attackCooldown = Phaser.Math.Between(260, 620);
+    this.assignEnemyTactic(e,true);
+    return;
+  }
+
+  const useKick = Phaser.Math.Between(0,1) === 1;
+
+  e.state = "attack";
+  e.busy = true;
+  e.vx = 0;
+  e.attackCooldown = Phaser.Math.Between(850,1500);
+  e.sprite.setFlipX(dx < 0);
+
+  this.safeEnemyPlay(e, useKick ? "kick" : "punch");
+
+  this.time.delayedCall(280, ()=>{
+    if(!e || e.dead || e.state !== "attack") return;
+
+    const hitDx = Math.abs(this.player.x - e.x);
+    const hitDy = Math.abs(this.player.y - e.y);
+
+    if(hitDx <= closeRange + (useKick ? 10 : 0) && hitDy <= laneRange){
+      this.damagePlayer((e.attackDamage || 8) + (useKick ? 2 : 0), dir);
+    }
+  });
+
+  this.time.delayedCall(640, ()=>{
+    if(!e || e.dead) return;
+
+    e.busy = false;
+    e.state = "idle";
+    e.vx = 0;
+    this.assignEnemyTactic(e,true);
+    this.safeEnemyPlay(e,"idle");
+  });
+};
+
+/* Feral rush is now shorter and must connect close */
+Game.prototype.startFeralRush = function(e){
+  if(!e || e.dead || e.busy) return;
+
+  const dx = this.player.x - e.x;
+  const dir = dx > 0 ? 1 : -1;
+
+  e.state = "rush";
+  e.busy = true;
+  e.vx = dir * 170;
+  e.attackCooldown = Phaser.Math.Between(950,1500);
+  e.sprite.setFlipX(dx < 0);
+
+  this.safeEnemyPlay(e,"walk");
+
+  this.time.delayedCall(220, ()=>{
+    if(!e || e.dead || e.state !== "rush") return;
+
+    const hitDx = Math.abs(this.player.x - e.x);
+    const hitDy = Math.abs(this.player.y - e.y);
+
+    if(hitDx <= 62 && hitDy <= 38){
+      this.damagePlayer(e.attackDamage || 7,dir);
+    }
+  });
+
+  this.time.delayedCall(420, ()=>{
+    if(!e || e.dead) return;
+
+    e.busy = false;
+    e.state = "idle";
+    e.vx = 0;
+    this.assignEnemyTactic(e,true);
+    this.safeEnemyPlay(e,"idle");
+  });
+};
+
+/* Main tactical AI replacement */
+Game.prototype.updateEnemyAI = function(delta){
+  const dt = delta / 1000;
+
+  this.enemies.forEach(e=>{
+    if(!e) return;
+
+    if(e.grabbed || e.thrownTime > 0){
+      this.updateEnemyVisuals(e);
+      return;
+    }
+
+    if(e.attackCooldown > 0){
+      e.attackCooldown -= delta;
+      if(e.attackCooldown < 0) e.attackCooldown = 0;
+    }
+
+    if(e.knockbackTime > 0){
+      e.knockbackTime -= delta;
+      if(e.knockbackTime < 0) e.knockbackTime = 0;
+    }
+
+    if(e.specialCooldown > 0){
+      e.specialCooldown -= delta;
+      if(e.specialCooldown < 0) e.specialCooldown = 0;
+    }
+
+    if(e.dead || e.state === "dead"){
+      e.dead = true;
+      e.state = "dead";
+      e.vx = 0;
+      this.updateEnemyVisuals(e);
+      return;
+    }
+
+    if(e.transitioning){
+      this.updateEnemyVisuals(e);
+      return;
+    }
+
+    if(e.knockbackTime > 0){
+      e.y = e.homeY;
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(e.platform !== this.platform){
+      e.y = e.homeY;
+      this.updateEnemyNavigation(e,delta);
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    this.syncEnemyLane(e,delta);
+
+    if(e.busy){
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(e.enemyType === "doorman"){
+      this.updateDoormanAI(e,delta);
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(this.playerHealth <= 0){
+      e.state = "idle";
+      e.vx = 0;
+      this.safeEnemyPlay(e,"idle");
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(!e.tacticState || !e.tacticUntil || this.time.now > e.tacticUntil){
+      this.assignEnemyTactic(e,true);
+    }
+
+    const dx = this.player.x - e.x;
+    const dy = this.player.y - e.y;
+    const dist = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const dir = dx > 0 ? 1 : -1;
+
+    const closeRange = this.getEnemyCloseAttackRange(e);
+    const stopRange = this.getEnemyStopRange(e);
+    const laneRange = this.getEnemyLaneRange(e);
+
+    e.sprite.setFlipX(dx < 0);
+
+    // Do not dogpile: enemies near other enemies hesitate or strafe.
+    let crowdPenalty = 0;
+    this.enemies.forEach(other=>{
+      if(!other || other === e || other.dead) return;
+      if(other.platform !== e.platform) return;
+
+      const gap = Math.abs(other.x - e.x);
+      const sameLane = Math.abs(other.y - e.y) < 38;
+
+      if(gap < 82 && sameLane){
+        crowdPenalty++;
+      }
+    });
+
+    if(crowdPenalty >= 2 && e.tacticState !== "backoff"){
+      e.tacticState = Phaser.Math.Between(0,1) === 0 ? "circle" : "wait";
+      e.tacticUntil = this.time.now + Phaser.Math.Between(350,800);
+    }
+
+    // Too far vertically: line up first, do not swing from far away.
+    if(absDy > laneRange + 20){
+      e.vx = dir * 48;
+      this.safeEnemyPlay(e,"walk");
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    // Feral has rush chance, but only after thinking and only from medium range.
+    if(e.enemyType === "feral"){
+      if(
+        e.tacticState === "rush" &&
+        e.attackCooldown <= 0 &&
+        dist > closeRange &&
+        dist <= 145 &&
+        absDy <= laneRange
+      ){
+        this.startFeralRush(e);
+        this.finishEnemyMove(e,dt);
+        return;
+      }
+    }
+
+    // Close enough: only then attack.
+    if(dist <= closeRange && absDy <= laneRange && e.attackCooldown <= 0){
+      if(e.enemyType === "corpo_sellout"){
+        this.startSmartEnemyAttack(e);
+      }else{
+        this.startEnemyAttack(e);
+      }
+
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    // Tactical movement states.
+    if(e.tacticState === "wait"){
+      e.vx = 0;
+      this.safeEnemyPlay(e,"idle");
+
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(e.tacticState === "backoff"){
+      if(dist < stopRange + 25){
+        e.vx = -dir * 65;
+        this.safeEnemyPlay(e,"walk");
+      }else{
+        e.vx = 0;
+        this.safeEnemyPlay(e,"idle");
+      }
+
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    if(e.tacticState === "circle"){
+      if(dist > stopRange + 35){
+        e.vx = dir * (e.chaseSpeed || 70);
+      }else{
+        e.vx = (e.smartSide || 1) * 45;
+      }
+
+      this.safeEnemyPlay(e,"walk");
+      this.applyEnemySeparation(e);
+      this.finishEnemyMove(e,dt);
+      return;
+    }
+
+    // Default approach: move in, but stop outside striking range.
+    if(dist > stopRange){
+      e.state = "chase";
+      e.vx = dir * (e.chaseSpeed || 70);
+      this.safeEnemyPlay(e,"walk");
+    }else if(dist > closeRange){
+      e.state = "measure";
+      e.vx = dir * 24;
+      this.safeEnemyPlay(e,"walk");
+    }else{
+      e.state = "idle";
+      e.vx = 0;
+      this.safeEnemyPlay(e,"idle");
+    }
+
+    this.applyEnemySeparation(e);
+    this.finishEnemyMove(e,dt);
+  });
+};
+
+/* Optional debug: shows enemy tactic above their heads */
+Game.prototype.updateEnemyTacticalDebug = function(){
+  if(!ENEMY_TACTICAL_DEBUG || !this.enemies) return;
+
+  this.enemies.forEach(e=>{
+    if(!e || e.dead) return;
+
+    if(!e.tacticText){
+      e.tacticText = this.add.text(e.x, e.y - 154, "", {
+        font:"10px monospace",
+        fill:"#7CFF6B",
+        backgroundColor:"#000000"
+      }).setOrigin(0.5).setDepth(16000);
+    }
+
+    e.tacticText.setText(e.tacticState || "");
+    e.tacticText.x = e.x;
+    e.tacticText.y = e.y - 154;
+  });
+};
+
+const MP_ORIGINAL_SAFE_UPDATE_TACTICAL = Game.prototype.safeUpdate;
+
+Game.prototype.safeUpdate = function(time,delta){
+  MP_ORIGINAL_SAFE_UPDATE_TACTICAL.call(this,time,delta);
+  this.updateEnemyTacticalDebug();
+};
+
+/* =========================================================
+   END ENEMY CLOSE-RANGE + TACTICAL AI PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
