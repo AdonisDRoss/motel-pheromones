@@ -12807,6 +12807,1039 @@ if(typeof Game !== "undefined" && !Game.prototype.mpToggleStickWrapped){
 /* =========================================================
    END OUTDOOR MAP CHAIN + TOGGLE STICK PATCH
 ========================================================= */
+ /* =========================================================
+   JT SIZE + BUS ROUTES + ENEMY PICKUP AI + AGGRESSION PATCH
+   - Makes JT bigger
+   - Moves Arrow bus to correct route per outdoor screen
+   - Enemies can pick up weapons
+   - Low-health enemies try to grab health items
+   - Enemies are slightly more aggressive
+   Paste ABOVE: const config = {
+========================================================= */
+
+(function(){
+  if(window.MP_JT_BUS_ENEMY_AI_PATCH_V1) return;
+  window.MP_JT_BUS_ENEMY_AI_PATCH_V1 = true;
+
+  if(typeof Game === "undefined") return;
+
+  /* =======================================================
+     1) JT SIZE FIX
+  ======================================================= */
+
+  var MP_JT_SCALE_BOOST = 1.23;
+
+  function mpGetSelectedFighterSafe(){
+    try{
+      if(typeof getSelectedFighterId === "function"){
+        return String(getSelectedFighterId()).toUpperCase();
+      }
+    }catch(e){}
+
+    try{
+      if(typeof selectedFighter !== "undefined"){
+        return String(selectedFighter).toUpperCase();
+      }
+    }catch(e){}
+
+    return "";
+  }
+
+  function mpIsJTSelected(){
+    var id = mpGetSelectedFighterSafe();
+    return id === "JT" || id.indexOf("JT") >= 0;
+  }
+
+  if(Game.prototype.getPlayerMoveScale && !Game.prototype.mpJTScaleWrapped){
+    Game.prototype.mpJTScaleWrapped = true;
+
+    var MP_OLD_GET_PLAYER_MOVE_SCALE_JT = Game.prototype.getPlayerMoveScale;
+
+    Game.prototype.getPlayerMoveScale = function(){
+      var base = MP_OLD_GET_PLAYER_MOVE_SCALE_JT.call(this);
+
+      if(mpIsJTSelected()){
+        return base * MP_JT_SCALE_BOOST;
+      }
+
+      return base;
+    };
+  }
+
+  function mpApplyJTSize(scene){
+    if(!scene || !mpIsJTSelected()) return;
+
+    var scale = scene.getPlayerMoveScale
+      ? scene.getPlayerMoveScale()
+      : ((typeof PLAYER_MOVE_SCALE !== "undefined" ? PLAYER_MOVE_SCALE : 1) * MP_JT_SCALE_BOOST);
+
+    if(scene.player && scene.player.setScale){
+      scene.player.setScale(scale);
+    }
+
+    if(scene.poseSprite && scene.poseSprite.visible && scene.poseSprite.setScale){
+      scene.poseSprite.setScale(scale);
+    }
+  }
+
+  /* =======================================================
+     2) ARROW BUS ROUTE PER SCREEN
+     These Y values match your white route lines.
+     If one screen is off, only adjust that screen number.
+  ======================================================= */
+
+  var MP_ARROW_BUS_ROUTE_BY_SCREEN = {
+    leftys_outdoor: 418,
+    university_street: 418,
+    theater: 420,
+    blakefield: 425,
+    crestwood: 420
+  };
+
+  var MP_ARROW_BUS_WIDTH_BY_SCREEN = {
+    leftys_outdoor: 250,
+    university_street: 250,
+    theater: 250,
+    blakefield: 250,
+    crestwood: 250
+  };
+
+  function mpCurrentOutdoorScreen(scene){
+    if(!scene) return "leftys_outdoor";
+    return scene.mpOutdoorScreen || "leftys_outdoor";
+  }
+
+  function mpNormalizeArrowBusOnRoute(scene, bus){
+    if(!scene || !bus || !bus.texture || bus.texture.key !== "arrow_bus") return;
+
+    var screen = mpCurrentOutdoorScreen(scene);
+    var routeY = MP_ARROW_BUS_ROUTE_BY_SCREEN[screen] || 418;
+    var targetW = MP_ARROW_BUS_WIDTH_BY_SCREEN[screen] || 250;
+
+    try{
+      var tex = scene.textures.get("arrow_bus");
+      var src = tex && tex.source && tex.source[0];
+
+      if(src && src.width){
+        var scale = targetW / src.width;
+        bus.setScale(scale);
+      }else if(bus.setDisplaySize){
+        bus.setDisplaySize(targetW, 78);
+      }
+    }catch(e){
+      if(bus.setDisplaySize){
+        bus.setDisplaySize(targetW, 78);
+      }
+    }
+
+    // Bus bottom rides on the route line.
+    bus.setOrigin(0.5, 1);
+    bus.y = routeY;
+    bus.setDepth(routeY - 20);
+  }
+
+  function mpFixAllArrowBuses(scene){
+    if(!scene || !scene.children) return;
+
+    scene.children.list.forEach(function(obj){
+      mpNormalizeArrowBusOnRoute(scene, obj);
+    });
+  }
+
+  if(Game.prototype.spawnArrowBusHazard && !Game.prototype.mpBusRouteWrapped){
+    Game.prototype.mpBusRouteWrapped = true;
+
+    var MP_OLD_SPAWN_ARROW_BUS_ROUTE = Game.prototype.spawnArrowBusHazard;
+
+    Game.prototype.spawnArrowBusHazard = function(){
+      var result = MP_OLD_SPAWN_ARROW_BUS_ROUTE.apply(this, arguments);
+
+      mpFixAllArrowBuses(this);
+
+      return result;
+    };
+  }
+
+  /* =======================================================
+     3) ENEMY WEAPON / HEALTH PICKUP AI
+  ======================================================= */
+
+  var MP_ENEMY_LOOT_CHECK_MS = 220;
+  var MP_ENEMY_LOOT_SPEED = 1.55;
+  var MP_ENEMY_PICKUP_DIST = 30;
+  var MP_ENEMY_WEAPON_SEARCH_DIST = 260;
+  var MP_ENEMY_HEALTH_SEARCH_DIST = 360;
+  var MP_ENEMY_LOW_HEALTH_RATIO = 0.48;
+
+  function mpEnemySprite(e){
+    if(!e) return null;
+    return e.sprite || e.body || e.obj || e;
+  }
+
+  function mpEnemyX(e){
+    var s = mpEnemySprite(e);
+    return s && typeof s.x === "number" ? s.x : (e.x || 0);
+  }
+
+  function mpEnemyY(e){
+    var s = mpEnemySprite(e);
+    return s && typeof s.y === "number" ? s.y : (e.y || 0);
+  }
+
+  function mpSetEnemyPos(e, x, y){
+    var s = mpEnemySprite(e);
+
+    if(s){
+      s.x = x;
+      s.y = y;
+    }
+
+    e.x = x;
+    e.y = y;
+
+    if(e.label){
+      e.label.x = x;
+      e.label.y = y - 78;
+    }
+
+    if(e.healthBar){
+      e.healthBar.x = x;
+      e.healthBar.y = y - 60;
+    }
+
+    if(e.nameText){
+      e.nameText.x = x;
+      e.nameText.y = y - 88;
+    }
+  }
+
+  function mpDist(a, b){
+    var dx = a.x - b.x;
+    var dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function mpEnemyMaxHp(e){
+    return Number(e.maxHp || e.maxHealth || e.baseHp || 100);
+  }
+
+  function mpEnemyHp(e){
+    return Number(e.hp || e.health || e.maxHp || e.maxHealth || 100);
+  }
+
+  function mpSetEnemyHp(e, hp){
+    var max = mpEnemyMaxHp(e);
+    var fixed = Phaser.Math.Clamp(hp, 0, max);
+
+    if(typeof e.hp !== "undefined") e.hp = fixed;
+    if(typeof e.health !== "undefined") e.health = fixed;
+
+    if(typeof e.hp === "undefined" && typeof e.health === "undefined"){
+      e.hp = fixed;
+    }
+  }
+
+  function mpEnemyNeedsHealth(e){
+    var max = mpEnemyMaxHp(e);
+    var hp = mpEnemyHp(e);
+
+    return max > 0 && hp / max <= MP_ENEMY_LOW_HEALTH_RATIO;
+  }
+
+  function mpPickupPoint(p){
+    var obj = p && (p.obj || p.sprite || p.body);
+    if(!obj) return null;
+
+    if(p.pickedUp) return null;
+    if(obj.visible === false) return null;
+
+    return {
+      x: obj.x,
+      y: obj.y,
+      obj: obj,
+      pickup: p
+    };
+  }
+
+  function mpCurrentScreenMatches(scene, p){
+    if(!scene || !p) return true;
+
+    var current = scene.mpOutdoorScreen || "leftys_outdoor";
+
+    if(!p.screenKey) return true;
+
+    return p.screenKey === current;
+  }
+
+  function mpNearestHealthPickup(scene, e){
+    if(!scene || !scene.healthItemPickups) return null;
+
+    var ex = mpEnemyX(e);
+    var ey = mpEnemyY(e);
+    var best = null;
+    var bestD = 999999;
+
+    scene.healthItemPickups.forEach(function(p){
+      if(!mpCurrentScreenMatches(scene, p)) return;
+
+      var pt = mpPickupPoint(p);
+      if(!pt) return;
+
+      var d = mpDist({x:ex, y:ey}, pt);
+
+      if(d < bestD && d <= MP_ENEMY_HEALTH_SEARCH_DIST){
+        bestD = d;
+        best = pt;
+      }
+    });
+
+    return best;
+  }
+
+  function mpNearestWeaponPickup(scene, e){
+    if(!scene || !scene.weaponPickups) return null;
+
+    var ex = mpEnemyX(e);
+    var ey = mpEnemyY(e);
+    var best = null;
+    var bestD = 999999;
+
+    scene.weaponPickups.forEach(function(p){
+      if(!mpCurrentScreenMatches(scene, p)) return;
+
+      var pt = mpPickupPoint(p);
+      if(!pt) return;
+
+      var d = mpDist({x:ex, y:ey}, pt);
+
+      if(d < bestD && d <= MP_ENEMY_WEAPON_SEARCH_DIST){
+        bestD = d;
+        best = pt;
+      }
+    });
+
+    return best;
+  }
+
+  function mpGetHealthAmount(type){
+    if(typeof MP_HEALTH_ITEM_DEFS !== "undefined" && MP_HEALTH_ITEM_DEFS[type]){
+      var def = MP_HEALTH_ITEM_DEFS[type];
+
+      return Number(
+        def.heal ||
+        def.hp ||
+        def.amount ||
+        def.value ||
+        10
+      );
+    }
+
+    if(type === "pizza") return 22;
+    if(type === "chicken") return 35;
+    if(type === "taco") return 12;
+    if(type === "water") return 6;
+    if(type === "soda") return 8;
+    if(type === "energy_drink" || type === "energy") return 5;
+    if(type === "first_aid") return 45;
+
+    return 10;
+  }
+
+  function mpEnemyUseHealthPickup(scene, e, p){
+    if(!scene || !e || !p) return;
+
+    var type = p.type || "food";
+    var heal = mpGetHealthAmount(type);
+
+    mpSetEnemyHp(e, mpEnemyHp(e) + heal);
+
+    p.pickedUp = true;
+
+    if(p.obj) p.obj.setVisible(false);
+    if(p.label) p.label.setVisible(false);
+
+    if(scene.add){
+      scene.add.text(mpEnemyX(e), mpEnemyY(e) - 70, "+" + heal + " " + String(type).toUpperCase(), {
+        font: "13px monospace",
+        fill: "#7CFF6B",
+        stroke: "#000000",
+        strokeThickness: 4
+      })
+        .setOrigin(0.5)
+        .setDepth(30000)
+        .setScrollFactor(0);
+    }
+  }
+
+  function mpGetWeaponDef(type){
+    if(typeof MPW_DEFS !== "undefined" && MPW_DEFS[type]) return MPW_DEFS[type];
+    if(typeof MP_WEAPON_DEFS !== "undefined" && MP_WEAPON_DEFS[type]) return MP_WEAPON_DEFS[type];
+    return null;
+  }
+
+  function mpEnemyAttachWeaponVisual(scene, e, type){
+    if(!scene || !e) return;
+
+    var def = mpGetWeaponDef(type);
+    if(!def || !def.key || !hasTex(scene, def.key)) return;
+
+    if(e.mpWeaponObj && e.mpWeaponObj.destroy){
+      e.mpWeaponObj.destroy();
+    }
+
+    var obj = scene.add.image(mpEnemyX(e) + 18, mpEnemyY(e) - 43, def.key)
+      .setOrigin(0.5)
+      .setDepth(mpEnemyY(e) + 45);
+
+    var longWeapon =
+      type === "bat" ||
+      type === "pipe" ||
+      type === "bottle" ||
+      type === "chain";
+
+    obj.setDisplaySize(longWeapon ? 42 : 28, longWeapon ? 28 : 24);
+    obj.setRotation(def.rotation || -0.25);
+
+    e.mpWeaponObj = obj;
+  }
+
+  function mpEnemyPickupWeapon(scene, e, p){
+    if(!scene || !e || !p) return;
+
+    var type = p.type || "pipe";
+    var def = mpGetWeaponDef(type) || {};
+
+    e.mpWeaponType = type;
+    e.mpWeaponDamageBonus = Number(def.damage || 8);
+
+    if(!e.mpBaseDamageSaved){
+      e.mpBaseDamageSaved = true;
+
+      if(typeof e.damage !== "undefined") e.mpBaseDamage = e.damage;
+      if(typeof e.attackDamage !== "undefined") e.mpBaseAttackDamage = e.attackDamage;
+      if(typeof e.hitDamage !== "undefined") e.mpBaseHitDamage = e.hitDamage;
+    }
+
+    if(typeof e.damage !== "undefined"){
+      e.damage = Number(e.mpBaseDamage || e.damage || 8) + e.mpWeaponDamageBonus;
+    }
+
+    if(typeof e.attackDamage !== "undefined"){
+      e.attackDamage = Number(e.mpBaseAttackDamage || e.attackDamage || 8) + e.mpWeaponDamageBonus;
+    }
+
+    if(typeof e.hitDamage !== "undefined"){
+      e.hitDamage = Number(e.mpBaseHitDamage || e.hitDamage || 8) + e.mpWeaponDamageBonus;
+    }
+
+    // If your enemy attacks read attackRange/stopRange, do not make it huge.
+    if(e.attackRange && !e.mpWeaponRangeTuned){
+      e.mpWeaponRangeTuned = true;
+      e.attackRange = Math.min(e.attackRange + 10, 62);
+    }
+
+    p.pickedUp = true;
+
+    if(p.obj) p.obj.setVisible(false);
+    if(p.label) p.label.setVisible(false);
+
+    mpEnemyAttachWeaponVisual(scene, e, type);
+  }
+
+  function mpUpdateEnemyWeaponVisual(e){
+    if(!e || !e.mpWeaponObj) return;
+
+    var x = mpEnemyX(e);
+    var y = mpEnemyY(e);
+
+    var facing = e.facing || e.dir || e.lastDir || "right";
+    var sx = String(facing).indexOf("left") >= 0 ? -1 : 1;
+
+    e.mpWeaponObj.x = x + (sx * 19);
+    e.mpWeaponObj.y = y - 43;
+    e.mpWeaponObj.setDepth(y + 45);
+
+    if(e.mpWeaponObj.setFlipX){
+      e.mpWeaponObj.setFlipX(sx < 0);
+    }
+  }
+
+  function mpEnemyWalkTowardPickup(scene, e, pt, dt){
+    if(!scene || !e || !pt) return false;
+
+    var ex = mpEnemyX(e);
+    var ey = mpEnemyY(e);
+    var dx = pt.x - ex;
+    var dy = pt.y - ey;
+    var d = Math.sqrt(dx * dx + dy * dy);
+
+    if(d <= MP_ENEMY_PICKUP_DIST){
+      return true;
+    }
+
+    var step = MP_ENEMY_LOOT_SPEED * Math.max(1, dt / 16.67);
+
+    var nx = ex + (dx / d) * step;
+    var ny = ey + (dy / d) * step;
+
+    mpSetEnemyPos(e, nx, ny);
+
+    e.busy = false;
+    e.state = "chase";
+
+    return false;
+  }
+
+  function mpTuneEnemyAggression(e){
+    if(!e || e.mpAggroTuned) return;
+
+    e.mpAggroTuned = true;
+
+    if(typeof e.chaseSpeed === "number"){
+      e.chaseSpeed *= 1.08;
+    }
+
+    if(typeof e.speed === "number"){
+      e.speed *= 1.06;
+    }
+
+    if(typeof e.attackCooldownMin === "number"){
+      e.attackCooldownMin = Math.max(260, Math.floor(e.attackCooldownMin * 0.82));
+    }
+
+    if(typeof e.attackCooldownMax === "number"){
+      e.attackCooldownMax = Math.max(520, Math.floor(e.attackCooldownMax * 0.86));
+    }
+
+    if(typeof e.thinkDelay === "number"){
+      e.thinkDelay = Math.max(160, Math.floor(e.thinkDelay * 0.75));
+    }
+
+    if(typeof e.reactionDelay === "number"){
+      e.reactionDelay = Math.max(120, Math.floor(e.reactionDelay * 0.75));
+    }
+
+    // Slightly closer/faster pressure, not huge long-range hits.
+    if(typeof e.stopRange === "number"){
+      e.stopRange = Math.max(28, Math.floor(e.stopRange * 0.92));
+    }
+  }
+
+  function mpUpdateEnemyPickupAI(scene, time, dt){
+    if(!scene || !scene.enemies) return;
+
+    scene.enemies.forEach(function(e){
+      if(!e || e.dead || e.state === "dead") return;
+
+      mpTuneEnemyAggression(e);
+      mpUpdateEnemyWeaponVisual(e);
+
+      if(!e.mpNextLootCheck || time >= e.mpNextLootCheck){
+        e.mpNextLootCheck = time + MP_ENEMY_LOOT_CHECK_MS + Phaser.Math.Between(0, 160);
+
+        e.mpLootTarget = null;
+        e.mpLootTargetKind = null;
+
+        // Low-health enemies prioritize food/health.
+        if(mpEnemyNeedsHealth(e)){
+          var hpTarget = mpNearestHealthPickup(scene, e);
+
+          if(hpTarget){
+            e.mpLootTarget = hpTarget;
+            e.mpLootTargetKind = "health";
+          }
+        }
+
+        // Weaponless enemies look for nearby weapons.
+        if(!e.mpLootTarget && !e.mpWeaponType){
+          var weaponTarget = mpNearestWeaponPickup(scene, e);
+
+          if(weaponTarget){
+            e.mpLootTarget = weaponTarget;
+            e.mpLootTargetKind = "weapon";
+          }
+        }
+      }
+
+      if(e.mpLootTarget && e.mpLootTarget.pickup && !e.mpLootTarget.pickup.pickedUp){
+        var reached = mpEnemyWalkTowardPickup(scene, e, e.mpLootTarget, dt);
+
+        if(reached){
+          if(e.mpLootTargetKind === "health"){
+            mpEnemyUseHealthPickup(scene, e, e.mpLootTarget.pickup);
+          }else if(e.mpLootTargetKind === "weapon"){
+            mpEnemyPickupWeapon(scene, e, e.mpLootTarget.pickup);
+          }
+
+          e.mpLootTarget = null;
+          e.mpLootTargetKind = null;
+        }
+      }
+    });
+  }
+
+  if(Game.prototype.spawnEnemyType && !Game.prototype.mpAggroSpawnWrapped){
+    Game.prototype.mpAggroSpawnWrapped = true;
+
+    var MP_OLD_SPAWN_ENEMY_AGGRO = Game.prototype.spawnEnemyType;
+
+    Game.prototype.spawnEnemyType = function(type, x, y, platform){
+      var e = MP_OLD_SPAWN_ENEMY_AGGRO.call(this, type, x, y, platform);
+      mpTuneEnemyAggression(e);
+      return e;
+    };
+  }
+
+  /* =======================================================
+     4) WRAP CREATE / UPDATE
+  ======================================================= */
+
+  var MP_OLD_CREATE_JT_BUS_ENEMY_AI = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MP_OLD_CREATE_JT_BUS_ENEMY_AI.call(this);
+
+    mpApplyJTSize(this);
+    mpFixAllArrowBuses(this);
+
+    if(this.time){
+      this.time.delayedCall(120, ()=>{
+        mpApplyJTSize(this);
+        mpFixAllArrowBuses(this);
+
+        if(this.enemies){
+          this.enemies.forEach(mpTuneEnemyAggression);
+        }
+      });
+    }
+  };
+
+  var MP_OLD_UPDATE_JT_BUS_ENEMY_AI = Game.prototype.update;
+
+  Game.prototype.update = function(time, delta){
+    if(MP_OLD_UPDATE_JT_BUS_ENEMY_AI){
+      MP_OLD_UPDATE_JT_BUS_ENEMY_AI.call(this, time, delta);
+    }
+
+    mpApplyJTSize(this);
+    mpFixAllArrowBuses(this);
+    mpUpdateEnemyPickupAI(this, time || 0, delta || 16.67);
+  };
+
+})();
+
+/* =========================================================
+   END JT SIZE + BUS ROUTES + ENEMY PICKUP AI PATCH
+========================================================= */
+ /* =========================================================
+   FOOD VISIBILITY + LEFT MIRROR TOGGLE STICK OVERRIDE
+   - Makes food pickups visible again
+   - Keeps one-frame crop for current multi-item sheets
+   - Moves STICK toggle opposite of right button diamond
+   Paste ABOVE: const config = {
+========================================================= */
+
+(function(){
+  if(window.MP_FOOD_VISIBLE_TOGGLE_STICK_PATCH_V1) return;
+  window.MP_FOOD_VISIBLE_TOGGLE_STICK_PATCH_V1 = true;
+
+  if(typeof Game === "undefined") return;
+
+  /* =======================================================
+     1) FOOD SIZE OVERRIDE
+     Current sheets still show multiple items, so crop first frame.
+     Tomorrow, when you replace them with one-item PNGs, set:
+       MP_FORCE_FOOD_CROP = false;
+  ======================================================= */
+
+  var MP_FORCE_FOOD_CROP = true;
+
+  var MP_FOOD_VISIBLE_SIZE = 32;
+  var MP_BIG_FOOD_VISIBLE_SIZE = 36;
+
+  function mpFoodTypeFromKey(key){
+    return String(key || "").replace("item_", "");
+  }
+
+  function mpIsBigFood(type){
+    return (
+      type === "pizza" ||
+      type === "chicken" ||
+      type === "first_aid" ||
+      type === "medkit"
+    );
+  }
+
+  function mpFixFoodVisible(obj, type){
+    if(!obj || !obj.texture) return obj;
+
+    var key = obj.texture.key || "";
+    if(key.indexOf("item_") !== 0) return obj;
+
+    type = type || mpFoodTypeFromKey(key);
+
+    if(MP_FORCE_FOOD_CROP && obj.setCrop){
+      try{
+        var tex = obj.scene.textures.get(key);
+        var src = tex && tex.source && tex.source[0];
+
+        if(src && src.width && src.height){
+          var w = src.width;
+          var h = src.height;
+          var cropW = w;
+          var cropH = h;
+          var ratio = w / h;
+
+          // 4 horizontal frames
+          if(ratio > 2.8){
+            cropW = Math.floor(w / 4);
+            cropH = h;
+          }
+          // 2 horizontal frames
+          else if(ratio > 1.35){
+            cropW = Math.floor(w / 2);
+            cropH = h;
+          }
+          // 4 vertical frames
+          else if(ratio < 0.38){
+            cropW = w;
+            cropH = Math.floor(h / 4);
+          }
+          // 2x2 sheet
+          else{
+            cropW = Math.floor(w / 2);
+            cropH = Math.floor(h / 2);
+          }
+
+          obj.setCrop(0, 0, cropW, cropH);
+        }
+      }catch(e){}
+    }
+
+    if(obj.setDisplaySize){
+      var size = mpIsBigFood(type)
+        ? MP_BIG_FOOD_VISIBLE_SIZE
+        : MP_FOOD_VISIBLE_SIZE;
+
+      obj.setDisplaySize(size, size);
+    }
+
+    return obj;
+  }
+
+  if(Game.prototype.makeHealthItemSprite && !Game.prototype.mpFoodVisibleWrapped){
+    Game.prototype.mpFoodVisibleWrapped = true;
+
+    var MP_OLD_MAKE_HEALTH_VISIBLE = Game.prototype.makeHealthItemSprite;
+
+    Game.prototype.makeHealthItemSprite = function(type, x, y){
+      var obj = MP_OLD_MAKE_HEALTH_VISIBLE.call(this, type, x, y);
+      return mpFixFoodVisible(obj, type);
+    };
+  }
+
+  function mpFixAllFoodVisible(scene){
+    if(!scene || !scene.children) return;
+
+    scene.children.list.forEach(function(obj){
+      if(obj && obj.texture && obj.texture.key && obj.texture.key.indexOf("item_") === 0){
+        mpFixFoodVisible(obj, mpFoodTypeFromKey(obj.texture.key));
+      }
+    });
+
+    if(scene.healthItemPickups){
+      scene.healthItemPickups.forEach(function(p){
+        if(!p || !p.obj) return;
+
+        mpFixFoodVisible(p.obj, p.type);
+
+        if(p.label){
+          p.label.x = p.obj.x;
+          p.label.y = p.obj.y - 24;
+          p.label.setDepth(30000);
+        }
+      });
+    }
+  }
+
+  /* =======================================================
+     2) TOGGLE STICK LEFT MIRROR POSITION
+  ======================================================= */
+
+  if(typeof window.MP_STICK_FLOATING === "undefined"){
+    try{
+      window.MP_STICK_FLOATING =
+        localStorage.getItem("MP_STICK_FLOATING") === "1";
+    }catch(e){
+      window.MP_STICK_FLOATING = false;
+    }
+  }
+
+  function mpFindButtonDiamondCenter(scene){
+    var found = [];
+
+    if(scene.mobileButtons){
+      scene.mobileButtons.forEach(function(btn){
+        if(!btn || !btn.text) return;
+
+        var label = String(btn.text.text || "").toUpperCase();
+
+        if(label === "A" || label === "B" || label === "X" || label === "Y"){
+          found.push(btn.text);
+        }
+      });
+    }
+
+    if(found.length > 0){
+      var sx = 0;
+      var sy = 0;
+
+      found.forEach(function(t){
+        sx += t.x;
+        sy += t.y;
+      });
+
+      return {
+        x: sx / found.length,
+        y: sy / found.length
+      };
+    }
+
+    // Fallback: approximate center of right button diamond.
+    return {
+      x: W - 135,
+      y: H - 125
+    };
+  }
+
+  function mpCreateOrMoveStickToggle(scene){
+    if(!scene) return;
+
+    var diamond = mpFindButtonDiamondCenter(scene);
+
+    // Exact mirror opposite of button diamond.
+    var toggleX = W - diamond.x;
+    var toggleY = diamond.y;
+
+    // Keep it safely inside the left side.
+    toggleX = Phaser.Math.Clamp(toggleX, 82, 180);
+    toggleY = Phaser.Math.Clamp(toggleY, H - 190, H - 78);
+
+    if(!scene.mobileUI){
+      scene.mobileUI = {};
+    }
+
+    if(!scene.mobileUI.stickToggleBox){
+      scene.mobileUI.stickToggleBox = scene.add.rectangle(
+        toggleX,
+        toggleY,
+        124,
+        36,
+        0x000000,
+        0.48
+      )
+        .setStrokeStyle(2, 0xffffff, 0.45)
+        .setDepth(97000)
+        .setScrollFactor(0)
+        .setInteractive();
+
+      scene.mobileUI.stickToggleLabel = scene.add.text(toggleX, toggleY, "", {
+        font:"12px monospace",
+        fill:"#ffffff",
+        stroke:"#000000",
+        strokeThickness:3
+      })
+        .setOrigin(0.5)
+        .setDepth(97001)
+        .setScrollFactor(0);
+
+      scene.mobileUI.stickToggleBox.on("pointerdown", function(p){
+        if(p && p.event && p.event.preventDefault){
+          p.event.preventDefault();
+        }
+
+        window.MP_STICK_FLOATING = !window.MP_STICK_FLOATING;
+
+        try{
+          localStorage.setItem(
+            "MP_STICK_FLOATING",
+            window.MP_STICK_FLOATING ? "1" : "0"
+          );
+        }catch(e){}
+
+        mpRefreshStickToggle(scene);
+      });
+    }
+
+    scene.mobileUI.stickToggleBox.x = toggleX;
+    scene.mobileUI.stickToggleBox.y = toggleY;
+    scene.mobileUI.stickToggleBox.setVisible(true);
+    scene.mobileUI.stickToggleBox.setDepth(97000);
+
+    if(scene.mobileUI.stickToggleLabel){
+      scene.mobileUI.stickToggleLabel.x = toggleX;
+      scene.mobileUI.stickToggleLabel.y = toggleY;
+      scene.mobileUI.stickToggleLabel.setVisible(true);
+      scene.mobileUI.stickToggleLabel.setDepth(97001);
+    }
+
+    mpRefreshStickToggle(scene);
+  }
+
+  function mpRefreshStickToggle(scene){
+    if(!scene || !scene.mobileUI || !scene.mobileUI.stickToggleLabel) return;
+
+    scene.mobileUI.stickToggleLabel.setText(
+      window.MP_STICK_FLOATING ? "STICK: FLOAT" : "STICK: FIX"
+    );
+  }
+
+  /* =======================================================
+     3) FLOATING STICK INPUT SAFETY
+  ======================================================= */
+
+  if(Game.prototype.makeMobileControls && !Game.prototype.mpMirrorStickInputWrapped){
+    Game.prototype.mpMirrorStickInputWrapped = true;
+
+    var MP_OLD_MAKE_MOBILE_MIRROR_STICK =
+      Game.prototype.makeMobileControls;
+
+    Game.prototype.makeMobileControls = function(){
+      MP_OLD_MAKE_MOBILE_MIRROR_STICK.call(this);
+
+      var scene = this;
+      var floatDragging = false;
+
+      this.time.delayedCall(50, function(){
+        mpCreateOrMoveStickToggle(scene);
+      });
+
+      function moveFloatingStick(p){
+        if(!scene.mobileUI || !scene.mobileUI.stickBase || !scene.mobileUI.stickKnob) return;
+
+        var base = scene.mobileUI.stickBase;
+        var knob = scene.mobileUI.stickKnob;
+
+        var dx = p.x - base.x;
+        var dy = p.y - base.y;
+
+        var max = 44 * (typeof CONTROL_ZOOM !== "undefined" ? CONTROL_ZOOM : 1);
+        var d = Math.sqrt(dx * dx + dy * dy);
+
+        if(d > max){
+          dx = (dx / d) * max;
+          dy = (dy / d) * max;
+        }
+
+        knob.x = base.x + dx;
+        knob.y = base.y + dy;
+
+        scene.stickX = dx / max;
+        scene.stickY = dy / max;
+      }
+
+      this.input.on("pointerdown", function(p){
+        if(!window.MP_STICK_FLOATING) return;
+        if(!p) return;
+
+        // Floating stick only on left half.
+        if(p.x > W * 0.42) return;
+
+        // Do not move stick when tapping toggle.
+        if(scene.mobileUI && scene.mobileUI.stickToggleBox){
+          var b = scene.mobileUI.stickToggleBox;
+
+          if(Math.abs(p.x - b.x) < 80 && Math.abs(p.y - b.y) < 50){
+            return;
+          }
+        }
+
+        if(!scene.mobileUI || !scene.mobileUI.stickBase || !scene.mobileUI.stickKnob) return;
+
+        floatDragging = true;
+
+        scene.mobileUI.stickBase.x = p.x;
+        scene.mobileUI.stickBase.y = p.y;
+        scene.mobileUI.stickKnob.x = p.x;
+        scene.mobileUI.stickKnob.y = p.y;
+
+        scene.stickX = 0;
+        scene.stickY = 0;
+      });
+
+      this.input.on("pointermove", function(p){
+        if(!window.MP_STICK_FLOATING) return;
+        if(!floatDragging) return;
+
+        moveFloatingStick(p);
+      });
+
+      this.input.on("pointerup", function(){
+        if(!window.MP_STICK_FLOATING) return;
+
+        floatDragging = false;
+
+        if(scene.mobileUI && scene.mobileUI.stickBase && scene.mobileUI.stickKnob){
+          scene.mobileUI.stickKnob.x = scene.mobileUI.stickBase.x;
+          scene.mobileUI.stickKnob.y = scene.mobileUI.stickBase.y;
+        }
+
+        scene.stickX = 0;
+        scene.stickY = 0;
+      });
+
+      this.input.on("pointerupoutside", function(){
+        if(!window.MP_STICK_FLOATING) return;
+
+        floatDragging = false;
+
+        if(scene.mobileUI && scene.mobileUI.stickBase && scene.mobileUI.stickKnob){
+          scene.mobileUI.stickKnob.x = scene.mobileUI.stickBase.x;
+          scene.mobileUI.stickKnob.y = scene.mobileUI.stickBase.y;
+        }
+
+        scene.stickX = 0;
+        scene.stickY = 0;
+      });
+    };
+  }
+
+  /* =======================================================
+     4) WRAP CREATE / UPDATE
+  ======================================================= */
+
+  var MP_OLD_CREATE_FOOD_STICK_VISIBLE = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MP_OLD_CREATE_FOOD_STICK_VISIBLE.call(this);
+
+    mpFixAllFoodVisible(this);
+    mpCreateOrMoveStickToggle(this);
+
+    if(this.time){
+      this.time.delayedCall(120, ()=>{
+        mpFixAllFoodVisible(this);
+        mpCreateOrMoveStickToggle(this);
+      });
+    }
+  };
+
+  var MP_OLD_UPDATE_FOOD_STICK_VISIBLE = Game.prototype.update;
+
+  Game.prototype.update = function(time, delta){
+    if(MP_OLD_UPDATE_FOOD_STICK_VISIBLE){
+      MP_OLD_UPDATE_FOOD_STICK_VISIBLE.call(this, time, delta);
+    }
+
+    mpFixAllFoodVisible(this);
+    mpCreateOrMoveStickToggle(this);
+  };
+
+})();
+
+/* =========================================================
+   END FOOD VISIBILITY + LEFT MIRROR TOGGLE STICK OVERRIDE
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
