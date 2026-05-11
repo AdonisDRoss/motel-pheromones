@@ -10868,6 +10868,67 @@ Game.prototype.create = function(){
       .setScrollFactor(0);
   }
 };
+  /* =========================================================
+   ITEM ARRAY STARTUP FIX
+   - Prevents healthItemPickups / weaponPickups crash
+   - Fixes Game.create crash after level select
+========================================================= */
+
+function mpEnsurePickupArrays(scene){
+  if(!scene) return;
+
+  if(!scene.healthItemPickups){
+    scene.healthItemPickups = [];
+  }
+
+  if(!scene.weaponPickups){
+    scene.weaponPickups = [];
+  }
+
+  if(!scene.inventory){
+    scene.inventory = [];
+  }
+
+  if(!scene.healthItemPopulatedScreens){
+    scene.healthItemPopulatedScreens = {};
+  }
+
+  if(!scene.weaponPopulatedScreens){
+    scene.weaponPopulatedScreens = {};
+  }
+}
+
+const MP_ORIGINAL_GAME_CREATE_ITEM_ARRAY_FIX = Game.prototype.create;
+
+Game.prototype.create = function(){
+  mpEnsurePickupArrays(this);
+  MP_ORIGINAL_GAME_CREATE_ITEM_ARRAY_FIX.call(this);
+  mpEnsurePickupArrays(this);
+};
+
+if(Game.prototype.spawnHealthItemPickup){
+  const MP_ORIGINAL_SPAWN_HEALTH_ITEM_ARRAY_FIX =
+    Game.prototype.spawnHealthItemPickup;
+
+  Game.prototype.spawnHealthItemPickup = function(){
+    mpEnsurePickupArrays(this);
+    return MP_ORIGINAL_SPAWN_HEALTH_ITEM_ARRAY_FIX.apply(this, arguments);
+  };
+}
+
+if(Game.prototype.spawnWeaponPickup){
+  const MP_ORIGINAL_SPAWN_WEAPON_ITEM_ARRAY_FIX =
+    Game.prototype.spawnWeaponPickup;
+
+  Game.prototype.spawnWeaponPickup = function(){
+    mpEnsurePickupArrays(this);
+    return MP_ORIGINAL_SPAWN_WEAPON_ITEM_ARRAY_FIX.apply(this, arguments);
+  };
+}
+
+/* =========================================================
+   END ITEM ARRAY STARTUP FIX
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
