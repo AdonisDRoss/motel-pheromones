@@ -10761,6 +10761,113 @@ Game.prototype.closePauseMenu = function(){
 /* =========================================================
    END FOOD + WEAPON SHARED INVENTORY — LIGHT USE / HEAVY STORE
 ========================================================= */
+  /* =========================================================
+   MISSING HELPER SAFETY PATCH
+========================================================= */
+
+if(typeof Game !== "undefined"){
+  if(!Game.prototype.updateBusyWatchdog){
+    Game.prototype.updateBusyWatchdog = function(){};
+  }
+
+  if(!Game.prototype.freezeActors){
+    Game.prototype.freezeActors = function(){
+      if(this.enemies){
+        this.enemies.forEach(e=>{
+          if(e && e.sprite && e.sprite.anims){
+            e.sprite.anims.pause();
+          }
+        });
+      }
+    };
+  }
+
+  if(!Game.prototype.updatePlayerAntiStuck){
+    Game.prototype.updatePlayerAntiStuck = function(){};
+  }
+}
+  /* =========================================================
+   MISSING HELPER SAFETY PATCH
+========================================================= */
+
+if(typeof Game !== "undefined"){
+  if(!Game.prototype.updateBusyWatchdog){
+    Game.prototype.updateBusyWatchdog = function(){};
+  }
+
+  if(!Game.prototype.freezeActors){
+    Game.prototype.freezeActors = function(){
+      if(this.enemies){
+        this.enemies.forEach(e=>{
+          if(e && e.sprite && e.sprite.anims){
+            e.sprite.anims.pause();
+          }
+        });
+      }
+    };
+  }
+
+  if(!Game.prototype.updatePlayerAntiStuck){
+    Game.prototype.updatePlayerAntiStuck = function(){};
+  }
+}
+  /* =========================================================
+   MISSING HELPER SAFETY PATCH
+========================================================= */
+
+if(typeof Game !== "undefined"){
+  if(!Game.prototype.updateBusyWatchdog){
+    Game.prototype.updateBusyWatchdog = function(){};
+  }
+
+  if(!Game.prototype.freezeActors){
+    Game.prototype.freezeActors = function(){};
+  }
+
+  if(!Game.prototype.updatePlayerAntiStuck){
+    Game.prototype.updatePlayerAntiStuck = function(){};
+  }
+}
+
+/* =========================================================
+   GAME CREATE ERROR SCREEN
+========================================================= */
+
+const MP_ORIGINAL_GAME_CREATE_DEBUG = Game.prototype.create;
+
+Game.prototype.create = function(){
+  try{
+    MP_ORIGINAL_GAME_CREATE_DEBUG.call(this);
+  }catch(err){
+    const msg = err && err.message ? err.message : String(err);
+
+    window.__MP_LAST_ERROR = msg;
+    console.error("GAME CREATE ERROR:", err);
+
+    this.add.rectangle(CX, CY, W, H, 0x000000, 0.92)
+      .setDepth(99990)
+      .setScrollFactor(0);
+
+    this.add.text(CX, 130, "GAME START ERROR", {
+      font: "34px monospace",
+      fill: "#ff4fc3",
+      stroke: "#000000",
+      strokeThickness: 6
+    })
+      .setOrigin(0.5)
+      .setDepth(99991)
+      .setScrollFactor(0);
+
+    this.add.text(40, 190, msg, {
+      font: "18px monospace",
+      fill: "#ffffff",
+      backgroundColor: "#000000",
+      wordWrap: { width: W - 80 }
+    })
+      .setDepth(99991)
+      .setScrollFactor(0);
+  }
+};
   const config = {
   parent: "game",
   type: Phaser.AUTO,
