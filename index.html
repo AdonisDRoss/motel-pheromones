@@ -1752,10 +1752,7 @@ this.player.setDepth(200);
 
 safePlay(this.player,this.getPlayerAnim("idle_down"));
 this.setupCameraFollow();
-   this.add.image(300, getPlatformY("middle") - 20, "item_pizza")
-  .setOrigin(0.5)
-  .setScale(0.3)
-  .setDepth(getPlatformY("middle") + 30);
+
    
 this.poseSprite=this.add.sprite(470,390,this.getPlayerAttackSheet());
 this.poseSprite.setOrigin(0.5,1);
@@ -9607,16 +9604,16 @@ Game.prototype.populateHealthItemsForScreen = function(screenKey){
 const MP_PICKUP_MIN_DISTANCE = 145;
 
 // Food / drink pickup screen size.
-const MP_FOOD_PICKUP_W = 34;
-const MP_FOOD_PICKUP_H = 34;
+const MP_FOOD_PICKUP_W = 22;
+const MP_FOOD_PICKUP_H = 22;
 
 // Bigger food items can be slightly larger.
-const MP_BIG_FOOD_PICKUP_W = 42;
-const MP_BIG_FOOD_PICKUP_H = 42;
+const MP_BIG_FOOD_PICKUP_W = 28;
+const MP_BIG_FOOD_PICKUP_H = 28;
 
 // Weapon pickup screen size.
-const MP_WEAPON_PICKUP_W = 42;
-const MP_WEAPON_PICKUP_H = 42;
+const MP_WEAPON_PICKUP_W = 30;
+const MP_WEAPON_PICKUP_H = 30;
 
 // Held weapon screen size.
 const MP_HELD_WEAPON_W = 54;
