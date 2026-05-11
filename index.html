@@ -9596,7 +9596,1171 @@ Game.prototype.populateHealthItemsForScreen = function(screenKey){
 /* =========================================================
    END QUICK RANDOM HEALTH ITEM SPAWN PATCH
 ========================================================= */
-  
+  /* =========================================================
+   SMALL PICKUPS + FAR RANDOM SPACING PATCH
+   - Makes food/drinks small
+   - Makes weapons small on the ground
+   - Keeps held weapons slightly larger
+   - Prevents random pickups from spawning too close together
+========================================================= */
+
+const MP_PICKUP_MIN_DISTANCE = 145;
+
+// Food / drink pickup screen size.
+const MP_FOOD_PICKUP_W = 34;
+const MP_FOOD_PICKUP_H = 34;
+
+// Bigger food items can be slightly larger.
+const MP_BIG_FOOD_PICKUP_W = 42;
+const MP_BIG_FOOD_PICKUP_H = 42;
+
+// Weapon pickup screen size.
+const MP_WEAPON_PICKUP_W = 42;
+const MP_WEAPON_PICKUP_H = 42;
+
+// Held weapon screen size.
+const MP_HELD_WEAPON_W = 54;
+const MP_HELD_WEAPON_H = 54;
+
+// Long held weapons.
+const MP_LONG_HELD_WEAPON_W = 76;
+const MP_LONG_HELD_WEAPON_H = 54;
+
+function mpApplyImageSize(obj, w, h){
+  if(!obj) return obj;
+
+  if(obj.setDisplaySize){
+    obj.setDisplaySize(w, h);
+  }
+
+  return obj;
+}
+
+function mpDistance2D(a, b){
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function mpPickFarApartPoints(scene, points, count, minDistance){
+  const shuffled = scene.shuffleHealthArrayCopy
+    ? scene.shuffleHealthArrayCopy(points)
+    : points.slice();
+
+  const picked = [];
+
+  for(let i = 0; i < shuffled.length; i++){
+    const p = shuffled[i];
+
+    let tooClose = false;
+
+    for(let j = 0; j < picked.length; j++){
+      if(mpDistance2D(p, picked[j]) < minDistance){
+        tooClose = true;
+        break;
+      }
+    }
+
+    if(!tooClose){
+      picked.push(p);
+    }
+
+    if(picked.length >= count){
+      break;
+    }
+  }
+
+  // Fallback if spacing was too strict.
+  if(picked.length < count){
+    for(let i = 0; i < shuffled.length; i++){
+      if(picked.indexOf(shuffled[i]) === -1){
+        picked.push(shuffled[i]);
+      }
+
+      if(picked.length >= count){
+        break;
+      }
+    }
+  }
+
+  return picked;
+}
+
+/* =========================================================
+   FOOD / DRINK SIZE FIX
+========================================================= */
+
+if(typeof MP_HEALTH_ITEM_DEFS !== "undefined"){
+  Object.keys(MP_HEALTH_ITEM_DEFS).forEach(type=>{
+    const def = MP_HEALTH_ITEM_DEFS[type];
+
+    // These scale values are only backups.
+    // The real size is forced with setDisplaySize below.
+    def.scale = 1;
+  });
+}
+
+if(typeof Game !== "undefined"){
+  Game.prototype.makeHealthItemSprite = function(type, x, y){
+    const def = MP_HEALTH_ITEM_DEFS[type];
+    if(!def) return null;
+
+    let obj;
+
+    if(hasTex(this, def.key)){
+      obj = this.add.image(x, y, def.key)
+        .setOrigin(0.5, 0.5);
+
+      const big =
+        type === "pizza" ||
+        type === "chicken" ||
+        type === "first_aid";
+
+      mpApplyImageSize(
+        obj,
+        big ? MP_BIG_FOOD_PICKUP_W : MP_FOOD_PICKUP_W,
+        big ? MP_BIG_FOOD_PICKUP_H : MP_FOOD_PICKUP_H
+      );
+
+      return obj;
+    }
+
+    // Fallback placeholders if asset is missing.
+    if(type === "pizza"){
+      return this.add.triangle(x, y, -12, 9, 12, 9, 0, -11, 0xffcc55, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "chicken"){
+      return this.add.circle(x, y, 13, 0xd28a3c, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "soda" || type === "energy_drink" || type === "water"){
+      return this.add.rectangle(x, y, 14, 24, 0x55ccff, 1)
+        .setStrokeStyle(2, 0x000000);
+    }
+
+    if(type === "spliff"){
+      return this.add.rectangle(x, y, 26, 6, 0xe8e0c8, 1)
+        .setStrokeStyle(2, 0x000000)
+        .setRotation(-0.25);
+    }
+
+    return this.add.circle(x, y, 12, 0xffd35a, 1)
+      .setStrokeStyle(2, 0x000000);
+  };
+}
+
+/* =========================================================
+   WEAPON SIZE FIX
+========================================================= */
+
+if(typeof MPW_DEFS !== "undefined"){
+  Object.keys(MPW_DEFS).forEach(type=>{
+    const def = MPW_DEFS[type];
+
+    // Backup only. setDisplaySize controls real size.
+    def.scale = 1;
+    def.pickupScale = 1;
+  });
+}
+
+if(typeof Game !== "undefined"){
+  Game.prototype.makeWeaponObject = function(type, x, y, held=false){
+    const def = MPW_DEFS[type];
+    if(!def) return null;
+
+    let obj;
+
+    if(hasTex(this, def.key)){
+      obj = this.add.image(x, y, def.key)
+        .setOrigin(0.5, 0.5);
+
+      const longWeapon =
+        type === "pipe" ||
+        type === "bat" ||
+        type === "bottle" ||
+        type === "chain";
+
+      if(held){
+        mpApplyImageSize(
+          obj,
+          longWeapon ? MP_LONG_HELD_WEAPON_W : MP_HELD_WEAPON_W,
+          longWeapon ? MP_LONG_HELD_WEAPON_H : MP_HELD_WEAPON_H
+        );
+      }else{
+        mpApplyImageSize(
+          obj,
+          MP_WEAPON_PICKUP_W,
+          MP_WEAPON_PICKUP_H
+        );
+      }
+
+      return obj;
+    }
+
+    if(type === "rock"){
+      return this.add.circle(x, y, held ? 12 : 10, 0x777777, 1)
+        .setStrokeStyle(2, 0x222222);
+    }
+
+    if(type === "chain"){
+      return this.add.rectangle(x, y, held ? 62 : 38, held ? 9 : 7, 0xa0a0a0, 1)
+        .setStrokeStyle(2, 0x222222)
+        .setRotation(-0.15);
+    }
+
+    return this.add.rectangle(x, y, held ? 58 : 36, held ? 10 : 8, 0xc0c0c0, 1)
+      .setStrokeStyle(2, 0x000000)
+      .setRotation(-0.25);
+  };
+}
+
+/* =========================================================
+   FAR APART HEALTH ITEM SPAWNS
+========================================================= */
+
+if(typeof Game !== "undefined" && Game.prototype.populateHealthItemsForScreen){
+  Game.prototype.populateHealthItemsForScreen = function(screenKey){
+    if(!screenKey){
+      screenKey = mpHealthScreenKey(this);
+    }
+
+    if(!this.healthItemPopulatedScreens){
+      this.healthItemPopulatedScreens = {};
+    }
+
+    if(this.healthItemPopulatedScreens[screenKey]){
+      return;
+    }
+
+    this.healthItemPopulatedScreens[screenKey] = true;
+
+    const points = this.getHealthItemSpawnPoints(screenKey);
+
+    const count = Phaser.Math.Between(
+      typeof MP_HEALTH_QUICK_MIN !== "undefined" ? MP_HEALTH_QUICK_MIN : 6,
+      typeof MP_HEALTH_QUICK_MAX !== "undefined" ? MP_HEALTH_QUICK_MAX : 7
+    );
+
+    const pickedPoints = mpPickFarApartPoints(
+      this,
+      points,
+      count,
+      MP_PICKUP_MIN_DISTANCE
+    );
+
+    pickedPoints.forEach(p=>{
+      const type = this.pickWeightedHealthItemType();
+
+      this.spawnHealthItemPickup(
+        type,
+        p.x + Phaser.Math.Between(-10, 10),
+        p.y,
+        p.platform,
+        screenKey
+      );
+    });
+  };
+}
+
+/* =========================================================
+   FAR APART WEAPON SPAWNS
+========================================================= */
+
+if(typeof Game !== "undefined" && Game.prototype.populateRandomWeaponsForScreen){
+  Game.prototype.populateRandomWeaponsForScreen = function(screenKey){
+    if(!screenKey){
+      screenKey = this.getCurrentWeaponScreenKey
+        ? this.getCurrentWeaponScreenKey()
+        : selectedLevel || "default";
+    }
+
+    if(!this.weaponPopulatedScreens){
+      this.weaponPopulatedScreens = {};
+    }
+
+    if(this.weaponPopulatedScreens[screenKey]){
+      return;
+    }
+
+    this.weaponPopulatedScreens[screenKey] = true;
+
+    const points = this.getRandomWeaponSpawnPoints(screenKey);
+
+    const count = Phaser.Math.Between(
+      typeof MP_RANDOM_WEAPON_MIN !== "undefined" ? MP_RANDOM_WEAPON_MIN : 3,
+      typeof MP_RANDOM_WEAPON_MAX !== "undefined" ? MP_RANDOM_WEAPON_MAX : 4
+    );
+
+    const pickedPoints = mpPickFarApartPoints(
+      this,
+      points,
+      count,
+      MP_PICKUP_MIN_DISTANCE
+    );
+
+    pickedPoints.forEach(p=>{
+      const type = this.pickRandomWeaponType();
+
+      this.spawnWeaponPickup(
+        type,
+        p.x + Phaser.Math.Between(-10, 10),
+        p.y,
+        p.platform,
+        screenKey
+      );
+    });
+  };
+}
+
+/* =========================================================
+   END SMALL PICKUPS + FAR RANDOM SPACING PATCH
+========================================================= */
+ /* =========================================================
+   FOOD + WEAPON SHARED INVENTORY — LIGHT USE / HEAVY STORE
+   - Light attack near food = consume immediately
+   - Heavy attack near food = store food in inventory
+   - Inventory max = 3
+   - Inventory A / ENTER = use food or equip weapon
+   - Inventory B = drop selected item
+   - Dropped food/weapons return to ground for teammate pickup
+========================================================= */
+
+const MP_SHARED_INVENTORY_MAX = 3;
+
+function mpGetSharedInventoryMax(){
+  return MP_SHARED_INVENTORY_MAX;
+}
+
+function mpIsFoodInventoryItem(item){
+  return item && item.itemKind === "food";
+}
+
+function mpIsWeaponInventoryItem(item){
+  return item && item.itemKind !== "food";
+}
+
+function mpMixedInventoryScreenKey(scene){
+  if(scene && scene.getCurrentWeaponScreenKey){
+    return scene.getCurrentWeaponScreenKey();
+  }
+
+  if(scene && scene.isLeftyLowerScreen && scene.isLeftyLowerScreen()){
+    return "lefty_lower";
+  }
+
+  if(scene && scene.isLeftyOutdoorLevel && scene.isLeftyOutdoorLevel()){
+    return "lefty_main";
+  }
+
+  return selectedLevel || "default";
+}
+
+function mpMixedFoodGroundY(scene, platform){
+  if(typeof mpHealthGroundY === "function"){
+    return mpHealthGroundY(scene, platform);
+  }
+
+  if(
+    scene &&
+    scene.isLeftyLowerScreen &&
+    scene.isLeftyLowerScreen() &&
+    typeof getLeftyLowerPlatformY === "function"
+  ){
+    return getLeftyLowerPlatformY(platform);
+  }
+
+  return getPlatformY(platform);
+}
+
+function mpMixedWeaponGroundY(scene, platform){
+  if(typeof mpwGetGroundY === "function"){
+    return mpwGetGroundY(scene, platform);
+  }
+
+  if(
+    scene &&
+    scene.isLeftyLowerScreen &&
+    scene.isLeftyLowerScreen() &&
+    typeof getLeftyLowerPlatformY === "function"
+  ){
+    return getLeftyLowerPlatformY(platform);
+  }
+
+  return getPlatformY(platform);
+}
+
+/* =========================================================
+   FOOD: USE NOW OR STORE
+========================================================= */
+
+Game.prototype.useFoodPickupNow = function(pickup){
+  if(!pickup || pickup.pickedUp) return false;
+
+  pickup.pickedUp = true;
+
+  if(pickup.obj) pickup.obj.setVisible(false);
+  if(pickup.label) pickup.label.setVisible(false);
+
+  if(this.consumeHealthItemPickup){
+    // Re-open consumed flag for existing consume function.
+    pickup.pickedUp = false;
+    return this.consumeHealthItemPickup(pickup);
+  }
+
+  const def = pickup.def;
+  const heal = def.heal || 0;
+  const maxHp = this.playerMaxHealth || 100;
+
+  this.playerHealth = Phaser.Math.Clamp(
+    (this.playerHealth || 0) + heal,
+    0,
+    maxHp
+  );
+
+  if(this.applyHealthItemBuff){
+    this.applyHealthItemBuff(def);
+  }
+
+  if(this.zoneText){
+    this.zoneText.setText(def.label + " +" + heal + " HP");
+  }
+
+  return true;
+};
+
+Game.prototype.pickupFoodToInventory = function(pickup){
+  if(!pickup || pickup.pickedUp) return false;
+
+  if(!this.inventory){
+    this.inventory = [];
+  }
+
+  if(this.inventory.length >= mpGetSharedInventoryMax()){
+    if(this.zoneText){
+      this.zoneText.setText("INVENTORY FULL");
+    }
+    return false;
+  }
+
+  pickup.pickedUp = true;
+
+  if(pickup.obj) pickup.obj.setVisible(false);
+  if(pickup.label) pickup.label.setVisible(false);
+
+  this.inventory.push({
+    id: Date.now() + "_" + Phaser.Math.Between(1000, 9999),
+    itemKind: "food",
+    type: pickup.type,
+    label: pickup.def.label,
+    def: pickup.def
+  });
+
+  if(this.zoneText){
+    this.zoneText.setText("STORED: " + pickup.def.label);
+  }
+
+  return true;
+};
+
+/* =========================================================
+   WEAPONS: STORE IN SAME INVENTORY
+========================================================= */
+
+Game.prototype.pickupWeapon = function(pickup){
+  if(!pickup || pickup.pickedUp) return false;
+
+  if(!this.inventory){
+    this.inventory = [];
+  }
+
+  if(this.inventory.length >= mpGetSharedInventoryMax()){
+    if(this.zoneText){
+      this.zoneText.setText("INVENTORY FULL");
+    }
+    return false;
+  }
+
+  pickup.pickedUp = true;
+
+  if(pickup.obj) pickup.obj.setVisible(false);
+  if(pickup.label) pickup.label.setVisible(false);
+
+  const item = {
+    id: Date.now() + "_" + Phaser.Math.Between(1000,9999),
+    itemKind: "weapon",
+    type: pickup.type,
+    label: pickup.def.label,
+    def: pickup.def
+  };
+
+  this.inventory.push(item);
+  this.equipWeaponIndex(this.inventory.length - 1);
+
+  if(this.zoneText){
+    this.zoneText.setText("PICKED UP: " + pickup.def.label);
+  }
+
+  return true;
+};
+
+/* =========================================================
+   GROUND CONTROLS
+   - Light attack near food = use immediately
+   - Heavy attack near food = put in inventory
+========================================================= */
+
+const MP_ORIGINAL_START_ATTACK_MIXED_INV = Game.prototype.startAttack;
+
+Game.prototype.startAttack = function(type){
+  if(
+    !this.inventoryOpen &&
+    type === "light" &&
+    this.getNearestHealthItemPickup &&
+    !this.pauseMenuOpen &&
+    this.matchStarted &&
+    !this.matchOver
+  ){
+    const food = this.getNearestHealthItemPickup();
+
+    if(food){
+      this.useFoodPickupNow(food);
+      return;
+    }
+  }
+
+  MP_ORIGINAL_START_ATTACK_MIXED_INV.call(this, type);
+};
+
+const MP_ORIGINAL_START_CONTEXT_Y_MIXED_INV = Game.prototype.startContextY;
+
+Game.prototype.startContextY = function(){
+  if(this.inventoryOpen){
+    this.useOrEquipSelectedInventoryItem();
+    return;
+  }
+
+  if(
+    this.getNearestHealthItemPickup &&
+    !this.pauseMenuOpen &&
+    this.matchStarted &&
+    !this.matchOver
+  ){
+    const food = this.getNearestHealthItemPickup();
+
+    if(food){
+      this.pickupFoodToInventory(food);
+      return;
+    }
+  }
+
+  MP_ORIGINAL_START_CONTEXT_Y_MIXED_INV.call(this);
+};
+
+/* Optional: E/G near food also stores it, so pickup still works */
+const MP_ORIGINAL_START_GRAB_MIXED_INV = Game.prototype.startGrab;
+
+Game.prototype.startGrab = function(){
+  if(this.inventoryOpen){
+    return;
+  }
+
+  const food = this.getNearestHealthItemPickup
+    ? this.getNearestHealthItemPickup()
+    : null;
+
+  if(food){
+    this.pickupFoodToInventory(food);
+    return;
+  }
+
+  MP_ORIGINAL_START_GRAB_MIXED_INV.call(this);
+};
+
+/* =========================================================
+   EQUIP / REMOVE WEAPONS
+========================================================= */
+
+Game.prototype.equipWeaponIndex = function(index){
+  if(!this.inventory || index < 0 || index >= this.inventory.length){
+    this.currentWeaponIndex = -1;
+    this.currentWeapon = null;
+
+    if(this.destroyHeldWeaponSprite){
+      this.destroyHeldWeaponSprite();
+    }
+
+    return;
+  }
+
+  const item = this.inventory[index];
+
+  if(mpIsFoodInventoryItem(item)){
+    if(this.zoneText){
+      this.zoneText.setText("FOOD CAN'T EQUIP — USE IT");
+    }
+    return;
+  }
+
+  this.currentWeaponIndex = index;
+  this.currentWeapon = item;
+
+  if(this.destroyHeldWeaponSprite){
+    this.destroyHeldWeaponSprite();
+  }
+
+  if(this.makeWeaponObject){
+    this.weaponSprite = this.makeWeaponObject(
+      item.type,
+      this.player.x,
+      this.player.y - 60,
+      true
+    );
+  }
+
+  if(this.weaponSprite){
+    this.weaponSprite.setDepth(12000);
+
+    if(this.weaponSprite.setRotation){
+      this.weaponSprite.setRotation(item.def.rotation || 0);
+    }
+  }
+
+  if(this.zoneText){
+    this.zoneText.setText("EQUIPPED: " + item.def.label);
+  }
+};
+
+Game.prototype.removeCurrentWeaponFromInventory = function(){
+  if(!this.inventory) return null;
+  if(this.currentWeaponIndex < 0) return null;
+  if(this.currentWeaponIndex >= this.inventory.length) return null;
+
+  const item = this.inventory[this.currentWeaponIndex];
+
+  if(mpIsFoodInventoryItem(item)){
+    return null;
+  }
+
+  const removed = this.inventory.splice(this.currentWeaponIndex, 1)[0];
+
+  this.currentWeaponIndex = -1;
+  this.currentWeapon = null;
+
+  if(this.destroyHeldWeaponSprite){
+    this.destroyHeldWeaponSprite();
+  }
+
+  for(let i = 0; i < this.inventory.length; i++){
+    if(mpIsWeaponInventoryItem(this.inventory[i])){
+      this.equipWeaponIndex(i);
+      break;
+    }
+  }
+
+  return removed;
+};
+
+/* =========================================================
+   USE FOOD FROM INVENTORY
+========================================================= */
+
+Game.prototype.useFoodInventoryItem = function(index){
+  if(!this.inventory) return;
+  if(index < 0 || index >= this.inventory.length) return;
+
+  const item = this.inventory[index];
+  if(!mpIsFoodInventoryItem(item)) return;
+
+  const def = item.def;
+  const heal = def.heal || 0;
+  const maxHp = this.playerMaxHealth || 100;
+
+  this.playerHealth = Phaser.Math.Clamp(
+    (this.playerHealth || 0) + heal,
+    0,
+    maxHp
+  );
+
+  if(this.applyHealthItemBuff){
+    this.applyHealthItemBuff(def);
+  }
+
+  if(this.showHealthItemFX){
+    this.showHealthItemFX({
+      def,
+      x: this.player.x,
+      y: this.player.y,
+      pickedUp: true
+    });
+  }else{
+    const txt = this.add.text(this.player.x, this.player.y - 90, "+" + heal + " HP", {
+      font: "18px monospace",
+      fill: "#7CFF6B",
+      stroke: "#000000",
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(15000);
+
+    this.tweens.add({
+      targets: txt,
+      y: txt.y - 30,
+      alpha: 0,
+      duration: 600,
+      onComplete: ()=>txt.destroy()
+    });
+  }
+
+  this.inventory.splice(index, 1);
+
+  if(index < this.currentWeaponIndex){
+    this.currentWeaponIndex--;
+  }
+
+  if(this.zoneText){
+    this.zoneText.setText(def.label + " +" + heal + " HP");
+  }
+};
+
+/* =========================================================
+   DROP FOOD OR WEAPON FOR TEAMMATE
+========================================================= */
+
+Game.prototype.dropInventoryItem = function(index){
+  if(!this.inventory) return;
+  if(index < 0 || index >= this.inventory.length) return;
+  if(!this.player) return;
+
+  const item = this.inventory[index];
+  const screenKey = mpMixedInventoryScreenKey(this);
+
+  this.inventory.splice(index, 1);
+
+  if(index === this.currentWeaponIndex){
+    this.currentWeaponIndex = -1;
+    this.currentWeapon = null;
+
+    if(this.destroyHeldWeaponSprite){
+      this.destroyHeldWeaponSprite();
+    }
+  }else if(index < this.currentWeaponIndex){
+    this.currentWeaponIndex--;
+  }
+
+  const x = Phaser.Math.Clamp(
+    this.player.x + this.getFacingDir() * 42,
+    80,
+    W - 80
+  );
+
+  if(mpIsFoodInventoryItem(item)){
+    const y = mpMixedFoodGroundY(this, this.platform);
+
+    if(this.spawnHealthItemPickup){
+      this.spawnHealthItemPickup(
+        item.type,
+        x,
+        y,
+        this.platform,
+        screenKey
+      );
+    }
+  }else{
+    const y = mpMixedWeaponGroundY(this, this.platform);
+
+    if(this.spawnWeaponPickup){
+      this.spawnWeaponPickup(
+        item.type,
+        x,
+        y,
+        this.platform,
+        screenKey
+      );
+    }
+  }
+
+  this.selectedInventoryIndex = Phaser.Math.Clamp(
+    this.selectedInventoryIndex || 0,
+    0,
+    Math.max(0, this.inventory.length - 1)
+  );
+
+  if(this.zoneText){
+    this.zoneText.setText("DROPPED: " + item.label);
+  }
+};
+
+Game.prototype.dropSelectedInventoryItem = function(){
+  if(!this.inventoryOpen) return;
+  if(!this.inventory || this.inventory.length <= 0) return;
+
+  const index = Phaser.Math.Clamp(
+    this.selectedInventoryIndex || 0,
+    0,
+    this.inventory.length - 1
+  );
+
+  this.dropInventoryItem(index);
+  this.openInventoryMenu();
+};
+
+Game.prototype.useOrEquipSelectedInventoryItem = function(){
+  if(!this.inventoryOpen) return;
+  if(!this.inventory || this.inventory.length <= 0) return;
+
+  const index = Phaser.Math.Clamp(
+    this.selectedInventoryIndex || 0,
+    0,
+    this.inventory.length - 1
+  );
+
+  const item = this.inventory[index];
+
+  if(mpIsFoodInventoryItem(item)){
+    this.useFoodInventoryItem(index);
+  }else{
+    this.equipWeaponIndex(index);
+  }
+
+  this.openInventoryMenu();
+};
+
+Game.prototype.moveInventorySelection = function(dir){
+  if(!this.inventoryOpen) return;
+  if(!this.inventory || this.inventory.length <= 0) return;
+
+  const len = this.inventory.length;
+
+  this.selectedInventoryIndex =
+    ((this.selectedInventoryIndex || 0) + dir + len) % len;
+
+  this.openInventoryMenu();
+};
+
+/* =========================================================
+   INVENTORY BUTTON HOOKS
+   - Mobile A = use/equip
+   - Mobile B = drop
+========================================================= */
+
+const MP_ORIGINAL_START_CONTEXT_KICK_MIXED_INV = Game.prototype.startContextKick;
+
+Game.prototype.startContextKick = function(){
+  if(this.inventoryOpen){
+    this.useOrEquipSelectedInventoryItem();
+    return;
+  }
+
+  MP_ORIGINAL_START_CONTEXT_KICK_MIXED_INV.call(this);
+};
+
+const MP_ORIGINAL_START_CONTEXT_B_MIXED_INV = Game.prototype.startContextB;
+
+Game.prototype.startContextB = function(){
+  if(this.inventoryOpen){
+    this.dropSelectedInventoryItem();
+    return;
+  }
+
+  MP_ORIGINAL_START_CONTEXT_B_MIXED_INV.call(this);
+};
+
+const MP_ORIGINAL_MAKE_KEYBOARD_MIXED_INV = Game.prototype.makeKeyboard;
+
+Game.prototype.makeKeyboard = function(){
+  MP_ORIGINAL_MAKE_KEYBOARD_MIXED_INV.call(this);
+
+  if(this.mpInventoryKeyboardReady) return;
+  this.mpInventoryKeyboardReady = true;
+
+  this.input.keyboard.on("keydown-UP", ()=>{
+    if(this.inventoryOpen) this.moveInventorySelection(-1);
+  });
+
+  this.input.keyboard.on("keydown-DOWN", ()=>{
+    if(this.inventoryOpen) this.moveInventorySelection(1);
+  });
+
+  this.input.keyboard.on("keydown-W", ()=>{
+    if(this.inventoryOpen) this.moveInventorySelection(-1);
+  });
+
+  this.input.keyboard.on("keydown-S", ()=>{
+    if(this.inventoryOpen) this.moveInventorySelection(1);
+  });
+
+  this.input.keyboard.on("keydown-A", ()=>{
+    if(this.inventoryOpen) this.useOrEquipSelectedInventoryItem();
+  });
+
+  this.input.keyboard.on("keydown-ENTER", ()=>{
+    if(this.inventoryOpen) this.useOrEquipSelectedInventoryItem();
+  });
+
+  this.input.keyboard.on("keydown-B", ()=>{
+    if(this.inventoryOpen) this.dropSelectedInventoryItem();
+  });
+
+  this.input.keyboard.on("keydown-ESC", ()=>{
+    if(this.inventoryOpen){
+      this.clearInventoryUI();
+      this.openPauseMenu();
+    }
+  });
+};
+
+/* =========================================================
+   INVENTORY UI
+========================================================= */
+
+Game.prototype.clearInventoryUI = function(){
+  if(this.inventoryItems && this.inventoryItems.length){
+    this.inventoryItems.forEach(obj=>{
+      if(obj && obj.destroy) obj.destroy();
+    });
+  }
+
+  this.inventoryItems = [];
+  this.inventoryRows = [];
+  this.inventoryOpen = false;
+};
+
+Game.prototype.openInventoryMenu = function(){
+  this.clearInventoryUI();
+  this.inventoryOpen = true;
+
+  if(!this.inventory){
+    this.inventory = [];
+  }
+
+  if(this.inventory.length <= 0){
+    this.selectedInventoryIndex = 0;
+  }else{
+    this.selectedInventoryIndex = Phaser.Math.Clamp(
+      this.selectedInventoryIndex || 0,
+      0,
+      this.inventory.length - 1
+    );
+  }
+
+  const shade = this.add.rectangle(CX, CY, W, H, 0x000000, 0.72)
+    .setDepth(40000)
+    .setScrollFactor(0);
+
+  const panel = this.add.rectangle(CX, CY, 610, 410, 0x111111, 0.96)
+    .setStrokeStyle(4, 0xff4fc3)
+    .setDepth(40001)
+    .setScrollFactor(0);
+
+  const title = this.add.text(CX, 88, "INVENTORY", {
+    font: "38px monospace",
+    fill: "#fff45c",
+    stroke: "#000000",
+    strokeThickness: 6
+  }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+  const count = this.add.text(CX, 124, this.inventory.length + " / " + mpGetSharedInventoryMax(), {
+    font: "16px monospace",
+    fill: "#7CFF6B",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+  const help = this.add.text(CX, 455, "A = USE / EQUIP     B = DROP     UP/DOWN = SELECT", {
+    font: "13px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+  this.inventoryItems.push(shade, panel, title, count, help);
+
+  if(this.inventory.length <= 0){
+    const empty = this.add.text(CX, 260, "NO ITEMS", {
+      font: "24px monospace",
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+    this.inventoryItems.push(empty);
+  }else{
+    this.inventory.forEach((item, index)=>{
+      const y = 170 + index * 54;
+      const isFood = mpIsFoodInventoryItem(item);
+      const equipped = !isFood && index === this.currentWeaponIndex;
+      const selected = index === this.selectedInventoryIndex;
+
+      const rowColor = selected ? 0x2b1028 : 0x000000;
+      const strokeColor = selected
+        ? 0xfff45c
+        : equipped
+          ? 0x00eaff
+          : isFood
+            ? 0x7CFF6B
+            : 0xff4fc3;
+
+      const row = this.add.rectangle(CX, y, 530, 42, rowColor, 0.92)
+        .setStrokeStyle(selected ? 4 : 2, strokeColor)
+        .setDepth(40002)
+        .setScrollFactor(0)
+        .setInteractive();
+
+      const typeText = isFood ? "FOOD" : "WEAPON";
+      const heldText = equipped ? " HELD" : "";
+      const arrow = selected ? "> " : "  ";
+
+      const name = this.add.text(CX - 245, y, arrow + (index + 1) + ". " + item.label + " [" + typeText + "]" + heldText, {
+        font: "15px monospace",
+        fill: selected ? "#fff45c" : "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 3
+      }).setOrigin(0, 0.5).setDepth(40003).setScrollFactor(0);
+
+      const actionLabel = isFood ? "A USE" : equipped ? "HELD" : "A EQUIP";
+
+      const actionBtn = this.add.text(CX + 100, y, actionLabel, {
+        font: "14px monospace",
+        fill: isFood ? "#7CFF6B" : "#00eaff",
+        stroke: "#000000",
+        strokeThickness: 3,
+        backgroundColor: "#101022"
+      }).setOrigin(0.5).setDepth(40004).setScrollFactor(0).setInteractive();
+
+      actionBtn.on("pointerdown", ()=>{
+        this.selectedInventoryIndex = index;
+        this.useOrEquipSelectedInventoryItem();
+      });
+
+      const dropBtn = this.add.text(CX + 205, y, "B DROP", {
+        font: "14px monospace",
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 3,
+        backgroundColor: "#220018"
+      }).setOrigin(0.5).setDepth(40004).setScrollFactor(0).setInteractive();
+
+      dropBtn.on("pointerdown", ()=>{
+        this.selectedInventoryIndex = index;
+        this.dropSelectedInventoryItem();
+      });
+
+      row.on("pointerdown", ()=>{
+        this.selectedInventoryIndex = index;
+        this.openInventoryMenu();
+      });
+
+      this.inventoryRows.push(row);
+      this.inventoryItems.push(row, name, actionBtn, dropBtn);
+    });
+  }
+
+  const backBtn = this.add.text(CX, 498, "BACK", {
+    font: "20px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 4,
+    backgroundColor: "#220018"
+  }).setOrigin(0.5).setDepth(40003).setScrollFactor(0).setInteractive();
+
+  backBtn.on("pointerdown", ()=>{
+    this.clearInventoryUI();
+    this.openPauseMenu();
+  });
+
+  this.inventoryItems.push(backBtn);
+};
+
+Game.prototype.openSimpleInventoryMenu = Game.prototype.openInventoryMenu;
+
+/* =========================================================
+   PAUSE MENU WITH INVENTORY OPTION
+========================================================= */
+
+Game.prototype.openPauseMenu = function(){
+  if(this.pauseMenuOpen) return;
+
+  this.pauseMenuOpen = true;
+  this.clearInventoryUI();
+
+  const shade = this.add.rectangle(CX, CY, W, H, 0x000000, 0.55)
+    .setDepth(30000)
+    .setScrollFactor(0);
+
+  const panel = this.add.rectangle(480, 270, 460, 310, 0x111111, 0.94)
+    .setStrokeStyle(4, 0xff4fc3)
+    .setDepth(30001)
+    .setScrollFactor(0);
+
+  const title = this.add.text(480, 145, "PAUSED", {
+    font: "46px monospace",
+    fill: "#fff45c",
+    stroke: "#000000",
+    strokeThickness: 6
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0);
+
+  const continueText = this.add.text(480, 225, "CONTINUE", {
+    font: "28px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  const inventoryText = this.add.text(480, 275, "INVENTORY", {
+    font: "28px monospace",
+    fill: "#7CFF6B",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  const quitText = this.add.text(480, 325, "QUIT TO TITLE", {
+    font: "28px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  continueText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+  });
+
+  inventoryText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+    this.pauseMenuOpen = true;
+    this.openInventoryMenu();
+  });
+
+  quitText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+    this.scene.start("Title");
+  });
+
+  this.pauseItems = [
+    shade,
+    panel,
+    title,
+    continueText,
+    inventoryText,
+    quitText
+  ];
+};
+
+Game.prototype.closePauseMenu = function(){
+  if(this.pauseItems && this.pauseItems.length){
+    this.pauseItems.forEach(item=>{
+      if(item && item.destroy) item.destroy();
+    });
+  }
+
+  this.pauseItems = [];
+  this.clearInventoryUI();
+  this.pauseMenuOpen = false;
+};
+
+/* =========================================================
+   END FOOD + WEAPON SHARED INVENTORY — LIGHT USE / HEAVY STORE
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
