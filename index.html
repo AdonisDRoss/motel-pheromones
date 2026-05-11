@@ -11678,6 +11678,421 @@ if(typeof Game !== "undefined"){
 /* =========================================================
    END FOOD SINGLE-ITEM + MENU CONTROLLER FIX PATCH
 ========================================================= */
+  /* =========================================================
+   TITLE CLEANUP + LANDING SPOTS + SINGLE-FRAME FOOD
+   + HUD SAFE POSITION + ARROW BUS SIZE FIX
+   Put this ABOVE: const config = {
+========================================================= */
+
+/* =========================================================
+   1) REMOVE "MUSIC TEST" FROM TITLE SCREEN
+========================================================= */
+
+if(typeof Title !== "undefined"){
+  const MP_OLD_TITLE_CREATE_CLEAN = Title.prototype.create;
+
+  Title.prototype.create = function(){
+    if(MP_OLD_TITLE_CREATE_CLEAN){
+      MP_OLD_TITLE_CREATE_CLEAN.call(this);
+    }
+
+    if(this.children && this.children.list){
+      this.children.list.forEach(obj=>{
+        if(obj && typeof obj.text === "string"){
+          if(/music test/i.test(obj.text)){
+            obj.setText("");
+            obj.setVisible(false);
+          }
+        }
+      });
+    }
+  };
+}
+
+/* =========================================================
+   2) MOVE HUD INTO CAMERA FRAME
+   - Fixes HP / groove text being cut off on left side
+========================================================= */
+
+const MP_HUD_SAFE_X = 44;
+const MP_HUD_SAFE_TOP = 76;
+
+function mpMoveHudIntoFrame(scene){
+  if(!scene || !scene.children) return;
+
+  scene.children.list.forEach(obj=>{
+    if(!obj || typeof obj.text !== "string") return;
+
+    const txt = obj.text.toUpperCase();
+
+    const isHud =
+      txt.indexOf("CHAR:") === 0 ||
+      txt.indexOf("LEVEL:") === 0 ||
+      txt.indexOf("COMBO:") === 0 ||
+      txt.indexOf("HP:") === 0 ||
+      txt.indexOf("THM:") >= 0 ||
+      txt.indexOf("RHYTHM") >= 0 ||
+      txt.indexOf("GROOVE") >= 0;
+
+    if(!isHud) return;
+
+    if(obj.x < MP_HUD_SAFE_X){
+      obj.x = MP_HUD_SAFE_X;
+    }
+
+    if(obj.y < MP_HUD_SAFE_TOP){
+      obj.y = MP_HUD_SAFE_TOP;
+    }
+
+    if(obj.setScrollFactor){
+      obj.setScrollFactor(0);
+    }
+
+    if(obj.setDepth){
+      obj.setDepth(99999);
+    }
+  });
+
+  // Your main HUD variables, if present.
+  if(scene.playerHealthText){
+    scene.playerHealthText.x = MP_HUD_SAFE_X;
+    scene.playerHealthText.y = MP_HUD_SAFE_TOP + 74;
+    scene.playerHealthText.setScrollFactor(0).setDepth(99999);
+  }
+
+  if(scene.comboText){
+    scene.comboText.x = MP_HUD_SAFE_X;
+    scene.comboText.y = MP_HUD_SAFE_TOP + 50;
+    scene.comboText.setScrollFactor(0).setDepth(99999);
+  }
+
+  if(scene.debugInputText){
+    scene.debugInputText.x = MP_HUD_SAFE_X;
+    scene.debugInputText.y = MP_HUD_SAFE_TOP + 98;
+    scene.debugInputText.setScrollFactor(0).setDepth(99999);
+  }
+}
+
+/* =========================================================
+   3) EXTRA JUMP / LANDING SPOTS
+   - Car hood
+   - Upper-left mini roof
+========================================================= */
+
+const MP_CAR_TOP_ZONE = {
+  minX: 95,
+  maxX: 275,
+  y: 372,
+  snapUp: 95,
+  snapDown: 30,
+  platform: "car_top"
+};
+
+const MP_LEFT_MINI_ROOF_ZONE = {
+  minX: 300,
+  maxX: 490,
+  y: 236,
+  snapUp: 120,
+  snapDown: 35,
+  platform: "mini_roof"
+};
+
+function mpIsPlayerAirborne(scene){
+  if(!scene || !scene.player) return false;
+
+  if(scene.isJumping) return true;
+  if(scene.playerJumping) return true;
+  if(scene.jumpCount && scene.jumpCount > 0) return true;
+
+  if(scene.player.body && Math.abs(scene.player.body.velocity.y) > 4){
+    return true;
+  }
+
+  return false;
+}
+
+function mpTrySnapToLandingZone(scene, zone){
+  if(!scene || !scene.player || !zone) return false;
+
+  const p = scene.player;
+  const px = p.x;
+  const py = p.y;
+
+  if(px < zone.minX || px > zone.maxX) return false;
+  if(py < zone.y - zone.snapUp) return false;
+  if(py > zone.y + zone.snapDown) return false;
+
+  if(p.body && p.body.velocity && p.body.velocity.y < -15){
+    return false;
+  }
+
+  p.y = zone.y;
+
+  if(p.body && p.body.velocity){
+    p.body.velocity.y = 0;
+  }
+
+  scene.isJumping = false;
+  scene.playerJumping = false;
+  scene.jumpCount = 0;
+  scene.doubleJumpUsed = false;
+  scene.platform = zone.platform;
+  scene.currentPlatform = zone.platform;
+  scene.lastPlatform = zone.platform;
+  scene.playerGroundY = zone.y;
+
+  if(scene.shadow){
+    scene.shadow.x = p.x;
+    scene.shadow.y = zone.y + 4;
+  }
+
+  if(scene.zoneText){
+    scene.zoneText.setText(String(zone.platform).toUpperCase());
+  }
+
+  if(scene.forcePlayerReady){
+    scene.forcePlayerReady();
+  }
+
+  return true;
+}
+
+/* =========================================================
+   4) FORCE FOOD TO SHOW ONLY ONE FRAME
+   - Crops to the first cell
+   - Makes pickups tiny
+========================================================= */
+
+const MP_SMALL_FOOD_SIZE = 14;
+const MP_BIG_FOOD_SIZE = 16;
+
+const MP_FOOD_FRAME_CROP = {
+  taco:         { w: 16, h: 16 },
+  pizza:        { w: 16, h: 16 },
+  chicken:      { w: 16, h: 16 },
+  water:        { w: 16, h: 16 },
+  soda:         { w: 16, h: 16 },
+  energy:       { w: 16, h: 16 },
+  energy_drink: { w: 16, h: 16 },
+  spliff:       { w: 16, h: 16 },
+  first_aid:    { w: 16, h: 16 },
+  medkit:       { w: 16, h: 16 },
+  hot_sauce:    { w: 16, h: 16 }
+};
+
+function mpApplySingleFrameCrop(obj, cropW, cropH, sizeW, sizeH){
+  if(!obj) return obj;
+
+  if(obj.setCrop){
+    obj.setCrop(0, 0, cropW, cropH);
+  }
+
+  if(obj.setDisplaySize){
+    obj.setDisplaySize(sizeW, sizeH);
+  }
+
+  return obj;
+}
+
+function mpFixExistingFoodObjects(scene){
+  if(!scene || !scene.children) return;
+
+  scene.children.list.forEach(obj=>{
+    if(!obj || !obj.texture || !obj.texture.key) return;
+
+    const key = obj.texture.key;
+
+    if(key.indexOf("item_") !== 0) return;
+
+    const type = key.replace("item_", "");
+    const crop = MP_FOOD_FRAME_CROP[type] || { w: 16, h: 16 };
+
+    const isBig =
+      type === "pizza" ||
+      type === "chicken" ||
+      type === "first_aid" ||
+      type === "medkit";
+
+    const size = isBig ? MP_BIG_FOOD_SIZE : MP_SMALL_FOOD_SIZE;
+
+    mpApplySingleFrameCrop(obj, crop.w, crop.h, size, size);
+  });
+
+  if(scene.healthItemPickups){
+    scene.healthItemPickups.forEach(p=>{
+      if(!p || !p.obj) return;
+
+      const type = p.type || "";
+      const crop = MP_FOOD_FRAME_CROP[type] || { w: 16, h: 16 };
+
+      const isBig =
+        type === "pizza" ||
+        type === "chicken" ||
+        type === "first_aid" ||
+        type === "medkit";
+
+      const size = isBig ? MP_BIG_FOOD_SIZE : MP_SMALL_FOOD_SIZE;
+
+      mpApplySingleFrameCrop(p.obj, crop.w, crop.h, size, size);
+
+      if(p.label){
+        p.label.y = p.obj.y - 18;
+      }
+    });
+  }
+}
+
+if(typeof Game !== "undefined"){
+  Game.prototype.makeHealthItemSprite = function(type, x, y){
+    if(typeof MP_HEALTH_ITEM_DEFS === "undefined") return null;
+
+    const def = MP_HEALTH_ITEM_DEFS[type];
+    if(!def) return null;
+
+    const key = def.key;
+    const crop = MP_FOOD_FRAME_CROP[type] || { w: 16, h: 16 };
+
+    const isBig =
+      type === "pizza" ||
+      type === "chicken" ||
+      type === "first_aid" ||
+      type === "medkit";
+
+    const size = isBig ? MP_BIG_FOOD_SIZE : MP_SMALL_FOOD_SIZE;
+
+    if(typeof hasTex === "function" && hasTex(this, key)){
+      const obj = this.add.image(x, y, key).setOrigin(0.5, 0.5);
+
+      mpApplySingleFrameCrop(
+        obj,
+        crop.w,
+        crop.h,
+        size,
+        size
+      );
+
+      return obj;
+    }
+
+    return this.add.circle(x, y, 5, 0xffd35a, 1)
+      .setStrokeStyle(1, 0x000000);
+  };
+}
+
+/* =========================================================
+   5) ARROW BUS SIZE / POSITION FIX
+   - Preserves image aspect ratio
+   - Stops stretched skinny bus
+   - Pushes bus farther back onto road
+========================================================= */
+
+const MP_ARROW_BUS_TARGET_W = 270;
+const MP_ARROW_BUS_ROAD_Y = 285;
+const MP_ARROW_BUS_DEPTH = 420;
+
+function mpNormalizeArrowBus(bus){
+  if(!bus || !bus.texture || bus.texture.key !== "arrow_bus") return;
+
+  try{
+    const tex = bus.scene.textures.get("arrow_bus");
+    const src = tex && tex.source && tex.source[0];
+
+    if(src && src.width){
+      const scale = MP_ARROW_BUS_TARGET_W / src.width;
+      bus.setScale(scale);
+    }else{
+      bus.setDisplaySize(MP_ARROW_BUS_TARGET_W, 82);
+    }
+  }catch(e){
+    if(bus.setDisplaySize){
+      bus.setDisplaySize(MP_ARROW_BUS_TARGET_W, 82);
+    }
+  }
+
+  bus.y = MP_ARROW_BUS_ROAD_Y;
+  bus.setOrigin(0.5, 0.75);
+  bus.setDepth(MP_ARROW_BUS_DEPTH);
+}
+
+/* If your bus patch uses spawnArrowBusHazard(), normalize it there. */
+if(typeof Game !== "undefined" && Game.prototype.spawnArrowBusHazard && !Game.prototype.mpArrowBusSpawnWrapped){
+  Game.prototype.mpArrowBusSpawnWrapped = true;
+
+  const MP_OLD_SPAWN_ARROW_BUS = Game.prototype.spawnArrowBusHazard;
+
+  Game.prototype.spawnArrowBusHazard = function(){
+    const result = MP_OLD_SPAWN_ARROW_BUS.apply(this, arguments);
+
+    this.children.list.forEach(obj=>{
+      mpNormalizeArrowBus(obj);
+    });
+
+    return result;
+  };
+}
+
+/* If your bus patch uses createArrowBus(), normalize it there too. */
+if(typeof Game !== "undefined" && Game.prototype.createArrowBus && !Game.prototype.mpCreateArrowBusWrapped){
+  Game.prototype.mpCreateArrowBusWrapped = true;
+
+  const MP_OLD_CREATE_ARROW_BUS = Game.prototype.createArrowBus;
+
+  Game.prototype.createArrowBus = function(){
+    const bus = MP_OLD_CREATE_ARROW_BUS.apply(this, arguments);
+    mpNormalizeArrowBus(bus);
+    return bus;
+  };
+}
+
+/* =========================================================
+   6) WRAP GAME CREATE / UPDATE
+========================================================= */
+
+if(typeof Game !== "undefined" && !Game.prototype.mpTitleLandingFoodHudBusWrapped){
+  Game.prototype.mpTitleLandingFoodHudBusWrapped = true;
+
+  const MP_OLD_GAME_CREATE_TITLE_LANDING_FOOD_HUD_BUS = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MP_OLD_GAME_CREATE_TITLE_LANDING_FOOD_HUD_BUS.call(this);
+
+    mpMoveHudIntoFrame(this);
+    mpFixExistingFoodObjects(this);
+
+    this.time.delayedCall(100, ()=>{
+      mpMoveHudIntoFrame(this);
+      mpFixExistingFoodObjects(this);
+
+      this.children.list.forEach(obj=>{
+        mpNormalizeArrowBus(obj);
+      });
+    });
+  };
+
+  const MP_OLD_GAME_UPDATE_TITLE_LANDING_FOOD_HUD_BUS = Game.prototype.update;
+
+  Game.prototype.update = function(time, delta){
+    if(MP_OLD_GAME_UPDATE_TITLE_LANDING_FOOD_HUD_BUS){
+      MP_OLD_GAME_UPDATE_TITLE_LANDING_FOOD_HUD_BUS.call(this, time, delta);
+    }
+
+    if(this.player && mpIsPlayerAirborne(this)){
+      if(mpTrySnapToLandingZone(this, MP_CAR_TOP_ZONE)) return;
+      if(mpTrySnapToLandingZone(this, MP_LEFT_MINI_ROOF_ZONE)) return;
+    }
+
+    mpMoveHudIntoFrame(this);
+    mpFixExistingFoodObjects(this);
+
+    this.children.list.forEach(obj=>{
+      mpNormalizeArrowBus(obj);
+    });
+  };
+}
+
+/* =========================================================
+   END PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
