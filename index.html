@@ -14493,6 +14493,1248 @@ if(typeof LevelSelect !== "undefined"){
 /* =========================================================
    END MODE SELECT MAIN CARD SCREEN PATCH — FIXED OVERWRITE
 ========================================================= */
+  /* =========================================================
+   COMBINED VERSUS 3v3 + TAG + TEAM SELECT PREVIEW PATCH
+   - Versus Mode becomes 3v3
+   - P1 selects 3 fighters
+   - P2/computer team selects 3 fighters
+   - Team idle sprites show on Character Select:
+       P1 lower-left
+       P2 lower-right
+   - Tagged-out fighters heal 1 HP per second
+   - Versus matches have 5-minute timer
+   - Q / on-screen TAG button switches P1 fighter
+   - TAG button appears upper-right under current fighter bars
+   Paste ABOVE: const config = {
+========================================================= */
+
+(function(){
+  if(window.MP_COMBINED_VERSUS_3V3_TEAM_TAG_PATCH_V1) return;
+  window.MP_COMBINED_VERSUS_3V3_TEAM_TAG_PATCH_V1 = true;
+
+  const MPV_TEAM_SIZE = 3;
+  const MPV_MAX_HP = 100;
+  const MPV_MATCH_SECONDS = 300;
+  const MPV_TAG_COOLDOWN = 850;
+  const MPV_TAG_HEAL_PER_SECOND = 1;
+
+  function mpvIsVersus(){
+    return String(window.selectedGameMode || "").toLowerCase() === "versus";
+  }
+
+  function mpvCleanId(id){
+    id = String(id || "DONNY").toUpperCase();
+
+    if(id === "DONNY") return "DONNY";
+    if(id === "JT") return "JT";
+    if(id === "HEW") return "HEW";
+    if(id === "JACKSON") return "JACKSON";
+
+    return id;
+  }
+
+  function mpvName(id){
+    id = mpvCleanId(id);
+
+    if(id === "DONNY") return "DONNY";
+    if(id === "JT") return "JT";
+    if(id === "HEW") return "HEW";
+    if(id === "JACKSON") return "JACKSON";
+
+    return id;
+  }
+
+  function mpvSetGlobalFighter(id){
+    id = mpvCleanId(id);
+
+    window.selectedFighter = id;
+
+    try{
+      selectedFighter = id;
+    }catch(e){}
+  }
+
+  function mpvHasTex(scene,key){
+    return scene && scene.textures && scene.textures.exists(key);
+  }
+
+  function mpvHasAnim(scene,key){
+    return scene && scene.anims && scene.anims.exists(key);
+  }
+
+  function mpvSafePlay(sprite,key){
+    if(!sprite || !sprite.scene) return;
+
+    if(mpvHasAnim(sprite.scene,key)){
+      sprite.play(key,true);
+    }
+  }
+
+  function mpvPreviewConfig(id){
+    id = mpvCleanId(id);
+
+    const map = {
+      DONNY:{
+        sheet:"donny_movement",
+        anim:"donny_idle_down",
+        frame:0,
+        scale:0.31
+      },
+      JT:{
+        sheet:"jt_movement",
+        anim:"jt_idle_down",
+        frame:0,
+        scale:0.44
+      },
+      HEW:{
+        sheet:"hew_movement",
+        anim:"hew_idle_down",
+        frame:0,
+        scale:0.30
+      },
+      JACKSON:{
+        sheet:"jackson_movement",
+        anim:"jackson_idle_down",
+        frame:0,
+        scale:0.31
+      }
+    };
+
+    return map[id] || map.DONNY;
+  }
+
+  function mpvEnemyTypeForFighter(id){
+    id = mpvCleanId(id);
+
+    if(id === "DONNY") return "corpo_sellout";
+    if(id === "JT") return "feral";
+    if(id === "HEW") return "sellout";
+    if(id === "JACKSON") return "corpo_wannabe";
+
+    return "corpo_sellout";
+  }
+
+  function mpvEnsureTeamState(){
+    if(!Array.isArray(window.selectedP1Team)){
+      window.selectedP1Team = [];
+    }
+
+    if(!Array.isArray(window.selectedP2Team)){
+      window.selectedP2Team = [];
+    }
+
+    if(!window.MP_VERSUS_SELECT_SIDE){
+      window.MP_VERSUS_SELECT_SIDE = "p1";
+    }
+  }
+
+  function mpvResetTeamState(){
+    window.selectedP1Team = [];
+    window.selectedP2Team = [];
+    window.MP_VERSUS_SELECT_SIDE = "p1";
+  }
+
+  function mpvMakeTeamMember(id){
+    id = mpvCleanId(id);
+
+    return {
+      id:id,
+      name:mpvName(id),
+      hp:MPV_MAX_HP,
+      maxHp:MPV_MAX_HP,
+      alive:true
+    };
+  }
+
+  function mpvBuildP1Team(){
+    const ids = Array.isArray(window.selectedP1Team) && window.selectedP1Team.length
+      ? window.selectedP1Team
+      : [window.selectedFighter || "DONNY","JT","HEW"];
+
+    return ids.slice(0,MPV_TEAM_SIZE).map(mpvMakeTeamMember);
+  }
+
+  function mpvBuildP2Team(){
+    const ids = Array.isArray(window.selectedP2Team) && window.selectedP2Team.length
+      ? window.selectedP2Team
+      : ["JACKSON","HEW","JT"];
+
+    return ids.slice(0,MPV_TEAM_SIZE).map(id=>{
+      id = mpvCleanId(id);
+
+      return {
+        id:id,
+        name:"P2 " + mpvName(id),
+        fighterId:id,
+        enemyType:mpvEnemyTypeForFighter(id),
+        hp:MPV_MAX_HP,
+        maxHp:MPV_MAX_HP,
+        alive:true
+      };
+    });
+  }
+
+  function mpvNextAliveIndex(team,currentIndex){
+    if(!team || !team.length) return -1;
+
+    for(let i = 1; i <= team.length; i++){
+      const idx = (currentIndex + i) % team.length;
+      const member = team[idx];
+
+      if(member && member.alive && member.hp > 0){
+        return idx;
+      }
+    }
+
+    return -1;
+  }
+
+  function mpvTeamTotalHp(team){
+    if(!team) return 0;
+
+    return team.reduce((sum,m)=>{
+      if(!m || !m.alive) return sum;
+      return sum + Math.max(0,m.hp || 0);
+    },0);
+  }
+
+  function mpvFormatTime(seconds){
+    seconds = Math.max(0,Math.floor(seconds || 0));
+
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+
+    return String(m) + ":" + String(s).padStart(2,"0");
+  }
+
+  function mpvDestroyList(list){
+    if(!list) return;
+
+    list.forEach(obj=>{
+      if(obj && obj.destroy){
+        obj.destroy();
+      }
+    });
+  }
+
+  /* =======================================================
+     CHARACTER SELECT TEAM PREVIEW
+  ======================================================= */
+
+  if(typeof CharacterSelect !== "undefined"){
+
+    CharacterSelect.prototype.mpvMakePreviewSprite = function(id,x,y,side){
+      const cfg = mpvPreviewConfig(id);
+      const made = [];
+
+      let sprite;
+
+      if(mpvHasTex(this,cfg.sheet)){
+        sprite = this.add.sprite(x,y,cfg.sheet,cfg.frame)
+          .setOrigin(0.5,1)
+          .setScale(cfg.scale)
+          .setDepth(22000);
+
+        mpvSafePlay(sprite,cfg.anim);
+      }else{
+        sprite = this.add.rectangle(
+          x,
+          y - 32,
+          46,
+          64,
+          side === "p1" ? 0x00eaff : 0xff4fc3,
+          0.75
+        )
+          .setStrokeStyle(2,0xffffff,0.45)
+          .setDepth(22000);
+      }
+
+      const name = this.add.text(x,y + 7,mpvName(id),{
+        font:"10px monospace",
+        fill:side === "p1" ? "#7CFF6B" : "#ff9adf",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0.5)
+        .setDepth(22001);
+
+      made.push(sprite,name);
+
+      this.tweens.add({
+        targets:sprite,
+        y:y - 8,
+        duration:120,
+        yoyo:true,
+        ease:"Sine.easeOut"
+      });
+
+      return made;
+    };
+
+    CharacterSelect.prototype.mpvBuildTeamPreview = function(){
+      if(!mpvIsVersus()) return;
+
+      mpvEnsureTeamState();
+
+      if(this.mpvPreviewItems){
+        mpvDestroyList(this.mpvPreviewItems);
+      }
+
+      this.mpvPreviewItems = [];
+
+      const p1Slots = [
+        {x:235,y:500},
+        {x:300,y:500},
+        {x:365,y:500}
+      ];
+
+      const p2Slots = [
+        {x:635,y:500},
+        {x:700,y:500},
+        {x:765,y:500}
+      ];
+
+      const p1Label = this.add.text(300,432,"P1 TEAM",{
+        font:"16px monospace",
+        fill:"#7CFF6B",
+        stroke:"#000000",
+        strokeThickness:4,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0.5)
+        .setDepth(22000);
+
+      const p2Label = this.add.text(700,432,"P2 TEAM",{
+        font:"16px monospace",
+        fill:"#ff9adf",
+        stroke:"#000000",
+        strokeThickness:4,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0.5)
+        .setDepth(22000);
+
+      this.mpvPreviewItems.push(p1Label,p2Label);
+
+      p1Slots.forEach((slot,index)=>{
+        const box = this.add.rectangle(slot.x,slot.y - 35,58,78,0x000000,0.52)
+          .setStrokeStyle(2,0x7CFF6B,0.78)
+          .setDepth(21990);
+
+        this.mpvPreviewItems.push(box);
+
+        const id = window.selectedP1Team[index];
+
+        if(id){
+          this.mpvPreviewItems.push(
+            ...this.mpvMakePreviewSprite(id,slot.x,slot.y,"p1")
+          );
+        }
+      });
+
+      p2Slots.forEach((slot,index)=>{
+        const box = this.add.rectangle(slot.x,slot.y - 35,58,78,0x000000,0.52)
+          .setStrokeStyle(2,0xff4fc3,0.78)
+          .setDepth(21990);
+
+        this.mpvPreviewItems.push(box);
+
+        const id = window.selectedP2Team[index];
+
+        if(id){
+          this.mpvPreviewItems.push(
+            ...this.mpvMakePreviewSprite(id,slot.x,slot.y,"p2")
+          );
+        }
+      });
+
+      const side = window.MP_VERSUS_SELECT_SIDE || "p1";
+
+      const statusText = side === "p1"
+        ? "P1 SELECT " + (window.selectedP1Team.length + 1) + " / " + MPV_TEAM_SIZE
+        : "P2 SELECT " + (window.selectedP2Team.length + 1) + " / " + MPV_TEAM_SIZE;
+
+      const status = this.add.text(480,112,statusText,{
+        font:"18px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:4,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0.5)
+        .setDepth(22002);
+
+      const help = this.add.text(480,136,"A / ENTER SELECT    B REMOVES LAST PICK",{
+        font:"12px monospace",
+        fill:"#ffffff",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0.5)
+        .setDepth(22002);
+
+      this.mpvPreviewItems.push(status,help);
+    };
+
+    const MPV_OLD_CHARACTER_CREATE = CharacterSelect.prototype.create;
+
+    CharacterSelect.prototype.create = function(){
+      MPV_OLD_CHARACTER_CREATE.call(this);
+
+      if(mpvIsVersus()){
+        mpvResetTeamState();
+        this.mpvBuildTeamPreview();
+      }
+    };
+
+    const MPV_OLD_CHARACTER_UPDATE_SELECTION = CharacterSelect.prototype.updateSelection;
+
+    CharacterSelect.prototype.updateSelection = function(){
+      MPV_OLD_CHARACTER_UPDATE_SELECTION.call(this);
+
+      if(mpvIsVersus()){
+        this.mpvBuildTeamPreview();
+      }
+    };
+
+    const MPV_OLD_CHARACTER_SELECT_FIGHTER = CharacterSelect.prototype.selectFighter;
+
+    CharacterSelect.prototype.selectFighter = function(){
+      if(!mpvIsVersus()){
+        MPV_OLD_CHARACTER_SELECT_FIGHTER.call(this);
+        return;
+      }
+
+      mpvEnsureTeamState();
+
+      const fighter = this.fighters[this.selectedIndex];
+
+      if(!fighter || !fighter.unlocked) return;
+
+      const id = mpvCleanId(fighter.id);
+      const side = window.MP_VERSUS_SELECT_SIDE || "p1";
+      const team = side === "p1"
+        ? window.selectedP1Team
+        : window.selectedP2Team;
+
+      if(team.indexOf(id) !== -1){
+        if(this.infoName){
+          this.infoName.setText("ALREADY PICKED");
+        }
+
+        return;
+      }
+
+      team.push(id);
+
+      if(side === "p1" && team.length >= MPV_TEAM_SIZE){
+        window.MP_VERSUS_SELECT_SIDE = "p2";
+
+        if(this.infoName){
+          this.infoName.setText("P2 SELECT TEAM");
+        }
+
+        this.mpvBuildTeamPreview();
+        return;
+      }
+
+      if(side === "p2" && team.length >= MPV_TEAM_SIZE){
+        window.selectedFighter = window.selectedP1Team[0] || "DONNY";
+
+        try{
+          selectedFighter = window.selectedFighter;
+        }catch(e){}
+
+        this.scene.start("LevelSelect");
+        return;
+      }
+
+      this.mpvBuildTeamPreview();
+    };
+
+    const MPV_OLD_CHARACTER_GO_BACK = CharacterSelect.prototype.goBack;
+
+    CharacterSelect.prototype.goBack = function(){
+      if(!mpvIsVersus()){
+        MPV_OLD_CHARACTER_GO_BACK.call(this);
+        return;
+      }
+
+      mpvEnsureTeamState();
+
+      const side = window.MP_VERSUS_SELECT_SIDE || "p1";
+
+      if(side === "p2"){
+        if(window.selectedP2Team.length > 0){
+          window.selectedP2Team.pop();
+          this.mpvBuildTeamPreview();
+          return;
+        }
+
+        window.MP_VERSUS_SELECT_SIDE = "p1";
+        this.mpvBuildTeamPreview();
+        return;
+      }
+
+      if(window.selectedP1Team.length > 0){
+        window.selectedP1Team.pop();
+        this.mpvBuildTeamPreview();
+        return;
+      }
+
+      if(typeof ModeSelect !== "undefined"){
+        this.scene.start("ModeSelect");
+      }else{
+        this.scene.start("Title");
+      }
+    };
+  }
+
+  /* =======================================================
+     GAME VERSUS SYSTEM
+  ======================================================= */
+
+  if(typeof Game !== "undefined"){
+
+    function mpvClearCpu(scene){
+      if(!scene) return;
+
+      const oldCpu = scene.mpvCpu;
+
+      if(oldCpu){
+        if(scene.hideEnemyUI){
+          scene.hideEnemyUI(oldCpu);
+        }
+
+        if(oldCpu.sprite && oldCpu.sprite.destroy){
+          oldCpu.sprite.destroy();
+        }
+
+        if(oldCpu.shadow && oldCpu.shadow.destroy){
+          oldCpu.shadow.destroy();
+        }
+
+        if(oldCpu.mpWeaponObj && oldCpu.mpWeaponObj.destroy){
+          oldCpu.mpWeaponObj.destroy();
+        }
+      }
+
+      if(scene.enemies){
+        scene.enemies = scene.enemies.filter(e=>e !== oldCpu);
+      }
+
+      scene.mpvCpu = null;
+    }
+
+    function mpvCreateHud(scene){
+      if(scene.mpvHudItems){
+        mpvDestroyList(scene.mpvHudItems);
+      }
+
+      scene.mpvHudItems = [];
+
+      const x = W - 245;
+      const y = SAFE_TOP + 12;
+
+      const title = scene.add.text(x,y,"VERSUS 3v3",{
+        font:"15px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0,0)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const timer = scene.add.text(x,y + 20,"TIME 5:00",{
+        font:"18px monospace",
+        fill:"#ffffff",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0,0)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const p1Name = scene.add.text(x,y + 47,"P1",{
+        font:"14px monospace",
+        fill:"#7CFF6B",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0,0)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const hpBack = scene.add.rectangle(x + 70,y + 57,128,9,0x000000,0.85)
+        .setOrigin(0,0.5)
+        .setStrokeStyle(1,0xffffff,0.35)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const hpFill = scene.add.rectangle(x + 72,y + 57,124,5,0x7CFF6B,1)
+        .setOrigin(0,0.5)
+        .setScrollFactor(0)
+        .setDepth(65001);
+
+      const grooveBack = scene.add.rectangle(x + 70,y + 70,128,8,0x000000,0.85)
+        .setOrigin(0,0.5)
+        .setStrokeStyle(1,0xff4fc3,0.45)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const grooveFill = scene.add.rectangle(x + 72,y + 70,124,4,0xff4fc3,1)
+        .setOrigin(0,0.5)
+        .setScrollFactor(0)
+        .setDepth(65001);
+
+      const tagBox = scene.add.rectangle(x + 132,y + 101,108,34,0x220018,0.88)
+        .setStrokeStyle(3,0xfff45c,0.95)
+        .setInteractive()
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      const tagText = scene.add.text(x + 132,y + 101,"Q TAG",{
+        font:"17px monospace",
+        fill:"#ffffff",
+        stroke:"#000000",
+        strokeThickness:4
+      })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(65001);
+
+      const p2Text = scene.add.text(x,y + 124,"P2",{
+        font:"12px monospace",
+        fill:"#ff9adf",
+        stroke:"#000000",
+        strokeThickness:3,
+        backgroundColor:"#000000"
+      })
+        .setOrigin(0,0)
+        .setScrollFactor(0)
+        .setDepth(65000);
+
+      tagBox.on("pointerdown",()=>{
+        mpvTagP1(scene);
+      });
+
+      scene.mpvHud = {
+        title,
+        timer,
+        p1Name,
+        hpFill,
+        grooveFill,
+        tagBox,
+        tagText,
+        p2Text
+      };
+
+      scene.mpvHudItems.push(
+        title,
+        timer,
+        p1Name,
+        hpBack,
+        hpFill,
+        grooveBack,
+        grooveFill,
+        tagBox,
+        tagText,
+        p2Text
+      );
+    }
+
+    function mpvUpdateHud(scene){
+      if(!scene || !scene.mpvHud || !scene.mpvP1Team || !scene.mpvP2Team) return;
+
+      const p1 = scene.mpvP1Team[scene.mpvP1Index];
+      const p2 = scene.mpvP2Team[scene.mpvP2Index];
+
+      if(p1){
+        scene.mpvHud.p1Name.setText(
+          p1.name + "  HP " + Math.max(0,Math.floor(scene.playerHealth || p1.hp))
+        );
+
+        const hpPct = Phaser.Math.Clamp((scene.playerHealth || 0) / (p1.maxHp || 100),0,1);
+        scene.mpvHud.hpFill.setScale(hpPct,1);
+      }
+
+      const groovePct = Phaser.Math.Clamp((scene.rhythm || 0) / 10,0,1);
+      scene.mpvHud.grooveFill.setScale(groovePct,1);
+
+      scene.mpvHud.timer.setText("TIME " + mpvFormatTime(scene.mpvTimeLeft));
+
+      if(p2){
+        const p2Lines = scene.mpvP2Team.map((m,index)=>{
+          const mark = index === scene.mpvP2Index ? ">" : " ";
+          const ko = m.alive && m.hp > 0 ? "" : " KO";
+
+          return mark + m.name + " " + Math.floor(Math.max(0,m.hp)) + ko;
+        });
+
+        scene.mpvHud.p2Text.setText("P2 TEAM\n" + p2Lines.join("\n"));
+      }
+    }
+
+    function mpvApplyP1Fighter(scene,instant){
+      if(!scene || !scene.mpvP1Team) return;
+
+      const member = scene.mpvP1Team[scene.mpvP1Index];
+      if(!member) return;
+
+      mpvSetGlobalFighter(member.id);
+
+      scene.playerHealth = Math.max(1,Math.floor(member.hp));
+
+      if(scene.player){
+        if(scene.getPlayerMoveSheet){
+          scene.player.setTexture(scene.getPlayerMoveSheet());
+        }
+
+        scene.player.setOrigin(0.5,1);
+
+        if(scene.getPlayerMoveScale){
+          scene.player.setScale(scene.getPlayerMoveScale());
+        }
+
+        scene.player.setVisible(true);
+        scene.player.clearTint();
+
+        if(scene.getPlayerAnim){
+          mpvSafePlay(scene.player,scene.getPlayerAnim("idle_down"));
+        }
+      }
+
+      if(scene.poseSprite){
+        scene.poseSprite.stop();
+        scene.poseSprite.setVisible(false);
+      }
+
+      scene.playerBusy = false;
+      scene.busyUntil = 0;
+      scene.isJumping = false;
+      scene.isCrouching = false;
+      scene.isBlocking = false;
+
+      if(scene.zoneText){
+        scene.zoneText.setText("TAGGED IN: " + member.name);
+      }
+
+      if(!instant && scene.createHitFX && scene.player){
+        scene.createHitFX(scene.player.x,scene.player.y - 58,"jump",5);
+      }
+
+      mpvUpdateHud(scene);
+    }
+
+    function mpvSpawnCpu(scene){
+      if(!scene || !scene.mpvP2Team) return;
+
+      mpvClearCpu(scene);
+
+      const member = scene.mpvP2Team[scene.mpvP2Index];
+      if(!member || !member.alive || member.hp <= 0) return;
+
+      const bounds = scene.getCurrentPlatformBounds
+        ? scene.getCurrentPlatformBounds()
+        : (PLATFORM_BOUNDS[scene.platform] || PLATFORM_BOUNDS.middle);
+
+      const spawnX = scene.player && scene.player.x < (bounds.minX + bounds.maxX) / 2
+        ? bounds.maxX - 90
+        : bounds.minX + 90;
+
+      const spawnY = scene.player
+        ? scene.player.y
+        : ((bounds.minY + bounds.maxY) * 0.5);
+
+      const enemyType = member.enemyType || mpvEnemyTypeForFighter(member.fighterId || member.id);
+
+      const e = scene.spawnEnemyType(
+        enemyType,
+        spawnX,
+        spawnY,
+        scene.platform || "middle"
+      );
+
+      e.mpvCpuOpponent = true;
+      e.mpvCpuMember = member;
+      e.maxHealth = member.maxHp || MPV_MAX_HP;
+      e.health = Math.max(1,Math.floor(member.hp));
+      e.attackCooldown = 650;
+      e.platform = scene.platform;
+      e.homeY = spawnY;
+      e.y = spawnY;
+
+      if(e.nameText){
+        e.nameText.setText(member.name);
+      }
+
+      if(e.authText){
+        e.authText.setText("P2");
+        e.authText.setFill("#ff9adf");
+      }
+
+      if(scene.updateEnemyHealthBar){
+        scene.updateEnemyHealthBar(e);
+      }
+
+      if(scene.updateEnemyVisuals){
+        scene.updateEnemyVisuals(e);
+      }
+
+      scene.mpvCpu = e;
+
+      if(scene.zoneText){
+        scene.zoneText.setText(member.name + " TAGGED IN");
+      }
+
+      mpvUpdateHud(scene);
+    }
+
+    function mpvSetupMatch(scene){
+      if(!scene || scene.mpvSetupDone) return;
+
+      scene.versus3v3 = true;
+      scene.mpvSetupDone = true;
+      scene.mpvStarted = false;
+      scene.mpvOver = false;
+
+      scene.mpvP1Team = mpvBuildP1Team();
+      scene.mpvP2Team = mpvBuildP2Team();
+
+      scene.mpvP1Index = 0;
+      scene.mpvP2Index = 0;
+
+      scene.mpvTimeLeft = MPV_MATCH_SECONDS;
+      scene.mpvLastSecondTick = scene.time.now;
+      scene.mpvLastHealTick = scene.time.now;
+      scene.mpvNextTagTime = 0;
+      scene.mpvNextCpuTagTime = 0;
+
+      scene.enemies = [];
+      scene.enemyWaves = [];
+      scene.waveSpawning = false;
+      scene.initialWaveStarted = true;
+      scene.doormanSpawned = true;
+
+      mpvCreateHud(scene);
+      mpvApplyP1Fighter(scene,true);
+
+      if(scene.input && scene.input.keyboard && !scene.mpvTagKeyReady){
+        scene.mpvTagKeyReady = true;
+
+        scene.input.keyboard.on("keydown-Q",()=>{
+          mpvTagP1(scene);
+        });
+      }
+    }
+
+    function mpvStartMatch(scene){
+      if(!scene || !scene.mpvSetupDone || scene.mpvStarted) return;
+
+      scene.mpvStarted = true;
+      scene.mpvOver = false;
+      scene.enemies = [];
+
+      mpvSpawnCpu(scene);
+      mpvUpdateHud(scene);
+
+      if(scene.zoneText){
+        scene.zoneText.setText("VERSUS 3v3");
+      }
+    }
+
+    function mpvSyncActiveHp(scene){
+      if(!scene || !scene.mpvP1Team || !scene.mpvP2Team) return;
+
+      const p1 = scene.mpvP1Team[scene.mpvP1Index];
+
+      if(p1){
+        p1.hp = Phaser.Math.Clamp(scene.playerHealth || 0,0,p1.maxHp || MPV_MAX_HP);
+        p1.alive = p1.hp > 0;
+      }
+
+      const p2 = scene.mpvP2Team[scene.mpvP2Index];
+
+      if(p2 && scene.mpvCpu){
+        p2.hp = Phaser.Math.Clamp(scene.mpvCpu.health || 0,0,p2.maxHp || MPV_MAX_HP);
+        p2.alive = p2.hp > 0;
+      }
+    }
+
+    function mpvTagP1(scene){
+      if(!scene || !mpvIsVersus()) return;
+      if(!scene.mpvSetupDone || scene.mpvOver) return;
+      if(scene.time.now < scene.mpvNextTagTime) return;
+
+      mpvSyncActiveHp(scene);
+
+      const next = mpvNextAliveIndex(scene.mpvP1Team,scene.mpvP1Index);
+
+      if(next < 0 || next === scene.mpvP1Index){
+        if(scene.zoneText){
+          scene.zoneText.setText("NO TAG AVAILABLE");
+        }
+
+        return;
+      }
+
+      scene.mpvP1Index = next;
+      scene.mpvNextTagTime = scene.time.now + MPV_TAG_COOLDOWN;
+
+      mpvApplyP1Fighter(scene,false);
+    }
+
+    function mpvCpuAutoTag(scene){
+      if(!scene || !scene.mpvCpu || scene.mpvOver) return;
+      if(scene.time.now < scene.mpvNextCpuTagTime) return;
+
+      const member = scene.mpvP2Team[scene.mpvP2Index];
+
+      if(!member) return;
+
+      member.hp = Math.max(0,scene.mpvCpu.health || member.hp);
+
+      const hpPct = member.hp / (member.maxHp || MPV_MAX_HP);
+
+      if(hpPct > 0.25) return;
+
+      const next = mpvNextAliveIndex(scene.mpvP2Team,scene.mpvP2Index);
+
+      if(next < 0 || next === scene.mpvP2Index) return;
+
+      scene.mpvP2Index = next;
+      scene.mpvNextCpuTagTime = scene.time.now + 4500;
+
+      mpvSpawnCpu(scene);
+    }
+
+    function mpvHandleP1Ko(scene){
+      if(!scene || !scene.mpvP1Team || scene.mpvOver) return;
+
+      const member = scene.mpvP1Team[scene.mpvP1Index];
+
+      if(member){
+        member.hp = 0;
+        member.alive = false;
+      }
+
+      const next = mpvNextAliveIndex(scene.mpvP1Team,scene.mpvP1Index);
+
+      if(next < 0){
+        mpvFinishMatch(scene,"P2 WINS");
+        return;
+      }
+
+      scene.mpvP1Index = next;
+
+      scene.time.delayedCall(900,()=>{
+        if(scene.mpvOver) return;
+
+        mpvApplyP1Fighter(scene,false);
+      });
+    }
+
+    function mpvHandleCpuKo(scene){
+      if(!scene || !scene.mpvP2Team || scene.mpvOver) return;
+
+      const member = scene.mpvP2Team[scene.mpvP2Index];
+
+      if(member){
+        member.hp = 0;
+        member.alive = false;
+      }
+
+      const next = mpvNextAliveIndex(scene.mpvP2Team,scene.mpvP2Index);
+
+      if(next < 0){
+        mpvFinishMatch(scene,"P1 WINS");
+        return;
+      }
+
+      scene.mpvP2Index = next;
+
+      scene.time.delayedCall(900,()=>{
+        if(scene.mpvOver) return;
+
+        mpvSpawnCpu(scene);
+      });
+    }
+
+    function mpvHealTaggedOut(scene){
+      if(!scene || !scene.mpvP1Team || !scene.mpvP2Team) return;
+
+      scene.mpvP1Team.forEach((m,index)=>{
+        if(!m || !m.alive || index === scene.mpvP1Index) return;
+
+        m.hp = Math.min(m.maxHp || MPV_MAX_HP,(m.hp || 0) + MPV_TAG_HEAL_PER_SECOND);
+      });
+
+      scene.mpvP2Team.forEach((m,index)=>{
+        if(!m || !m.alive || index === scene.mpvP2Index) return;
+
+        m.hp = Math.min(m.maxHp || MPV_MAX_HP,(m.hp || 0) + MPV_TAG_HEAL_PER_SECOND);
+      });
+    }
+
+    function mpvCheckTimer(scene){
+      if(!scene || scene.mpvOver) return;
+
+      if(scene.time.now - scene.mpvLastSecondTick < 1000) return;
+
+      scene.mpvLastSecondTick += 1000;
+      scene.mpvTimeLeft = Math.max(0,(scene.mpvTimeLeft || 0) - 1);
+
+      if(scene.mpvTimeLeft <= 0){
+        mpvSyncActiveHp(scene);
+
+        const p1Hp = mpvTeamTotalHp(scene.mpvP1Team);
+        const p2Hp = mpvTeamTotalHp(scene.mpvP2Team);
+
+        if(p1Hp > p2Hp){
+          mpvFinishMatch(scene,"P1 WINS BY TIME");
+        }else if(p2Hp > p1Hp){
+          mpvFinishMatch(scene,"P2 WINS BY TIME");
+        }else{
+          mpvFinishMatch(scene,"DRAW");
+        }
+      }
+    }
+
+    function mpvFinishMatch(scene,resultText){
+      if(!scene || scene.mpvOver) return;
+
+      scene.mpvOver = true;
+      scene.matchOver = true;
+
+      mpvSyncActiveHp(scene);
+      mpvUpdateHud(scene);
+
+      scene.add.rectangle(CX,CY,W,H,0x000000,0.55)
+        .setDepth(76000)
+        .setScrollFactor(0);
+
+      scene.add.text(CX,CY - 22,resultText,{
+        font:"52px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:8
+      })
+        .setOrigin(0.5)
+        .setDepth(76001)
+        .setScrollFactor(0);
+
+      scene.add.text(CX,CY + 50,"VERSUS COMPLETE",{
+        font:"24px monospace",
+        fill:"#ff4fc3",
+        stroke:"#000000",
+        strokeThickness:5
+      })
+        .setOrigin(0.5)
+        .setDepth(76001)
+        .setScrollFactor(0);
+
+      if(scene.zoneText){
+        scene.zoneText.setText(resultText);
+      }
+    }
+
+    function mpvUpdate(scene,time,delta){
+      if(!scene || !mpvIsVersus()) return;
+      if(!scene.mpvSetupDone || !scene.mpvStarted || scene.mpvOver) return;
+
+      mpvSyncActiveHp(scene);
+
+      if(scene.time.now - scene.mpvLastHealTick >= 1000){
+        scene.mpvLastHealTick += 1000;
+        mpvHealTaggedOut(scene);
+      }
+
+      if(scene.playerHealth <= 0){
+        mpvHandleP1Ko(scene);
+        return;
+      }
+
+      if(scene.mpvCpu && (scene.mpvCpu.health <= 0 || scene.mpvCpu.dead || scene.mpvCpu.state === "dead")){
+        mpvHandleCpuKo(scene);
+        return;
+      }
+
+      mpvCpuAutoTag(scene);
+      mpvCheckTimer(scene);
+      mpvUpdateHud(scene);
+    }
+
+    /* -------------------------------------------------------
+       Disable story waves/bosses in Versus
+    ------------------------------------------------------- */
+
+    const MPV_OLD_CREATE_ENEMIES = Game.prototype.createEnemies;
+
+    Game.prototype.createEnemies = function(){
+      if(mpvIsVersus()){
+        this.enemies = [];
+        this.enemyWaves = [];
+        this.enemyWaveIndex = 0;
+        this.waveSpawning = false;
+        this.initialWaveStarted = true;
+        this.doormanSpawned = true;
+        return;
+      }
+
+      MPV_OLD_CREATE_ENEMIES.call(this);
+    };
+
+    if(Game.prototype.spawnEnemyWave){
+      const MPV_OLD_SPAWN_WAVE = Game.prototype.spawnEnemyWave;
+
+      Game.prototype.spawnEnemyWave = function(index){
+        if(mpvIsVersus()){
+          return false;
+        }
+
+        return MPV_OLD_SPAWN_WAVE.call(this,index);
+      };
+    }
+
+    if(Game.prototype.advanceEnemyWaveOrBoss){
+      const MPV_OLD_ADVANCE_WAVE = Game.prototype.advanceEnemyWaveOrBoss;
+
+      Game.prototype.advanceEnemyWaveOrBoss = function(){
+        if(mpvIsVersus()){
+          return;
+        }
+
+        MPV_OLD_ADVANCE_WAVE.call(this);
+      };
+    }
+
+    if(Game.prototype.checkVictory){
+      const MPV_OLD_CHECK_VICTORY = Game.prototype.checkVictory;
+
+      Game.prototype.checkVictory = function(){
+        if(mpvIsVersus()){
+          return;
+        }
+
+        MPV_OLD_CHECK_VICTORY.call(this);
+      };
+    }
+
+    /* -------------------------------------------------------
+       Hook Game create/unlock/update
+    ------------------------------------------------------- */
+
+    const MPV_OLD_GAME_CREATE = Game.prototype.create;
+
+    Game.prototype.create = function(){
+      MPV_OLD_GAME_CREATE.call(this);
+
+      if(mpvIsVersus()){
+        mpvSetupMatch(this);
+      }
+    };
+
+    if(Game.prototype.unlockPlayerControl){
+      const MPV_OLD_UNLOCK_PLAYER = Game.prototype.unlockPlayerControl;
+
+      Game.prototype.unlockPlayerControl = function(){
+        MPV_OLD_UNLOCK_PLAYER.call(this);
+
+        if(mpvIsVersus()){
+          mpvStartMatch(this);
+        }
+      };
+    }
+
+    if(Game.prototype.safeUpdate){
+      const MPV_OLD_SAFE_UPDATE = Game.prototype.safeUpdate;
+
+      Game.prototype.safeUpdate = function(time,delta){
+        MPV_OLD_SAFE_UPDATE.call(this,time,delta);
+        mpvUpdate(this,time || 0,delta || 16.67);
+      };
+    }
+
+    /* -------------------------------------------------------
+       Damage hooks
+    ------------------------------------------------------- */
+
+    if(Game.prototype.damagePlayer){
+      const MPV_OLD_DAMAGE_PLAYER = Game.prototype.damagePlayer;
+
+      Game.prototype.damagePlayer = function(amount,dir){
+        MPV_OLD_DAMAGE_PLAYER.call(this,amount,dir);
+
+        if(mpvIsVersus() && this.mpvSetupDone && this.mpvP1Team){
+          const member = this.mpvP1Team[this.mpvP1Index];
+
+          if(member){
+            member.hp = Math.max(0,this.playerHealth || 0);
+            member.alive = member.hp > 0;
+          }
+
+          if(this.playerHealth <= 0){
+            mpvHandleP1Ko(this);
+          }
+
+          mpvUpdateHud(this);
+        }
+      };
+    }
+
+    if(Game.prototype.damageEnemy){
+      const MPV_OLD_DAMAGE_ENEMY = Game.prototype.damageEnemy;
+
+      Game.prototype.damageEnemy = function(e,damage,stagger){
+        MPV_OLD_DAMAGE_ENEMY.call(this,e,damage,stagger);
+
+        if(mpvIsVersus() && e && e.mpvCpuOpponent && this.mpvP2Team){
+          const member = this.mpvP2Team[this.mpvP2Index];
+
+          if(member){
+            member.hp = Math.max(0,e.health || 0);
+            member.alive = member.hp > 0;
+          }
+
+          if((e.health <= 0 || e.dead || e.state === "dead") && !e.mpvKoHandled){
+            e.mpvKoHandled = true;
+            mpvHandleCpuKo(this);
+          }
+
+          mpvUpdateHud(this);
+        }
+      };
+    }
+
+    /* -------------------------------------------------------
+       Mobile button safety: make MENU/TAG stay visible
+    ------------------------------------------------------- */
+
+    if(Game.prototype.mpPutControllerOnTop){
+      const MPV_OLD_PUT_CONTROLLER_TOP = Game.prototype.mpPutControllerOnTop;
+
+      Game.prototype.mpPutControllerOnTop = function(){
+        MPV_OLD_PUT_CONTROLLER_TOP.call(this);
+
+        if(this.mpvHud && this.mpvHud.tagBox){
+          this.mpvHud.tagBox.setDepth(90050);
+          this.mpvHud.tagText.setDepth(90051);
+        }
+      };
+    }
+  }
+
+})();
+
+/* =========================================================
+   END COMBINED VERSUS 3v3 + TAG + TEAM SELECT PREVIEW PATCH
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
