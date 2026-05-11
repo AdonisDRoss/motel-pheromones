@@ -15735,6 +15735,618 @@ if(typeof LevelSelect !== "undefined"){
 /* =========================================================
    END COMBINED VERSUS 3v3 + TAG + TEAM SELECT PREVIEW PATCH
 ========================================================= */
+ /* =========================================================
+   VERSUS FULLSCREEN HUD + TAG FACE BUTTON FIX
+   - Pulls Versus camera back so full screen/HUD is visible
+   - Rebuilds Versus HUD inside safe screen area
+   - Moves TAG button to right side under P1 health/groove
+   - TAG button shows next teammate sprite/head preview
+   Paste AFTER combined Versus patch and ABOVE: const config = {
+========================================================= */
+
+(function(){
+  if(window.MP_VERSUS_FULLSCREEN_TAG_FACE_FIX_V1) return;
+  window.MP_VERSUS_FULLSCREEN_TAG_FACE_FIX_V1 = true;
+
+  if(typeof Game === "undefined") return;
+
+  const MPV_UI_VERSION = "tag_face_right_hud_v1";
+  const MPV_TAG_COOLDOWN = 850;
+
+  function mpvIsVersusMode(){
+    return String(window.selectedGameMode || "").toLowerCase() === "versus";
+  }
+
+  function mpvCleanFighterId(id){
+    id = String(id || "DONNY").toUpperCase();
+
+    if(id === "DONNY") return "DONNY";
+    if(id === "JT") return "JT";
+    if(id === "HEW") return "HEW";
+    if(id === "JACKSON") return "JACKSON";
+
+    return id;
+  }
+
+  function mpvNextAliveIndex(team,currentIndex){
+    if(!team || !team.length) return -1;
+
+    for(let i = 1; i <= team.length; i++){
+      const idx = (currentIndex + i) % team.length;
+      const member = team[idx];
+
+      if(member && member.alive !== false && member.hp > 0){
+        return idx;
+      }
+    }
+
+    return -1;
+  }
+
+  function mpvSetCurrentFighter(id){
+    id = mpvCleanFighterId(id);
+
+    window.selectedFighter = id;
+
+    try{
+      selectedFighter = id;
+    }catch(e){}
+  }
+
+  function mpvPreviewConfig(id){
+    id = mpvCleanFighterId(id);
+
+    const map = {
+      DONNY:{
+        sheet:"donny_movement",
+        frame:0,
+        crop:{x:0,y:0,w:210,h:92}
+      },
+      JT:{
+        sheet:"jt_movement",
+        frame:0,
+        crop:{x:0,y:0,w:204,h:78}
+      },
+      HEW:{
+        sheet:"hew_movement",
+        frame:0,
+        crop:{x:0,y:0,w:250,h:105}
+      },
+      JACKSON:{
+        sheet:"jackson_movement",
+        frame:0,
+        crop:{x:0,y:0,w:256,h:110}
+      }
+    };
+
+    return map[id] || map.DONNY;
+  }
+
+  function mpvDestroy(obj){
+    if(obj && obj.destroy){
+      obj.destroy();
+    }
+  }
+
+  function mpvDestroyList(list){
+    if(!list) return;
+
+    list.forEach(obj=>{
+      mpvDestroy(obj);
+    });
+  }
+
+  /* =======================================================
+     FULL SCREEN / CAMERA PULLBACK
+  ======================================================= */
+
+  function mpvForceFullVersusCamera(scene){
+    if(!scene || !mpvIsVersusMode()) return;
+    if(!scene.cameras || !scene.cameras.main) return;
+
+    const cam = scene.cameras.main;
+
+    // This is the main fix for missing screen edges.
+    // Versus should show the whole arena and full HUD.
+    if(cam.zoom !== 1){
+      cam.setZoom(1);
+    }
+
+    cam.setBounds(0,0,W,H);
+    cam.roundPixels = true;
+
+    if(scene.player && !scene.mpvCameraFixed){
+      scene.mpvCameraFixed = true;
+      cam.startFollow(scene.player,true,0.08,0.08);
+    }
+
+    // Keep page/canvas filling the visible browser area.
+    try{
+      document.documentElement.style.width = "100vw";
+      document.documentElement.style.height = "100dvh";
+      document.body.style.width = "100vw";
+      document.body.style.height = "100dvh";
+
+      const gameDiv = document.getElementById("game");
+      if(gameDiv){
+        gameDiv.style.width = "100vw";
+        gameDiv.style.height = "100dvh";
+      }
+
+      document.querySelectorAll("canvas").forEach(canvas=>{
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.objectFit = "contain";
+      });
+    }catch(e){}
+  }
+
+  /* =======================================================
+     LEFT HUD SAFETY
+  ======================================================= */
+
+  function mpvMoveLeftHudSafe(scene){
+    if(!scene || !scene.children) return;
+
+    const leftX = 44;
+    const topY = 76;
+
+    scene.children.list.forEach(obj=>{
+      if(!obj || typeof obj.text !== "string") return;
+
+      const txt = obj.text.toUpperCase();
+
+      const isHud =
+        txt.indexOf("CHAR:") === 0 ||
+        txt.indexOf("LEVEL:") === 0 ||
+        txt.indexOf("COMBO:") === 0 ||
+        txt.indexOf("HP:") === 0 ||
+        txt.indexOf("RHYTHM") >= 0 ||
+        txt.indexOf("GROOVE") >= 0;
+
+      if(!isHud) return;
+
+      if(obj.x < leftX) obj.x = leftX;
+      if(obj.y < topY) obj.y = topY;
+
+      if(obj.setScrollFactor) obj.setScrollFactor(0);
+      if(obj.setDepth) obj.setDepth(65000);
+    });
+
+    if(scene.comboText){
+      scene.comboText.x = leftX;
+      scene.comboText.y = topY + 48;
+      scene.comboText.setScrollFactor(0).setDepth(65000);
+    }
+
+    if(scene.playerHealthText){
+      scene.playerHealthText.x = leftX;
+      scene.playerHealthText.y = topY + 72;
+      scene.playerHealthText.setScrollFactor(0).setDepth(65000);
+    }
+
+    if(scene.debugInputText){
+      scene.debugInputText.x = leftX;
+      scene.debugInputText.y = topY + 98;
+      scene.debugInputText.setScrollFactor(0).setDepth(65000);
+    }
+  }
+
+  /* =======================================================
+     TAG LOGIC FOR NEW BUTTON
+  ======================================================= */
+
+  function mpvTagPlayerOne(scene){
+    if(!scene || !mpvIsVersusMode()) return;
+    if(!scene.mpvP1Team || !scene.mpvP1Team.length) return;
+    if(scene.mpvOver || scene.matchOver) return;
+
+    if(scene.time && scene.time.now < (scene.mpvNextTagTime || 0)){
+      if(scene.zoneText){
+        scene.zoneText.setText("TAG COOLDOWN");
+      }
+      return;
+    }
+
+    const current = scene.mpvP1Team[scene.mpvP1Index || 0];
+
+    if(current){
+      current.hp = Phaser.Math.Clamp(
+        scene.playerHealth || 0,
+        0,
+        current.maxHp || 100
+      );
+
+      current.alive = current.hp > 0;
+    }
+
+    const nextIndex = mpvNextAliveIndex(
+      scene.mpvP1Team,
+      scene.mpvP1Index || 0
+    );
+
+    if(nextIndex < 0 || nextIndex === scene.mpvP1Index){
+      if(scene.zoneText){
+        scene.zoneText.setText("NO TAG AVAILABLE");
+      }
+      return;
+    }
+
+    scene.mpvP1Index = nextIndex;
+    scene.mpvNextTagTime = scene.time.now + MPV_TAG_COOLDOWN;
+
+    const next = scene.mpvP1Team[scene.mpvP1Index];
+
+    mpvSetCurrentFighter(next.id);
+
+    scene.playerHealth = Phaser.Math.Clamp(
+      next.hp || next.maxHp || 100,
+      1,
+      next.maxHp || 100
+    );
+
+    if(scene.poseSprite){
+      scene.poseSprite.stop();
+      scene.poseSprite.setVisible(false);
+    }
+
+    if(scene.player){
+      scene.player.setVisible(true);
+      scene.player.clearTint();
+
+      if(scene.getPlayerMoveSheet){
+        scene.player.setTexture(scene.getPlayerMoveSheet());
+      }
+
+      scene.player.setOrigin(0.5,1);
+
+      if(scene.getPlayerMoveScale){
+        scene.player.setScale(scene.getPlayerMoveScale());
+      }
+
+      if(scene.getPlayerAnim){
+        const idle = scene.getPlayerAnim("idle_down");
+
+        if(scene.anims && scene.anims.exists(idle)){
+          scene.player.play(idle,true);
+        }
+      }
+    }
+
+    scene.playerBusy = false;
+    scene.busyUntil = 0;
+    scene.isJumping = false;
+    scene.isCrouching = false;
+    scene.isBlocking = false;
+
+    if(scene.createHitFX && scene.player){
+      scene.createHitFX(scene.player.x,scene.player.y - 58,"jump",5);
+    }
+
+    if(scene.zoneText){
+      scene.zoneText.setText("TAGGED IN: " + next.name);
+    }
+
+    mpvUpdateTagFace(scene,true);
+  }
+
+  /* =======================================================
+     RIGHT HUD REBUILD
+  ======================================================= */
+
+  function mpvBuildRightVersusHud(scene){
+    if(!scene || !mpvIsVersusMode()) return;
+    if(!scene.mpvHud) return;
+
+    if(scene.mpvHudPatchVersion === MPV_UI_VERSION) return;
+
+    mpvDestroyList(scene.mpvHudItems);
+    scene.mpvHudItems = [];
+
+    scene.mpvHudPatchVersion = MPV_UI_VERSION;
+
+    const rightPad = 28;
+    const hudW = 318;
+    const hudX = W - hudW - rightPad;
+    const hudY = SAFE_TOP - 8;
+
+    const tagW = 164;
+    const tagH = 48;
+    const tagX = W - rightPad - tagW / 2;
+    const tagY = hudY + 108;
+
+    const title = scene.add.text(hudX,hudY,"VERSUS 3v3",{
+      font:"15px monospace",
+      fill:"#fff45c",
+      stroke:"#000000",
+      strokeThickness:3,
+      backgroundColor:"#000000"
+    })
+      .setOrigin(0,0)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const timer = scene.add.text(hudX,hudY + 22,"TIME 5:00",{
+      font:"20px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:4,
+      backgroundColor:"#000000"
+    })
+      .setOrigin(0,0)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const p1Name = scene.add.text(hudX,hudY + 52,"P1",{
+      font:"15px monospace",
+      fill:"#7CFF6B",
+      stroke:"#000000",
+      strokeThickness:3,
+      backgroundColor:"#000000"
+    })
+      .setOrigin(0,0)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const hpBack = scene.add.rectangle(hudX + 102,hudY + 62,142,10,0x000000,0.88)
+      .setOrigin(0,0.5)
+      .setStrokeStyle(1,0xffffff,0.45)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const hpFill = scene.add.rectangle(hudX + 104,hudY + 62,138,6,0x7CFF6B,1)
+      .setOrigin(0,0.5)
+      .setScrollFactor(0)
+      .setDepth(65001);
+
+    const grooveBack = scene.add.rectangle(hudX + 102,hudY + 78,142,9,0x000000,0.88)
+      .setOrigin(0,0.5)
+      .setStrokeStyle(1,0xff4fc3,0.55)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const grooveFill = scene.add.rectangle(hudX + 104,hudY + 78,138,5,0xff4fc3,1)
+      .setOrigin(0,0.5)
+      .setScrollFactor(0)
+      .setDepth(65001);
+
+    const tagBox = scene.add.rectangle(tagX,tagY,tagW,tagH,0x220018,0.92)
+      .setStrokeStyle(3,0xfff45c,0.95)
+      .setInteractive()
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    const tagText = scene.add.text(tagX + 24,tagY - 9,"TAG",{
+      font:"17px monospace",
+      fill:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:4
+    })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(65002);
+
+    const tagNextText = scene.add.text(tagX + 24,tagY + 12,"NEXT",{
+      font:"10px monospace",
+      fill:"#fff45c",
+      stroke:"#000000",
+      strokeThickness:3
+    })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(65002);
+
+    const tagFaceBack = scene.add.circle(tagX - 54,tagY,18,0x000000,0.82)
+      .setStrokeStyle(2,0xffffff,0.65)
+      .setScrollFactor(0)
+      .setDepth(65001);
+
+    const p2Text = scene.add.text(hudX,hudY + 145,"P2 TEAM",{
+      font:"11px monospace",
+      fill:"#ff9adf",
+      stroke:"#000000",
+      strokeThickness:3,
+      backgroundColor:"#000000",
+      wordWrap:{width:hudW}
+    })
+      .setOrigin(0,0)
+      .setScrollFactor(0)
+      .setDepth(65000);
+
+    tagBox.on("pointerdown",()=>{
+      mpvTagPlayerOne(scene);
+    });
+
+    scene.mpvHud = {
+      title,
+      timer,
+      p1Name,
+      hpFill,
+      grooveFill,
+      tagBox,
+      tagText,
+      tagNextText,
+      tagFaceBack,
+      tagFace:null,
+      p2Text
+    };
+
+    scene.mpvHudItems.push(
+      title,
+      timer,
+      p1Name,
+      hpBack,
+      hpFill,
+      grooveBack,
+      grooveFill,
+      tagBox,
+      tagText,
+      tagNextText,
+      tagFaceBack,
+      p2Text
+    );
+
+    mpvUpdateTagFace(scene,true);
+  }
+
+  function mpvUpdateTagFace(scene,force){
+    if(!scene || !scene.mpvHud || !scene.mpvP1Team) return;
+
+    const nextIndex = mpvNextAliveIndex(
+      scene.mpvP1Team,
+      scene.mpvP1Index || 0
+    );
+
+    const next = nextIndex >= 0
+      ? scene.mpvP1Team[nextIndex]
+      : null;
+
+    const nextId = next ? mpvCleanFighterId(next.id) : "NONE";
+
+    if(!force && scene.mpvCurrentTagFaceId === nextId) return;
+
+    scene.mpvCurrentTagFaceId = nextId;
+
+    if(scene.mpvHud.tagFace){
+      scene.mpvHud.tagFace.destroy();
+      scene.mpvHud.tagFace = null;
+    }
+
+    if(scene.mpvHud.tagText){
+      scene.mpvHud.tagText.setText(next ? "TAG" : "NO TAG");
+    }
+
+    if(scene.mpvHud.tagNextText){
+      scene.mpvHud.tagNextText.setText(next ? next.name : "NONE");
+    }
+
+    if(!next) return;
+
+    const cfg = mpvPreviewConfig(nextId);
+    const x = scene.mpvHud.tagFaceBack.x;
+    const y = scene.mpvHud.tagFaceBack.y + 11;
+
+    if(scene.textures && scene.textures.exists(cfg.sheet)){
+      const face = scene.add.sprite(x,y,cfg.sheet,cfg.frame)
+        .setOrigin(0.5,0.5)
+        .setScrollFactor(0)
+        .setDepth(65003);
+
+      if(face.setCrop && cfg.crop){
+        face.setCrop(cfg.crop.x,cfg.crop.y,cfg.crop.w,cfg.crop.h);
+      }
+
+      face.setDisplaySize(34,34);
+
+      scene.mpvHud.tagFace = face;
+      scene.mpvHudItems.push(face);
+    }else{
+      const fallback = scene.add.text(x,y - 10,next.name.charAt(0),{
+        font:"20px monospace",
+        fill:"#fff45c",
+        stroke:"#000000",
+        strokeThickness:4
+      })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(65003);
+
+      scene.mpvHud.tagFace = fallback;
+      scene.mpvHudItems.push(fallback);
+    }
+  }
+
+  function mpvUpdateRightHudValues(scene){
+    if(!scene || !scene.mpvHud || !mpvIsVersusMode()) return;
+
+    const p1 = scene.mpvP1Team
+      ? scene.mpvP1Team[scene.mpvP1Index || 0]
+      : null;
+
+    if(p1 && scene.mpvHud.p1Name){
+      scene.mpvHud.p1Name.setText(
+        p1.name + "  HP " + Math.max(0,Math.floor(scene.playerHealth || p1.hp || 0))
+      );
+    }
+
+    if(scene.mpvHud.hpFill){
+      const maxHp = p1 ? (p1.maxHp || 100) : 100;
+      const pct = Phaser.Math.Clamp((scene.playerHealth || 0) / maxHp,0,1);
+      scene.mpvHud.hpFill.setScale(pct,1);
+    }
+
+    if(scene.mpvHud.grooveFill){
+      const groovePct = Phaser.Math.Clamp((scene.rhythm || 0) / 10,0,1);
+      scene.mpvHud.grooveFill.setScale(groovePct,1);
+    }
+
+    if(scene.mpvHud.timer && typeof scene.mpvTimeLeft === "number"){
+      const t = Math.max(0,Math.floor(scene.mpvTimeLeft));
+      const m = Math.floor(t / 60);
+      const s = String(t % 60).padStart(2,"0");
+      scene.mpvHud.timer.setText("TIME " + m + ":" + s);
+    }
+
+    mpvUpdateTagFace(scene,false);
+  }
+
+  /* =======================================================
+     HOOK GAME CREATE / UPDATE
+  ======================================================= */
+
+  const MPV_OLD_CREATE_FULLSCREEN_TAG_FIX = Game.prototype.create;
+
+  Game.prototype.create = function(){
+    MPV_OLD_CREATE_FULLSCREEN_TAG_FIX.call(this);
+
+    if(mpvIsVersusMode()){
+      mpvForceFullVersusCamera(this);
+      mpvMoveLeftHudSafe(this);
+
+      this.time.delayedCall(80,()=>{
+        mpvForceFullVersusCamera(this);
+        mpvMoveLeftHudSafe(this);
+        mpvBuildRightVersusHud(this);
+        mpvUpdateRightHudValues(this);
+      });
+    }
+  };
+
+  const MPV_OLD_UPDATE_FULLSCREEN_TAG_FIX = Game.prototype.update;
+
+  Game.prototype.update = function(time,delta){
+    if(MPV_OLD_UPDATE_FULLSCREEN_TAG_FIX){
+      MPV_OLD_UPDATE_FULLSCREEN_TAG_FIX.call(this,time,delta);
+    }
+
+    if(!mpvIsVersusMode()) return;
+
+    mpvForceFullVersusCamera(this);
+    mpvMoveLeftHudSafe(this);
+    mpvBuildRightVersusHud(this);
+    mpvUpdateRightHudValues(this);
+  };
+
+  if(Game.prototype.safeUpdate){
+    const MPV_OLD_SAFE_UPDATE_FULLSCREEN_TAG_FIX = Game.prototype.safeUpdate;
+
+    Game.prototype.safeUpdate = function(time,delta){
+      MPV_OLD_SAFE_UPDATE_FULLSCREEN_TAG_FIX.call(this,time,delta);
+
+      if(!mpvIsVersusMode()) return;
+
+      mpvForceFullVersusCamera(this);
+      mpvMoveLeftHudSafe(this);
+      mpvBuildRightVersusHud(this);
+      mpvUpdateRightHudValues(this);
+    };
+  }
+
+})();
+
+/* =========================================================
+   END VERSUS FULLSCREEN HUD + TAG FACE BUTTON FIX
+========================================================= */
   const config = {
   parent: "game",
   type: Phaser.AUTO,
