@@ -710,6 +710,10 @@ scene.load.image("item_hot_sauce", "assets/sprites/items/hot_sauce.png?v=" + VER
 scene.load.image("item_first_aid", "assets/sprites/items/first_aid.png?v=" + VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
+  scene.load.image(
+  "arrow_bus",
+  "assets/sprites/vehicles/arrow_bus.png?v=" + VERSION
+);
   scene.load.spritesheet("corpo_helicopter","assets/sprites/vehicles/corpo_helicopter_sheet.png?v="+VERSION,{
   frameWidth: HELI_FRAME_W,
   frameHeight: HELI_FRAME_H,
@@ -11292,6 +11296,387 @@ if(typeof Game !== "undefined"){
 
 /* =========================================================
    END MENU BUTTON BACKOUT PATCH
+========================================================= */
+ /* =========================================================
+   FOOD SINGLE-ITEM + MENU CONTROLLER FIX PATCH
+   - Crops multi-item food sheets to one visible item
+   - Keeps touch controller above pause/inventory
+   - MENU backs out of pause/inventory
+   - A uses/equips inventory item
+   - B drops inventory item
+========================================================= */
+
+if(typeof Game !== "undefined"){
+
+  /* =======================================================
+     FOOD SHOWING IN FOURS FIX
+  ======================================================= */
+
+  function mpForceSingleFoodFrame(obj, type){
+    if(!obj || !obj.texture) return obj;
+
+    const key = obj.texture.key || "";
+
+    if(key.indexOf("item_") !== 0){
+      return obj;
+    }
+
+    try{
+      const tex = obj.scene.textures.get(key);
+      const src = tex && tex.source && tex.source[0];
+
+      if(src && src.width && src.height){
+        const w = src.width;
+        const h = src.height;
+        const ratio = w / h;
+
+        let cropX = 0;
+        let cropY = 0;
+        let cropW = w;
+        let cropH = h;
+
+        // 4 frames in one horizontal row.
+        if(ratio > 2.8){
+          cropW = Math.floor(w / 4);
+          cropH = h;
+        }
+        // 2 frames in one horizontal row.
+        else if(ratio > 1.45){
+          cropW = Math.floor(w / 2);
+          cropH = h;
+        }
+        // 4 frames vertical.
+        else if(ratio < 0.36){
+          cropW = w;
+          cropH = Math.floor(h / 4);
+        }
+        // 2x2 sheet.
+        else{
+          cropW = Math.floor(w / 2);
+          cropH = Math.floor(h / 2);
+        }
+
+        obj.setCrop(cropX, cropY, cropW, cropH);
+      }
+    }catch(e){}
+
+    const big =
+      type === "pizza" ||
+      type === "chicken" ||
+      type === "first_aid";
+
+    if(obj.setDisplaySize){
+      obj.setDisplaySize(big ? 24 : 20, big ? 24 : 20);
+    }
+
+    return obj;
+  }
+
+  if(Game.prototype.makeHealthItemSprite && !Game.prototype.mpFoodSingleWrapped){
+    Game.prototype.mpFoodSingleWrapped = true;
+
+    const MP_ORIGINAL_MAKE_HEALTH_ITEM_SPRITE_SINGLE =
+      Game.prototype.makeHealthItemSprite;
+
+    Game.prototype.makeHealthItemSprite = function(type, x, y){
+      const obj = MP_ORIGINAL_MAKE_HEALTH_ITEM_SPRITE_SINGLE.call(this, type, x, y);
+      return mpForceSingleFoodFrame(obj, type);
+    };
+  }
+
+  if(Game.prototype.spawnHealthItemPickup && !Game.prototype.mpFoodSpawnSingleWrapped){
+    Game.prototype.mpFoodSpawnSingleWrapped = true;
+
+    const MP_ORIGINAL_SPAWN_HEALTH_ITEM_SINGLE =
+      Game.prototype.spawnHealthItemPickup;
+
+    Game.prototype.spawnHealthItemPickup = function(type, x, y, platform, screenKey){
+      const result = MP_ORIGINAL_SPAWN_HEALTH_ITEM_SINGLE.call(
+        this,
+        type,
+        x,
+        y,
+        platform,
+        screenKey
+      );
+
+      if(this.healthItemPickups){
+        this.healthItemPickups.forEach(p=>{
+          if(p && p.obj){
+            mpForceSingleFoodFrame(p.obj, p.type);
+          }
+        });
+      }
+
+      return result;
+    };
+  }
+
+  if(!Game.prototype.mpFoodCreateSingleWrapped){
+    Game.prototype.mpFoodCreateSingleWrapped = true;
+
+    const MP_ORIGINAL_CREATE_FOOD_SINGLE =
+      Game.prototype.create;
+
+    Game.prototype.create = function(){
+      MP_ORIGINAL_CREATE_FOOD_SINGLE.call(this);
+
+      this.time.delayedCall(100, ()=>{
+        if(this.healthItemPickups){
+          this.healthItemPickups.forEach(p=>{
+            if(p && p.obj){
+              mpForceSingleFoodFrame(p.obj, p.type);
+            }
+          });
+        }
+
+        this.children.list.forEach(obj=>{
+          if(obj && obj.texture && obj.texture.key && obj.texture.key.indexOf("item_") === 0){
+            mpForceSingleFoodFrame(obj, obj.texture.key.replace("item_", ""));
+          }
+        });
+      });
+    };
+  }
+
+  /* =======================================================
+     TRACK MOBILE BUTTONS
+  ======================================================= */
+
+  if(Game.prototype.mobileButton && !Game.prototype.mpTouchMenuTrackWrapped){
+    Game.prototype.mpTouchMenuTrackWrapped = true;
+
+    const MP_ORIGINAL_MOBILE_BUTTON_TOUCH_MENU =
+      Game.prototype.mobileButton;
+
+    Game.prototype.mobileButton = function(x, y, label, color, down, up){
+      const btn = MP_ORIGINAL_MOBILE_BUTTON_TOUCH_MENU.call(
+        this,
+        x,
+        y,
+        label,
+        color,
+        down,
+        up
+      );
+
+      if(!this.mobileButtons){
+        this.mobileButtons = [];
+      }
+
+      this.mobileButtons.push(btn);
+
+      return btn;
+    };
+  }
+
+  /* =======================================================
+     FORCE CONTROLLER ABOVE MENU
+  ======================================================= */
+
+  Game.prototype.mpPutControllerOnTop = function(){
+    const baseDepth = 90000;
+
+    if(this.mobileUI){
+      Object.keys(this.mobileUI).forEach(key=>{
+        const obj = this.mobileUI[key];
+
+        if(obj && obj.setDepth){
+          obj.setDepth(baseDepth + 10);
+          obj.setAlpha(1);
+          obj.setVisible(true);
+        }
+      });
+    }
+
+    if(this.mobileButtons){
+      this.mobileButtons.forEach(btn=>{
+        if(!btn) return;
+
+        if(btn.hit){
+          btn.hit.setDepth(baseDepth + 30);
+          btn.hit.setAlpha(0.01);
+          btn.hit.setVisible(true);
+        }
+
+        if(btn.shadow){
+          btn.shadow.setDepth(baseDepth + 31);
+          btn.shadow.setVisible(true);
+        }
+
+        if(btn.face){
+          btn.face.setDepth(baseDepth + 32);
+          btn.face.setAlpha(0.78);
+          btn.face.setVisible(true);
+        }
+
+        if(btn.shine){
+          btn.shine.setDepth(baseDepth + 33);
+          btn.shine.setVisible(true);
+        }
+
+        if(btn.text){
+          btn.text.setDepth(baseDepth + 34);
+          btn.text.setVisible(true);
+        }
+      });
+    }
+  };
+
+  Game.prototype.mpPutControllerNormal = function(){
+    const baseDepth = 9500;
+
+    if(this.mobileUI){
+      Object.keys(this.mobileUI).forEach(key=>{
+        const obj = this.mobileUI[key];
+
+        if(obj && obj.setDepth){
+          obj.setDepth(baseDepth + 10);
+          obj.setVisible(true);
+        }
+      });
+    }
+
+    if(this.mobileButtons){
+      this.mobileButtons.forEach(btn=>{
+        if(!btn) return;
+
+        if(btn.hit) btn.hit.setDepth(baseDepth + 20);
+        if(btn.shadow) btn.shadow.setDepth(baseDepth + 21);
+        if(btn.face) btn.face.setDepth(baseDepth + 22);
+        if(btn.shine) btn.shine.setDepth(baseDepth + 23);
+        if(btn.text) btn.text.setDepth(baseDepth + 24);
+      });
+    }
+  };
+
+  /* =======================================================
+     PAUSE / INVENTORY MENU BEHAVIOR
+  ======================================================= */
+
+  if(Game.prototype.openPauseMenu && !Game.prototype.mpOpenPauseTouchWrapped){
+    Game.prototype.mpOpenPauseTouchWrapped = true;
+
+    const MP_ORIGINAL_OPEN_PAUSE_TOUCH =
+      Game.prototype.openPauseMenu;
+
+    Game.prototype.openPauseMenu = function(){
+      MP_ORIGINAL_OPEN_PAUSE_TOUCH.call(this);
+
+      this.mpPutControllerOnTop();
+
+      if(this.zoneText){
+        this.zoneText.setText("PAUSED - MENU TO RETURN");
+      }
+    };
+  }
+
+  if(Game.prototype.openInventoryMenu && !Game.prototype.mpOpenInventoryTouchWrapped){
+    Game.prototype.mpOpenInventoryTouchWrapped = true;
+
+    const MP_ORIGINAL_OPEN_INVENTORY_TOUCH =
+      Game.prototype.openInventoryMenu;
+
+    Game.prototype.openInventoryMenu = function(){
+      MP_ORIGINAL_OPEN_INVENTORY_TOUCH.call(this);
+
+      this.mpPutControllerOnTop();
+
+      if(this.zoneText){
+        this.zoneText.setText("INVENTORY - A USE/EQUIP  B DROP  MENU BACK");
+      }
+    };
+  }
+
+  if(Game.prototype.closePauseMenu && !Game.prototype.mpClosePauseTouchWrapped){
+    Game.prototype.mpClosePauseTouchWrapped = true;
+
+    const MP_ORIGINAL_CLOSE_PAUSE_TOUCH =
+      Game.prototype.closePauseMenu;
+
+    Game.prototype.closePauseMenu = function(){
+      if(this.clearInventoryUI){
+        this.clearInventoryUI();
+      }
+
+      MP_ORIGINAL_CLOSE_PAUSE_TOUCH.call(this);
+
+      this.inventoryOpen = false;
+      this.pauseMenuOpen = false;
+
+      this.mpPutControllerNormal();
+
+      if(this.zoneText && this.platform){
+        this.zoneText.setText(String(this.platform).toUpperCase() + " PLATFORM");
+      }
+    };
+  }
+
+  if(Game.prototype.togglePauseMenu && !Game.prototype.mpTogglePauseTouchWrapped){
+    Game.prototype.mpTogglePauseTouchWrapped = true;
+
+    const MP_ORIGINAL_TOGGLE_PAUSE_TOUCH =
+      Game.prototype.togglePauseMenu;
+
+    Game.prototype.togglePauseMenu = function(){
+      if(this.inventoryOpen || this.pauseMenuOpen){
+        this.closePauseMenu();
+        return;
+      }
+
+      MP_ORIGINAL_TOGGLE_PAUSE_TOUCH.call(this);
+    };
+  }
+
+  /* =======================================================
+     INVENTORY BUTTON CONTROLS
+     A = use/equip
+     B = drop
+  ======================================================= */
+
+  if(Game.prototype.startContextKick && !Game.prototype.mpInventoryATouchWrapped){
+    Game.prototype.mpInventoryATouchWrapped = true;
+
+    const MP_ORIGINAL_START_CONTEXT_KICK_TOUCH =
+      Game.prototype.startContextKick;
+
+    Game.prototype.startContextKick = function(){
+      if(this.inventoryOpen){
+        if(this.useOrEquipSelectedInventoryItem){
+          this.useOrEquipSelectedInventoryItem();
+        }
+        return;
+      }
+
+      MP_ORIGINAL_START_CONTEXT_KICK_TOUCH.call(this);
+    };
+  }
+
+  if(Game.prototype.startContextB && !Game.prototype.mpInventoryBTouchWrapped){
+    Game.prototype.mpInventoryBTouchWrapped = true;
+
+    const MP_ORIGINAL_START_CONTEXT_B_TOUCH =
+      Game.prototype.startContextB;
+
+    Game.prototype.startContextB = function(){
+      if(this.inventoryOpen){
+        if(this.inventory && this.inventory.length > 0 && this.dropSelectedInventoryItem){
+          this.dropSelectedInventoryItem();
+        }
+        return;
+      }
+
+      if(this.pauseMenuOpen){
+        return;
+      }
+
+      MP_ORIGINAL_START_CONTEXT_B_TOUCH.call(this);
+    };
+  }
+}
+
+/* =========================================================
+   END FOOD SINGLE-ITEM + MENU CONTROLLER FIX PATCH
 ========================================================= */
   const config = {
   parent: "game",
