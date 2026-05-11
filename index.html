@@ -693,6 +693,11 @@ scene.load.on("loaderror", function(file){
  scene.load.image("lefty_lower_street","assets/levels/lefty_lower_street.png?v="+VERSION);
   scene.load.image("lmnop","assets/levels/Lmnop.png?v="+VERSION);
   scene.load.image("chicken","assets/levels/Chicken-coupe.png?v="+VERSION);
+scene.load.image("weapon_pipe", "assets/sprites/weapons/pipe.png?v=" + VERSION);
+scene.load.image("weapon_bat", "assets/sprites/weapons/bat.png?v=" + VERSION);
+scene.load.image("weapon_bottle", "assets/sprites/weapons/bottle.png?v=" + VERSION);
+scene.load.image("weapon_chain", "assets/sprites/weapons/chain.png?v=" + VERSION);
+scene.load.image("weapon_rock", "assets/sprites/weapons/rock.png?v=" + VERSION);
   scene.load.image("outdoor_barricade_front","assets/levels/outdoor_barricade_front.png?v="+VERSION);
   scene.load.image("car_front","assets/levels/car_front.png?v="+VERSION);
   scene.load.spritesheet("corpo_helicopter","assets/sprites/vehicles/corpo_helicopter_sheet.png?v="+VERSION,{
@@ -7564,6 +7569,890 @@ Game.prototype.makeKeyboard = function(){
 
 /* =========================================================
    END ARROW BUS ROAD HAZARD PATCH — SMALLER / HIGHER VERSION
+========================================================= */
+ /* =========================================================
+   WEAPON PICKUP / SWING / THROW / INVENTORY PATCH V2
+   - Pick up weapons
+   - Light attack swings weapon
+   - Any other attack throws weapon forward
+   - Thrown weapon damages enemies, then falls to ground
+   - Pause menu includes Inventory
+========================================================= */
+
+const MP_INVENTORY_MAX = 5;
+
+const MP_WEAPON_DEFS = {
+  pipe: {
+    key: "weapon_pipe",
+    label: "PIPE",
+    damage: 9,
+    throwDamage: 13,
+    rangeBonus: 38,
+    scale: 0.38,
+    pickupScale: 0.34,
+    handOffsetX: 30,
+    handOffsetY: -58,
+    rotation: -0.35,
+    throwSpeed: 430,
+    throwLife: 850,
+    hitRange: 48,
+    throwable: true
+  },
+
+  bat: {
+    key: "weapon_bat",
+    label: "BAT",
+    damage: 11,
+    throwDamage: 15,
+    rangeBonus: 48,
+    scale: 0.42,
+    pickupScale: 0.38,
+    handOffsetX: 32,
+    handOffsetY: -62,
+    rotation: -0.45,
+    throwSpeed: 400,
+    throwLife: 900,
+    hitRange: 54,
+    throwable: true
+  },
+
+  bottle: {
+    key: "weapon_bottle",
+    label: "BOTTLE",
+    damage: 7,
+    throwDamage: 11,
+    rangeBonus: 26,
+    scale: 0.34,
+    pickupScale: 0.32,
+    handOffsetX: 25,
+    handOffsetY: -54,
+    rotation: -0.25,
+    throwSpeed: 500,
+    throwLife: 620,
+    hitRange: 42,
+    throwable: true
+  },
+
+  chain: {
+    key: "weapon_chain",
+    label: "CHAIN",
+    damage: 10,
+    throwDamage: 14,
+    rangeBonus: 55,
+    scale: 0.42,
+    pickupScale: 0.36,
+    handOffsetX: 34,
+    handOffsetY: -56,
+    rotation: -0.15,
+    throwSpeed: 360,
+    throwLife: 900,
+    hitRange: 62,
+    throwable: true
+  },
+
+  rock: {
+    key: "weapon_rock",
+    label: "ROCK",
+    damage: 5,
+    throwDamage: 16,
+    rangeBonus: 12,
+    scale: 0.28,
+    pickupScale: 0.26,
+    handOffsetX: 24,
+    handOffsetY: -50,
+    rotation: 0,
+    throwSpeed: 560,
+    throwLife: 720,
+    hitRange: 38,
+    throwable: true
+  }
+};
+
+function mpGetWeaponGroundY(scene, platform){
+  if(scene && scene.isLeftyLowerScreen && scene.isLeftyLowerScreen()){
+    if(typeof getLeftyLowerPlatformY === "function"){
+      return getLeftyLowerPlatformY(platform);
+    }
+  }
+
+  return getPlatformY(platform);
+}
+
+/* =========================================================
+   SETUP
+========================================================= */
+
+Game.prototype.setupWeaponSystem = function(){
+  this.weaponPickups = [];
+  this.inventory = [];
+  this.currentWeaponIndex = -1;
+  this.currentWeapon = null;
+  this.weaponSprite = null;
+  this.thrownWeapons = [];
+  this.inventoryOpen = false;
+  this.inventoryItems = [];
+  this.weaponSwinging = false;
+
+  // Test placements. Move these later.
+  this.spawnWeaponPickup("pipe", 340, getPlatformY("middle"), "middle");
+  this.spawnWeaponPickup("bat", 620, getPlatformY("middle"), "middle");
+  this.spawnWeaponPickup("bottle", 760, getPlatformY("bottom"), "bottom");
+  this.spawnWeaponPickup("chain", 470, getPlatformY("bottom"), "bottom");
+  this.spawnWeaponPickup("rock", 540, getPlatformY("middle"), "middle");
+};
+
+const MP_ORIGINAL_GAME_CREATE_WEAPON_V2 = Game.prototype.create;
+
+Game.prototype.create = function(){
+  MP_ORIGINAL_GAME_CREATE_WEAPON_V2.call(this);
+  this.setupWeaponSystem();
+};
+
+/* =========================================================
+   PICKUPS / INVENTORY DATA
+========================================================= */
+
+Game.prototype.makeWeaponObject = function(type, x, y, held=false){
+  const def = MP_WEAPON_DEFS[type];
+  if(!def) return null;
+
+  const scale = held ? def.scale : def.pickupScale;
+
+  if(hasTex(this, def.key)){
+    return this.add.image(x, y, def.key)
+      .setOrigin(0.5, 0.5)
+      .setScale(scale);
+  }
+
+  if(type === "rock"){
+    return this.add.circle(x, y, 13, 0x777777, 1)
+      .setStrokeStyle(2, 0x222222);
+  }
+
+  if(type === "chain"){
+    return this.add.rectangle(x, y, 58, 10, 0xa0a0a0, 1)
+      .setStrokeStyle(2, 0x222222)
+      .setRotation(-0.15);
+  }
+
+  return this.add.rectangle(x, y, 54, 12, 0xc0c0c0, 1)
+    .setStrokeStyle(2, 0x000000)
+    .setRotation(-0.25);
+};
+
+Game.prototype.spawnWeaponPickup = function(type, x, y, platform="middle"){
+  const def = MP_WEAPON_DEFS[type];
+  if(!def) return null;
+
+  const obj = this.makeWeaponObject(type, x, y - 20, false);
+  if(!obj) return null;
+
+  obj.setDepth(y + 30);
+
+  const label = this.add.text(x, y - 54, def.label, {
+    font: "12px monospace",
+    fill: "#fff45c",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5).setDepth(y + 31);
+
+  const pickup = {
+    type,
+    def,
+    obj,
+    label,
+    x,
+    y,
+    platform,
+    pickedUp: false
+  };
+
+  this.weaponPickups.push(pickup);
+  return pickup;
+};
+
+Game.prototype.getNearestWeaponPickup = function(){
+  if(!this.weaponPickups || !this.player) return null;
+
+  let best = null;
+  let bestDist = 9999;
+
+  this.weaponPickups.forEach(w=>{
+    if(!w || w.pickedUp) return;
+    if(w.platform !== this.platform) return;
+
+    const dx = Math.abs(this.player.x - w.x);
+    const dy = Math.abs(this.player.y - w.y);
+
+    if(dx < 64 && dy < 48 && dx < bestDist){
+      best = w;
+      bestDist = dx;
+    }
+  });
+
+  return best;
+};
+
+Game.prototype.pickupWeapon = function(pickup){
+  if(!pickup || pickup.pickedUp) return false;
+
+  if(this.inventory.length >= MP_INVENTORY_MAX){
+    if(this.zoneText) this.zoneText.setText("INVENTORY FULL");
+    return false;
+  }
+
+  pickup.pickedUp = true;
+
+  if(pickup.obj) pickup.obj.setVisible(false);
+  if(pickup.label) pickup.label.setVisible(false);
+
+  const item = {
+    id: Date.now() + "_" + Phaser.Math.Between(1000,9999),
+    type: pickup.type,
+    def: pickup.def
+  };
+
+  this.inventory.push(item);
+  this.equipWeaponIndex(this.inventory.length - 1);
+
+  if(this.zoneText){
+    this.zoneText.setText("PICKED UP: " + pickup.def.label);
+  }
+
+  return true;
+};
+
+Game.prototype.equipWeaponIndex = function(index){
+  if(index < 0 || index >= this.inventory.length){
+    this.currentWeaponIndex = -1;
+    this.currentWeapon = null;
+    this.destroyHeldWeaponSprite();
+    return;
+  }
+
+  this.currentWeaponIndex = index;
+  this.currentWeapon = this.inventory[index];
+
+  this.destroyHeldWeaponSprite();
+
+  const def = this.currentWeapon.def;
+
+  this.weaponSprite = this.makeWeaponObject(
+    this.currentWeapon.type,
+    this.player.x,
+    this.player.y - 60,
+    true
+  );
+
+  if(this.weaponSprite){
+    this.weaponSprite.setDepth(12000);
+
+    if(this.weaponSprite.setRotation){
+      this.weaponSprite.setRotation(def.rotation);
+    }
+  }
+
+  if(this.zoneText){
+    this.zoneText.setText("EQUIPPED: " + def.label);
+  }
+};
+
+Game.prototype.destroyHeldWeaponSprite = function(){
+  if(this.weaponSprite && this.weaponSprite.destroy){
+    this.weaponSprite.destroy();
+  }
+
+  this.weaponSprite = null;
+};
+
+Game.prototype.removeCurrentWeaponFromInventory = function(){
+  if(this.currentWeaponIndex < 0) return null;
+  if(this.currentWeaponIndex >= this.inventory.length) return null;
+
+  const item = this.inventory.splice(this.currentWeaponIndex, 1)[0];
+
+  if(this.inventory.length <= 0){
+    this.currentWeaponIndex = -1;
+    this.currentWeapon = null;
+    this.destroyHeldWeaponSprite();
+  }else{
+    const next = Phaser.Math.Clamp(this.currentWeaponIndex, 0, this.inventory.length - 1);
+    this.equipWeaponIndex(next);
+  }
+
+  return item;
+};
+
+Game.prototype.dropCurrentWeapon = function(){
+  if(!this.currentWeapon || !this.player) return;
+
+  const item = this.removeCurrentWeaponFromInventory();
+  if(!item) return;
+
+  const x = Phaser.Math.Clamp(
+    this.player.x + this.getFacingDir() * 38,
+    80,
+    W - 80
+  );
+
+  const y = mpGetWeaponGroundY(this, this.platform);
+
+  this.spawnWeaponPickup(item.type, x, y, this.platform);
+
+  if(this.zoneText){
+    this.zoneText.setText("DROPPED: " + item.def.label);
+  }
+};
+
+/* =========================================================
+   HELD WEAPON VISUAL
+========================================================= */
+
+Game.prototype.updateHeldWeaponVisual = function(){
+  if(!this.weaponSprite || !this.currentWeapon || !this.player) return;
+
+  const def = this.currentWeapon.def;
+  const dir = this.getFacingDir();
+
+  const hideForPose =
+    this.poseSprite &&
+    this.poseSprite.visible &&
+    !this.isBlocking &&
+    !this.weaponSwinging;
+
+  if(hideForPose){
+    this.weaponSprite.setVisible(false);
+    return;
+  }
+
+  this.weaponSprite.setVisible(true);
+
+  let ox = def.handOffsetX;
+  let oy = def.handOffsetY;
+  let rot = def.rotation;
+
+  if(this.weaponSwinging){
+    ox += 18;
+    oy += 2;
+    rot -= 0.55;
+  }
+
+  this.weaponSprite.x = this.player.x + ox * dir;
+  this.weaponSprite.y = this.player.y + oy;
+
+  if(this.weaponSprite.setRotation){
+    this.weaponSprite.setRotation(rot * dir);
+  }
+
+  if(this.weaponSprite.setFlipX){
+    this.weaponSprite.setFlipX(dir < 0);
+  }
+
+  this.weaponSprite.setDepth(this.player.y + 130);
+};
+
+Game.prototype.showWeaponSwingFX = function(){
+  if(!this.currentWeapon || !this.player) return;
+
+  const dir = this.getFacingDir();
+
+  this.weaponSwinging = true;
+
+  this.time.delayedCall(180, ()=>{
+    this.weaponSwinging = false;
+  });
+
+  const arc = this.add.arc(
+    this.player.x + dir * 66,
+    this.player.y - 56,
+    this.currentWeapon.type === "chain" ? 54 : 40,
+    -60,
+    60,
+    false,
+    0xfff45c,
+    0.32
+  )
+    .setScale(dir, 1)
+    .setDepth(14000);
+
+  this.tweens.add({
+    targets: arc,
+    alpha: 0,
+    scaleX: dir * 1.4,
+    scaleY: 1.4,
+    duration: 140,
+    onComplete: ()=>{
+      arc.destroy();
+    }
+  });
+};
+
+/* =========================================================
+   THROW WEAPON
+========================================================= */
+
+Game.prototype.throwCurrentWeapon = function(){
+  if(!this.currentWeapon || !this.player) return false;
+
+  const item = this.removeCurrentWeaponFromInventory();
+  if(!item) return false;
+
+  const def = item.def;
+  const dir = this.getFacingDir();
+
+  const obj = this.makeWeaponObject(
+    item.type,
+    this.player.x + dir * 42,
+    this.player.y - 58,
+    true
+  );
+
+  if(!obj) return false;
+
+  obj.setDepth(this.player.y + 160);
+
+  if(obj.setFlipX){
+    obj.setFlipX(dir < 0);
+  }
+
+  const thrown = {
+    item,
+    obj,
+    x: obj.x,
+    y: obj.y,
+    startY: obj.y,
+    platform: this.platform,
+    dir,
+    vx: def.throwSpeed * dir,
+    life: def.throwLife,
+    hitEnemies: new Set(),
+    falling: false,
+    done: false
+  };
+
+  this.thrownWeapons.push(thrown);
+
+  if(this.zoneText){
+    this.zoneText.setText("THREW: " + def.label);
+  }
+
+  return true;
+};
+
+Game.prototype.startWeaponThrowAction = function(){
+  if(!this.currentWeapon) return false;
+  if(this.pauseMenuOpen) return false;
+  if(!this.matchStarted || this.matchOver) return false;
+  if(this.playerBusy || this.isClimbing || this.playerHealth <= 0) return false;
+
+  this.playerBusy = true;
+  this.busyUntil = this.time.now + 420;
+
+  const throwAnim = this.getPlayerAnim("attack_heavy");
+
+  if(hasAnim(this, throwAnim) && hasTex(this, this.getPlayerAttackSheet())){
+    this.positionAttackSprite("heavy");
+    this.poseSprite.setVisible(true);
+    this.player.setVisible(false);
+
+    if(typeof replayAnim === "function"){
+      replayAnim(this.poseSprite, throwAnim);
+    }else{
+      safePlay(this.poseSprite, throwAnim);
+    }
+  }else{
+    this.player.setTint(0xffff66);
+  }
+
+  this.time.delayedCall(120, ()=>{
+    this.throwCurrentWeapon();
+  });
+
+  this.time.delayedCall(360, ()=>{
+    if(this.player){
+      this.player.clearTint();
+    }
+
+    this.forcePlayerReady();
+  });
+
+  return true;
+};
+
+Game.prototype.updateThrownWeapons = function(delta){
+  if(!this.thrownWeapons || this.thrownWeapons.length <= 0) return;
+
+  const dt = delta / 1000;
+
+  this.thrownWeapons.forEach(t=>{
+    if(!t || !t.obj || t.done) return;
+
+    if(t.falling){
+      return;
+    }
+
+    t.life -= delta;
+    t.x += t.vx * dt;
+    t.y = t.startY + Math.sin(this.time.now / 70) * 5;
+
+    if(t.obj.setRotation){
+      t.obj.rotation += 0.22 * t.dir;
+    }
+
+    t.obj.x = t.x;
+    t.obj.y = t.y;
+
+    this.checkThrownWeaponEnemyHits(t);
+
+    if(t.life <= 0 || t.x < -120 || t.x > W + 120){
+      this.startThrownWeaponFall(t);
+    }
+  });
+
+  this.thrownWeapons = this.thrownWeapons.filter(t=>t && !t.done);
+};
+
+Game.prototype.startThrownWeaponFall = function(t){
+  if(!t || t.falling || t.done) return;
+
+  t.falling = true;
+
+  const groundY = mpGetWeaponGroundY(this, t.platform);
+
+  this.tweens.add({
+    targets: t,
+    y: groundY - 20,
+    duration: 260,
+    ease: "Sine.easeIn",
+    onUpdate: ()=>{
+      if(t.obj){
+        t.obj.x = t.x;
+        t.obj.y = t.y;
+      }
+    },
+    onComplete: ()=>{
+      if(t.obj && t.obj.destroy){
+        t.obj.destroy();
+      }
+
+      this.spawnWeaponPickup(t.item.type, t.x, groundY, t.platform);
+      t.done = true;
+    }
+  });
+};
+
+Game.prototype.checkThrownWeaponEnemyHits = function(t){
+  if(!t || !t.item || !this.enemies) return;
+
+  const def = t.item.def;
+
+  this.enemies.forEach(e=>{
+    if(!e || e.dead || e.state === "dead") return;
+    if(e.platform !== t.platform) return;
+    if(e.invulnerable || e.grabbed) return;
+    if(t.hitEnemies.has(e)) return;
+
+    const dx = Math.abs(e.x - t.x);
+    const dy = Math.abs((e.y - 45) - t.y);
+
+    if(dx <= def.hitRange && dy <= 58){
+      t.hitEnemies.add(e);
+      this.damageEnemy(e, def.throwDamage, true);
+
+      if(t.item.type === "rock" || t.item.type === "bottle"){
+        t.life = Math.min(t.life, 120);
+      }
+    }
+  });
+};
+
+/* =========================================================
+   ATTACK PATCHES
+========================================================= */
+
+const MP_ORIGINAL_GET_ATTACK_DATA_WEAPON_V2 = Game.prototype.getAttackData;
+
+Game.prototype.getAttackData = function(type){
+  const data = MP_ORIGINAL_GET_ATTACK_DATA_WEAPON_V2.call(this, type);
+  if(!data) return data;
+
+  if(this.currentWeapon && type === "light"){
+    const def = this.currentWeapon.def;
+
+    data.damage += def.damage;
+    data.range += def.rangeBonus;
+    data.offsetX += 12;
+  }
+
+  return data;
+};
+
+const MP_ORIGINAL_START_ATTACK_WEAPON_V2 = Game.prototype.startAttack;
+
+Game.prototype.startAttack = function(type){
+  if(this.currentWeapon && type !== "light"){
+    this.startWeaponThrowAction();
+    return;
+  }
+
+  const hadWeapon = !!this.currentWeapon;
+
+  MP_ORIGINAL_START_ATTACK_WEAPON_V2.call(this, type);
+
+  if(hadWeapon && type === "light"){
+    this.time.delayedCall(70, ()=>{
+      this.showWeaponSwingFX();
+    });
+  }
+};
+
+const MP_ORIGINAL_START_CONTEXT_Y_WEAPON_V2 = Game.prototype.startContextY;
+
+Game.prototype.startContextY = function(){
+  if(this.grabbedEnemy){
+    MP_ORIGINAL_START_CONTEXT_Y_WEAPON_V2.call(this);
+    return;
+  }
+
+  if(this.currentWeapon){
+    this.startWeaponThrowAction();
+    return;
+  }
+
+  MP_ORIGINAL_START_CONTEXT_Y_WEAPON_V2.call(this);
+};
+
+const MP_ORIGINAL_START_CONTEXT_KICK_WEAPON_V2 = Game.prototype.startContextKick;
+
+Game.prototype.startContextKick = function(){
+  if(this.grabbedEnemy){
+    MP_ORIGINAL_START_CONTEXT_KICK_WEAPON_V2.call(this);
+    return;
+  }
+
+  if(this.currentWeapon){
+    this.startWeaponThrowAction();
+    return;
+  }
+
+  MP_ORIGINAL_START_CONTEXT_KICK_WEAPON_V2.call(this);
+};
+
+const MP_ORIGINAL_START_GRAB_WEAPON_V2 = Game.prototype.startGrab;
+
+Game.prototype.startGrab = function(){
+  if(this.currentWeapon && this.isDownHeld && this.isDownHeld()){
+    this.dropCurrentWeapon();
+    return;
+  }
+
+  const weapon = this.getNearestWeaponPickup();
+
+  if(weapon && !this.grabbedEnemy){
+    this.pickupWeapon(weapon);
+    return;
+  }
+
+  MP_ORIGINAL_START_GRAB_WEAPON_V2.call(this);
+};
+
+/* =========================================================
+   INVENTORY MENU
+========================================================= */
+
+Game.prototype.clearInventoryUI = function(){
+  if(this.inventoryItems && this.inventoryItems.length){
+    this.inventoryItems.forEach(item=>{
+      if(item && item.destroy) item.destroy();
+    });
+  }
+
+  this.inventoryItems = [];
+  this.inventoryOpen = false;
+};
+
+Game.prototype.openInventoryMenu = function(){
+  this.clearInventoryUI();
+  this.inventoryOpen = true;
+
+  const shade = this.add.rectangle(CX, CY, W, H, 0x000000, 0.68)
+    .setDepth(40000)
+    .setScrollFactor(0);
+
+  const panel = this.add.rectangle(CX, CY, 520, 360, 0x111111, 0.96)
+    .setStrokeStyle(4, 0xff4fc3)
+    .setDepth(40001)
+    .setScrollFactor(0);
+
+  const title = this.add.text(CX, 120, "INVENTORY", {
+    font: "38px monospace",
+    fill: "#fff45c",
+    stroke: "#000000",
+    strokeThickness: 6
+  }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+  this.inventoryItems.push(shade, panel, title);
+
+  if(!this.inventory || this.inventory.length <= 0){
+    const empty = this.add.text(CX, 245, "NO WEAPONS", {
+      font: "24px monospace",
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(40002).setScrollFactor(0);
+
+    this.inventoryItems.push(empty);
+  }else{
+    this.inventory.forEach((item, index)=>{
+      const y = 175 + index * 38;
+      const equipped = index === this.currentWeaponIndex;
+
+      const row = this.add.rectangle(CX, y, 390, 30, equipped ? 0x351028 : 0x000000, 0.88)
+        .setStrokeStyle(2, equipped ? 0xfff45c : 0xff4fc3)
+        .setDepth(40002)
+        .setScrollFactor(0)
+        .setInteractive();
+
+      const text = this.add.text(CX, y, (equipped ? "> " : "  ") + item.def.label, {
+        font: "18px monospace",
+        fill: equipped ? "#fff45c" : "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 3
+      }).setOrigin(0.5).setDepth(40003).setScrollFactor(0);
+
+      row.on("pointerdown", ()=>{
+        this.equipWeaponIndex(index);
+        this.openInventoryMenu();
+      });
+
+      this.inventoryItems.push(row, text);
+    });
+  }
+
+  const dropBtn = this.add.text(CX - 130, 390, "DROP HELD", {
+    font: "18px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 4,
+    backgroundColor: "#220018"
+  }).setOrigin(0.5).setDepth(40003).setScrollFactor(0).setInteractive();
+
+  dropBtn.on("pointerdown", ()=>{
+    this.dropCurrentWeapon();
+    this.openInventoryMenu();
+  });
+
+  const backBtn = this.add.text(CX + 130, 390, "BACK", {
+    font: "18px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 4,
+    backgroundColor: "#220018"
+  }).setOrigin(0.5).setDepth(40003).setScrollFactor(0).setInteractive();
+
+  backBtn.on("pointerdown", ()=>{
+    this.clearInventoryUI();
+    this.openPauseMenu();
+  });
+
+  this.inventoryItems.push(dropBtn, backBtn);
+};
+
+Game.prototype.openPauseMenu = function(){
+  if(this.pauseMenuOpen) return;
+
+  this.pauseMenuOpen = true;
+  this.clearInventoryUI();
+
+  const shade = this.add.rectangle(CX, CY, W, H, 0x000000, 0.55)
+    .setDepth(30000)
+    .setScrollFactor(0);
+
+  const panel = this.add.rectangle(480, 270, 460, 310, 0x111111, 0.94)
+    .setStrokeStyle(4, 0xff4fc3)
+    .setDepth(30001)
+    .setScrollFactor(0);
+
+  const title = this.add.text(480, 145, "PAUSED", {
+    font: "46px monospace",
+    fill: "#fff45c",
+    stroke: "#000000",
+    strokeThickness: 6
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0);
+
+  const continueText = this.add.text(480, 225, "CONTINUE", {
+    font: "28px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  const inventoryText = this.add.text(480, 275, "INVENTORY", {
+    font: "28px monospace",
+    fill: "#7CFF6B",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  const quitText = this.add.text(480, 325, "QUIT TO TITLE", {
+    font: "28px monospace",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 5
+  }).setOrigin(0.5).setDepth(30002).setScrollFactor(0).setInteractive();
+
+  continueText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+  });
+
+  inventoryText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+    this.pauseMenuOpen = true;
+    this.openInventoryMenu();
+  });
+
+  quitText.on("pointerdown", ()=>{
+    this.closePauseMenu();
+    this.scene.start("Title");
+  });
+
+  this.pauseItems = [
+    shade,
+    panel,
+    title,
+    continueText,
+    inventoryText,
+    quitText
+  ];
+};
+
+Game.prototype.closePauseMenu = function(){
+  if(this.pauseItems && this.pauseItems.length){
+    this.pauseItems.forEach(item=>{
+      if(item && item.destroy) item.destroy();
+    });
+  }
+
+  this.pauseItems = [];
+  this.clearInventoryUI();
+  this.pauseMenuOpen = false;
+};
+
+/* =========================================================
+   UPDATE HOOK
+========================================================= */
+
+const MP_ORIGINAL_SAFE_UPDATE_WEAPON_V2 = Game.prototype.safeUpdate;
+
+Game.prototype.safeUpdate = function(time, delta){
+  MP_ORIGINAL_SAFE_UPDATE_WEAPON_V2.call(this, time, delta);
+
+  this.updateHeldWeaponVisual();
+  this.updateThrownWeapons(delta || 16.67);
+};
+
+/* =========================================================
+   END WEAPON PICKUP / SWING / THROW / INVENTORY PATCH V2
 ========================================================= */
   const config = {
   parent: "game",
