@@ -1072,41 +1072,60 @@ class CharacterSelect extends Phaser.Scene {
         unlocked: true
       },
       {
+{
   id: "amber",
-  name: "AMBER",
-  number: 5,
-  locked: true,
-  spritesReady: false,
-  card: "amber_card",
-  cardPath: "assets/cards/amber_card.png"
+  displayName: "AMBER",
+  faction: "LMNOP",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: "amber_card",
+  unlocked: false
 },
 {
   id: "johnny",
-  name: "JOHNNY",
-  number: 6,
-  locked: true,
-  spritesReady: false,
-  card: "johnny_card",
-  cardPath: "assets/cards/johnny_card.png"
+  displayName: "JOHNNY",
+  faction: "LMNOP",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: "johnny_card",
+  unlocked: false
 },
 {
   id: "greg",
-  name: "GREG",
-  number: 7,
-  locked: true,
-  spritesReady: false,
-  card: "greg_card",
-  cardPath: "assets/cards/greg_card.png"
+  displayName: "GREG",
+  faction: "LMNOP",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: "greg_card",
+  unlocked: false
 },
 {
   id: "buddy",
-  name: "BUDDY HARLEY",
-  number: 8,
-  locked: true,
-  spritesReady: false,
-  card: "buddy_harley_card",
-  cardPath: "assets/cards/buddy_harley_card.png"
-}
+  displayName: "BUDDY HARLEY",
+  faction: "",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: "buddy_harley_card",
+  unlocked: false
+},
+{
+  id: "locked_1",
+  displayName: "EMPTY SLOT",
+  faction: "",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: null,
+  unlocked: false
+},
+{
+  id: "locked_2",
+  displayName: "EMPTY SLOT",
+  faction: "",
+  role: "LOCKED",
+  weapon: "",
+  cardKey: null,
+  unlocked: false
+},
       {
         id: "locked_1",
         displayName: "EMPTY SLOT",
@@ -1124,7 +1143,7 @@ class CharacterSelect extends Phaser.Scene {
         weapon: "",
         cardKey: null,
         unlocked: false
-      }
+      },
     ];
 
     this.buildBackground();
