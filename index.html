@@ -687,6 +687,10 @@ scene.load.on("loaderror", function(file){
 });
   scene.load.image("title","assets/levels/title-screen.png?v="+VERSION);
   scene.load.image("charSelect","assets/levels/character-select.png?v="+VERSION);
+ scene.load.image("amber_card", "assets/cards/amber_card.png");
+scene.load.image("johnny_card", "assets/cards/johnny_card.png");
+scene.load.image("greg_card", "assets/cards/greg_card.png");
+scene.load.image("buddy_harley_card", "assets/cards/buddy_harley_card.png");
   scene.load.image("levelSelect","assets/levels/level-select.png?v="+VERSION);
   scene.load.image("house","assets/levels/house-party.png?v="+VERSION);
   scene.load.image("indoor","assets/levels/leftys-indoor.png?v="+VERSION);
@@ -1067,6 +1071,42 @@ class CharacterSelect extends Phaser.Scene {
         cardKey: "char_card_jackson",
         unlocked: true
       },
+      {
+  id: "amber",
+  name: "AMBER",
+  number: 5,
+  locked: true,
+  spritesReady: false,
+  card: "amber_card",
+  cardPath: "assets/cards/amber_card.png"
+},
+{
+  id: "johnny",
+  name: "JOHNNY",
+  number: 6,
+  locked: true,
+  spritesReady: false,
+  card: "johnny_card",
+  cardPath: "assets/cards/johnny_card.png"
+},
+{
+  id: "greg",
+  name: "GREG",
+  number: 7,
+  locked: true,
+  spritesReady: false,
+  card: "greg_card",
+  cardPath: "assets/cards/greg_card.png"
+},
+{
+  id: "buddy",
+  name: "BUDDY HARLEY",
+  number: 8,
+  locked: true,
+  spritesReady: false,
+  card: "buddy_harley_card",
+  cardPath: "assets/cards/buddy_harley_card.png"
+}
       {
         id: "locked_1",
         displayName: "EMPTY SLOT",
