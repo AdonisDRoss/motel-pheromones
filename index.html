@@ -16347,6 +16347,562 @@ if(typeof LevelSelect !== "undefined"){
 /* =========================================================
    END VERSUS FULLSCREEN HUD + TAG FACE BUTTON FIX
 ========================================================= */
+ /* =========================================================
+   MOTEL PHEROMONES - COMBINED PATCH
+   Includes:
+   1) Title screen "DES MOINES" logo text under DSM
+   2) Versus end prompt:
+      - RETRY
+      - CHARACTER SELECT
+========================================================= */
+
+(function () {
+  if (window.MP_COMBINED_PATCH_V1) return;
+  window.MP_COMBINED_PATCH_V1 = true;
+
+  /* =========================================================
+     CONFIG
+  ========================================================= */
+  const TITLE_SCENE_NAMES = [
+    "TitleScreen",
+    "TitleScene",
+    "Title",
+    "MainMenu"
+  ];
+
+  const VERSUS_SCENE_NAMES = [
+    "VersusScene",
+    "VersusModeScene",
+    "BattleScene",
+    "FightScene",
+    "GameScene"
+  ];
+
+  const CHAR_SELECT_SCENE_NAMES = [
+    "CharacterSelectScene",
+    "CharacterSelect",
+    "VersusCharacterSelect",
+    "RosterSelect"
+  ];
+
+  const TITLE_CFG = {
+    xRatio: 0.505,
+    yRatio: 0.505,
+    angle: -7,
+    fontSize: 24,
+    letterSpacing: 2
+  };
+
+  /* =========================================================
+     HELPERS
+  ========================================================= */
+  function getSceneManagerKeys(scene) {
+    try {
+      return Object.keys(scene.scene.manager.keys || {});
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function findFirstExistingSceneKey(scene, candidates) {
+    const keys = getSceneManagerKeys(scene);
+    for (const key of candidates) {
+      if (keys.includes(key)) return key;
+    }
+    return null;
+  }
+
+  function safeSetLetterSpacing(textObj, value) {
+    if (textObj && typeof textObj.setLetterSpacing === "function") {
+      textObj.setLetterSpacing(value);
+    }
+  }
+
+  function patchCreate(Ctor, patchFn, flagName) {
+    if (!Ctor || !Ctor.prototype) return false;
+    if (Ctor.prototype[flagName]) return true;
+
+    const oldCreate = Ctor.prototype.create;
+    Ctor.prototype.create = function () {
+      if (oldCreate) oldCreate.apply(this, arguments);
+      patchFn(this);
+    };
+
+    Ctor.prototype[flagName] = true;
+    return true;
+  }
+
+  function patchUpdate(Ctor, patchFn, flagName) {
+    if (!Ctor || !Ctor.prototype) return false;
+    if (Ctor.prototype[flagName]) return true;
+
+    const oldUpdate = Ctor.prototype.update;
+    Ctor.prototype.update = function () {
+      if (oldUpdate) oldUpdate.apply(this, arguments);
+      patchFn(this);
+    };
+
+    Ctor.prototype[flagName] = true;
+    return true;
+  }
+
+  function patchMethod(Ctor, methodName, patchFn, flagName) {
+    if (!Ctor || !Ctor.prototype || typeof Ctor.prototype[methodName] !== "function") return false;
+
+    const protoFlag = `${flagName}_${methodName}`;
+    if (Ctor.prototype[protoFlag]) return true;
+
+    const oldMethod = Ctor.prototype[methodName];
+    Ctor.prototype[methodName] = function () {
+      const result = oldMethod.apply(this, arguments);
+      patchFn(this, methodName);
+      return result;
+    };
+
+    Ctor.prototype[protoFlag] = true;
+    return true;
+  }
+
+  /* =========================================================
+     TITLE PATCH - DES MOINES
+  ========================================================= */
+  function addDesMoinesTitle(scene) {
+    if (!scene || scene.mpDesMoinesTitleBuilt) return;
+    if (!scene.add || !scene.cameras || !scene.cameras.main) return;
+
+    scene.mpDesMoinesTitleBuilt = true;
+
+    const cam = scene.cameras.main;
+    const W = cam.width;
+    const H = cam.height;
+
+    const x = W * TITLE_CFG.xRatio;
+    const y = H * TITLE_CFG.yRatio;
+
+    const back = scene.add.text(x + 3, y + 3, "DES MOINES", {
+      fontFamily: "Impact, Arial Black, sans-serif",
+      fontSize: `${TITLE_CFG.fontSize}px`,
+      fontStyle: "bold italic",
+      color: "#33d8ff",
+      stroke: "#10142a",
+      strokeThickness: 5
+    })
+      .setOrigin(0.5)
+      .setAngle(TITLE_CFG.angle)
+      .setDepth(10001)
+      .setScrollFactor(0)
+      .setAlpha(0.95);
+
+    const front = scene.add.text(x, y, "DES MOINES", {
+      fontFamily: "Impact, Arial Black, sans-serif",
+      fontSize: `${TITLE_CFG.fontSize}px`,
+      fontStyle: "bold italic",
+      color: "#fff7ff",
+      stroke: "#ff2da8",
+      strokeThickness: 6
+    })
+      .setOrigin(0.5)
+      .setAngle(TITLE_CFG.angle)
+      .setDepth(10002)
+      .setScrollFactor(0);
+
+    safeSetLetterSpacing(front, TITLE_CFG.letterSpacing);
+    safeSetLetterSpacing(back, TITLE_CFG.letterSpacing);
+
+    if (typeof front.setShadow === "function") {
+      front.setShadow(0, 0, "#ff2da8", 10, true, true);
+    }
+
+    const shine = scene.add.rectangle(x, y - 10, 150, 2, 0xffffff, 0.22)
+      .setOrigin(0.5)
+      .setAngle(TITLE_CFG.angle)
+      .setDepth(10003)
+      .setScrollFactor(0);
+
+    scene.mpDesMoinesTitleParts = [back, front, shine];
+
+    scene.scale.on("resize", function (gameSize) {
+      if (!scene.mpDesMoinesTitleParts) return;
+      const w = gameSize.width;
+      const h = gameSize.height;
+      const nx = w * TITLE_CFG.xRatio;
+      const ny = h * TITLE_CFG.yRatio;
+
+      back.setPosition(nx + 3, ny + 3);
+      front.setPosition(nx, ny);
+      shine.setPosition(nx, ny - 10);
+    });
+  }
+
+  function tryPatchTitleScenes() {
+    let installed = false;
+
+    for (const sceneName of TITLE_SCENE_NAMES) {
+      const Ctor = window[sceneName];
+      if (!Ctor) continue;
+
+      const ok = patchCreate(
+        Ctor,
+        addDesMoinesTitle,
+        "mpDesMoinesPatchInstalled"
+      );
+
+      if (ok) installed = true;
+    }
+
+    return installed;
+  }
+
+  /* =========================================================
+     VERSUS END PROMPT PATCH
+  ========================================================= */
+  function getVersusResultText(scene) {
+    if (scene.winnerText && typeof scene.winnerText === "string") {
+      return scene.winnerText.toUpperCase();
+    }
+
+    if (scene.winnerName && typeof scene.winnerName === "string") {
+      return `${scene.winnerName.toUpperCase()} WINS`;
+    }
+
+    if (scene.winningTeam && typeof scene.winningTeam === "string") {
+      return `${scene.winningTeam.toUpperCase()} WINS`;
+    }
+
+    if (scene.player1Won) return "PLAYER 1 WINS";
+    if (scene.player2Won) return "PLAYER 2 WINS";
+
+    if (scene.timeUp) return "TIME UP";
+    if (scene.matchDraw) return "DRAW";
+
+    return "MATCH OVER";
+  }
+
+  function goToCharacterSelect(scene) {
+    const charSelectKey = findFirstExistingSceneKey(scene, CHAR_SELECT_SCENE_NAMES);
+
+    cleanupVersusEndPrompt(scene);
+
+    if (charSelectKey) {
+      scene.scene.start(charSelectKey);
+    } else {
+      console.warn("Character Select scene not found. Falling back to restart.");
+      scene.scene.restart(scene.mpVersusRestartData || {});
+    }
+  }
+
+  function retryVersusMatch(scene) {
+    const data = scene.mpVersusRestartData || {};
+    cleanupVersusEndPrompt(scene);
+    scene.scene.restart(data);
+  }
+
+  function cleanupVersusEndPrompt(scene) {
+    if (!scene) return;
+
+    if (scene.mpVersusPromptContainer) {
+      scene.mpVersusPromptContainer.destroy(true);
+      scene.mpVersusPromptContainer = null;
+    }
+
+    if (scene.mpVersusPromptKeys) {
+      scene.mpVersusPromptKeys.destroy();
+      scene.mpVersusPromptKeys = null;
+    }
+
+    scene.mpVersusPromptShown = false;
+    scene.mpVersusChoice = 0;
+
+    if (scene.physics && scene.physics.world && scene.mpVersusPhysicsPaused) {
+      scene.physics.world.resume();
+      scene.mpVersusPhysicsPaused = false;
+    }
+  }
+
+  function createPromptButton(scene, x, y, w, h, label, onClick) {
+    const bg = scene.add.rectangle(x, y, w, h, 0x120812, 0.95)
+      .setStrokeStyle(3, 0xff4ccf, 1)
+      .setInteractive({ useHandCursor: true });
+
+    const glow = scene.add.rectangle(x, y, w + 8, h + 8, 0xff4ccf, 0.10)
+      .setStrokeStyle(1, 0xff95e9, 0.5);
+
+    const txt = scene.add.text(x, y, label, {
+      fontFamily: "Arial Black, Arial, sans-serif",
+      fontSize: "22px",
+      color: "#ffffff",
+      stroke: "#ff2da8",
+      strokeThickness: 3
+    }).setOrigin(0.5);
+
+    bg.on("pointerup", onClick);
+
+    return { bg, glow, txt };
+  }
+
+  function refreshPromptSelection(scene) {
+    if (!scene.mpVersusButtons) return;
+
+    const activeIndex = scene.mpVersusChoice || 0;
+
+    scene.mpVersusButtons.forEach((btn, i) => {
+      const active = i === activeIndex;
+
+      btn.bg.setFillStyle(active ? 0x351035 : 0x120812, 0.98);
+      btn.bg.setStrokeStyle(active ? 4 : 3, active ? 0xffffff : 0xff4ccf, 1);
+      btn.glow.setAlpha(active ? 0.20 : 0.10);
+      btn.txt.setScale(active ? 1.05 : 1.0);
+    });
+  }
+
+  function showVersusEndPrompt(scene, resultText) {
+    if (!scene || scene.mpVersusPromptShown) return;
+    if (!scene.add || !scene.cameras || !scene.cameras.main) return;
+
+    scene.mpVersusPromptShown = true;
+    scene.mpVersusChoice = 0;
+
+    if (scene.physics && scene.physics.world) {
+      scene.physics.world.pause();
+      scene.mpVersusPhysicsPaused = true;
+    }
+
+    const cam = scene.cameras.main;
+    const cx = cam.width * 0.5;
+    const cy = cam.height * 0.5;
+
+    const overlay = scene.add.rectangle(cx, cy, cam.width, cam.height, 0x000000, 0.62);
+    const panelGlow = scene.add.rectangle(cx, cy, 500, 290, 0xff2da8, 0.12)
+      .setStrokeStyle(4, 0xff6adf, 0.45);
+    const panel = scene.add.rectangle(cx, cy, 480, 270, 0x110611, 0.95)
+      .setStrokeStyle(4, 0xff2da8, 1);
+
+    const title = scene.add.text(cx, cy - 78, resultText || "MATCH OVER", {
+      fontFamily: "Arial Black, Arial, sans-serif",
+      fontSize: "34px",
+      color: "#ffffff",
+      stroke: "#ff2da8",
+      strokeThickness: 5,
+      align: "center"
+    }).setOrigin(0.5);
+
+    const subtitle = scene.add.text(cx, cy - 24, "What do you want to do?", {
+      fontFamily: "Arial, sans-serif",
+      fontSize: "18px",
+      color: "#ffd8f3",
+      align: "center"
+    }).setOrigin(0.5);
+
+    const retryBtn = createPromptButton(scene, cx, cy + 28, 260, 52, "RETRY", () => {
+      retryVersusMatch(scene);
+    });
+
+    const charBtn = createPromptButton(scene, cx, cy + 94, 260, 52, "CHARACTER SELECT", () => {
+      goToCharacterSelect(scene);
+    });
+
+    const footer = scene.add.text(cx, cy + 138, "← / → or A / D to choose • ENTER to confirm", {
+      fontFamily: "Arial, sans-serif",
+      fontSize: "14px",
+      color: "#bbbbbb",
+      align: "center"
+    }).setOrigin(0.5);
+
+    scene.mpVersusButtons = [retryBtn, charBtn];
+
+    const container = scene.add.container(0, 0, [
+      overlay,
+      panelGlow,
+      panel,
+      title,
+      subtitle,
+      retryBtn.glow,
+      retryBtn.bg,
+      retryBtn.txt,
+      charBtn.glow,
+      charBtn.bg,
+      charBtn.txt,
+      footer
+    ]);
+
+    container.setDepth(999999);
+
+    scene.mpVersusPromptContainer = container;
+
+    refreshPromptSelection(scene);
+
+    const keys = scene.input.keyboard.addKeys({
+      left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+      right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      up: Phaser.Input.Keyboard.KeyCodes.UP,
+      down: Phaser.Input.Keyboard.KeyCodes.DOWN,
+      a: Phaser.Input.Keyboard.KeyCodes.A,
+      d: Phaser.Input.Keyboard.KeyCodes.D,
+      enter: Phaser.Input.Keyboard.KeyCodes.ENTER,
+      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      esc: Phaser.Input.Keyboard.KeyCodes.ESC
+    });
+
+    scene.mpVersusPromptKeys = keys;
+
+    const keyHandler = () => {
+      if (!scene.mpVersusPromptShown) return;
+
+      const justPressed = Phaser.Input.Keyboard.JustDown;
+
+      if (
+        justPressed(keys.left) ||
+        justPressed(keys.up) ||
+        justPressed(keys.a)
+      ) {
+        scene.mpVersusChoice = 0;
+        refreshPromptSelection(scene);
+      }
+
+      if (
+        justPressed(keys.right) ||
+        justPressed(keys.down) ||
+        justPressed(keys.d)
+      ) {
+        scene.mpVersusChoice = 1;
+        refreshPromptSelection(scene);
+      }
+
+      if (
+        justPressed(keys.enter) ||
+        justPressed(keys.space)
+      ) {
+        if (scene.mpVersusChoice === 0) {
+          retryVersusMatch(scene);
+        } else {
+          goToCharacterSelect(scene);
+        }
+      }
+
+      if (justPressed(keys.esc)) {
+        goToCharacterSelect(scene);
+      }
+    };
+
+    scene.events.on("update", keyHandler);
+
+    scene.events.once("shutdown", () => {
+      scene.events.off("update", keyHandler);
+      cleanupVersusEndPrompt(scene);
+    });
+
+    scene.events.once("destroy", () => {
+      scene.events.off("update", keyHandler);
+      cleanupVersusEndPrompt(scene);
+    });
+  }
+
+  function maybeShowVersusPrompt(scene) {
+    if (!scene || scene.mpVersusPromptShown) return;
+
+    const ended =
+      !!scene.matchEnded ||
+      !!scene.isMatchOver ||
+      !!scene.versusEnded ||
+      !!scene.fightOver ||
+      !!scene.gameOverFlag ||
+      !!scene.matchOver ||
+      !!scene.roundOver ||
+      !!scene.endOfMatch ||
+      !!scene.winner ||
+      !!scene.winnerName;
+
+    if (!ended) return;
+
+    showVersusEndPrompt(scene, getVersusResultText(scene));
+  }
+
+  function setupVersusScene(scene) {
+    if (!scene || scene.mpVersusSetupDone) return;
+    scene.mpVersusSetupDone = true;
+
+    const data = (scene.scene && scene.scene.settings && scene.scene.settings.data) || {};
+    scene.mpVersusRestartData = { ...data };
+  }
+
+  function tryPatchVersusScenes() {
+    let installed = false;
+
+    for (const sceneName of VERSUS_SCENE_NAMES) {
+      const Ctor = window[sceneName];
+      if (!Ctor) continue;
+
+      const createPatched = patchCreate(
+        Ctor,
+        setupVersusScene,
+        "mpVersusCreatePatched"
+      );
+
+      const updatePatched = patchUpdate(
+        Ctor,
+        maybeShowVersusPrompt,
+        "mpVersusUpdatePatched"
+      );
+
+      const endMethodNames = [
+        "endMatch",
+        "finishMatch",
+        "handleMatchEnd",
+        "onMatchEnd",
+        "gameOver",
+        "showGameOver",
+        "endRound"
+      ];
+
+      let anyMethodPatched = false;
+
+      endMethodNames.forEach((methodName) => {
+        const ok = patchMethod(
+          Ctor,
+          methodName,
+          function (scene) {
+            if (!scene || scene.mpVersusPromptShown) return;
+            if (scene.time && typeof scene.time.delayedCall === "function") {
+              scene.time.delayedCall(50, () => {
+                showVersusEndPrompt(scene, getVersusResultText(scene));
+              });
+            } else {
+              showVersusEndPrompt(scene, getVersusResultText(scene));
+            }
+          },
+          "mpVersusEndMethodPatched"
+        );
+        if (ok) anyMethodPatched = true;
+      });
+
+      if (createPatched || updatePatched || anyMethodPatched) {
+        installed = true;
+      }
+    }
+
+    return installed;
+  }
+
+  /* =========================================================
+     INSTALL
+  ========================================================= */
+  function tryInstallAllPatches() {
+    const titleOk = tryPatchTitleScenes();
+    const versusOk = tryPatchVersusScenes();
+    return titleOk || versusOk;
+  }
+
+  let installed = tryInstallAllPatches();
+
+  if (!installed) {
+    const timer = setInterval(() => {
+      installed = tryInstallAllPatches();
+      if (installed) clearInterval(timer);
+    }, 200);
+
+    setTimeout(() => clearInterval(timer), 10000);
+  }
+})();
   const config = {
   parent: "game",
   type: Phaser.AUTO,
