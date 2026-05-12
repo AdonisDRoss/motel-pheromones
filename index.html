@@ -16962,6 +16962,82 @@ if(typeof LevelSelect !== "undefined"){
     setTimeout(() => clearInterval(timer), 10000);
   }
 })();
+ class ModeSelect extends Phaser.Scene {
+  constructor(){
+    super("ModeSelect");
+  }
+
+  create(){
+    this.input.addPointer(3);
+
+    this.cameras.main.setBackgroundColor("#050505");
+
+    this.add.text(CX, 70, "SELECT MODE", {
+      fontFamily: "monospace",
+      fontSize: "42px",
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    const storyBox = this.add.rectangle(CX, 210, 520, 92, 0x151515, 0.92)
+      .setStrokeStyle(3, 0xff2aa8);
+
+    const arenaBox = this.add.rectangle(CX, 330, 520, 92, 0x151515, 0.92)
+      .setStrokeStyle(3, 0x00e5ff);
+
+    const storyText = this.add.text(CX, 210, "STORY MODE", {
+      fontFamily: "monospace",
+      fontSize: "30px",
+      color: "#ffffff"
+    }).setOrigin(0.5);
+
+    const arenaText = this.add.text(CX, 330, "ARENA BATTLE", {
+      fontFamily: "monospace",
+      fontSize: "30px",
+      color: "#ffffff"
+    }).setOrigin(0.5);
+
+    const hint = this.add.text(CX, H - 64, "TAP A MODE TO CONTINUE", {
+      fontFamily: "monospace",
+      fontSize: "18px",
+      color: "#aaaaaa"
+    }).setOrigin(0.5);
+
+    const chooseStory = () => {
+      selectedMode = "STORY";
+      this.scene.start("CharacterSelect");
+    };
+
+    const chooseArena = () => {
+      selectedMode = "ARENA";
+      this.scene.start("CharacterSelect");
+    };
+
+    storyBox.setInteractive({ useHandCursor: true }).on("pointerup", chooseStory);
+    storyText.setInteractive({ useHandCursor: true }).on("pointerup", chooseStory);
+
+    arenaBox.setInteractive({ useHandCursor: true }).on("pointerup", chooseArena);
+    arenaText.setInteractive({ useHandCursor: true }).on("pointerup", chooseArena);
+
+    this.input.keyboard?.on("keydown-UP", () => {
+      selectedMode = "STORY";
+    });
+
+    this.input.keyboard?.on("keydown-DOWN", () => {
+      selectedMode = "ARENA";
+    });
+
+    this.input.keyboard?.on("keydown-ONE", chooseStory);
+    this.input.keyboard?.on("keydown-TWO", chooseArena);
+    this.input.keyboard?.on("keydown-ENTER", chooseStory);
+    this.input.keyboard?.on("keydown-SPACE", chooseStory);
+
+    this.input.keyboard?.on("keydown-ESC", () => {
+      this.scene.start("Title");
+    });
+  }
+}
   const config = {
   parent: "game",
   type: Phaser.AUTO,
