@@ -17038,6 +17038,92 @@ if(typeof LevelSelect !== "undefined"){
     });
   }
 }
+  /* =========================================================
+   PATCH: MODE SELECT BOOT FIX
+   Paste this directly above: const config = {
+   ========================================================= */
+
+window.MP_SELECTED_MODE = window.MP_SELECTED_MODE || "STORY";
+
+var ModeSelect = class ModeSelect extends Phaser.Scene {
+  constructor(){
+    super("ModeSelect");
+  }
+
+  create(){
+    this.input.addPointer(3);
+    this.cameras.main.setBackgroundColor("#000000");
+
+    const title = this.add.text(CX, 68, "SELECT MODE", {
+      fontFamily: "monospace",
+      fontSize: "42px",
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 6
+    }).setOrigin(0.5);
+
+    const makeButton = (y, label, strokeColor, onPick) => {
+      const box = this.add.rectangle(CX, y, 560, 96, 0x111111, 0.96)
+        .setStrokeStyle(4, strokeColor)
+        .setInteractive({ useHandCursor: true });
+
+      const text = this.add.text(CX, y, label, {
+        fontFamily: "monospace",
+        fontSize: "30px",
+        color: "#ffffff"
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+      box.on("pointerup", onPick);
+      text.on("pointerup", onPick);
+
+      return { box, text };
+    };
+
+    const chooseStory = () => {
+      window.MP_SELECTED_MODE = "STORY";
+      this.scene.start("CharacterSelect");
+    };
+
+    const chooseArena = () => {
+      window.MP_SELECTED_MODE = "ARENA";
+      this.scene.start("CharacterSelect");
+    };
+
+    makeButton(210, "STORY MODE", 0xff2aa8, chooseStory);
+    makeButton(330, "ARENA BATTLE", 0x00e5ff, chooseArena);
+
+    this.add.text(CX, H - 66, "TAP MODE TO CONTINUE", {
+      fontFamily: "monospace",
+      fontSize: "18px",
+      color: "#aaaaaa"
+    }).setOrigin(0.5);
+
+    this.add.text(CX, H - 38, "1 = STORY   2 = ARENA   ESC = BACK", {
+      fontFamily: "monospace",
+      fontSize: "16px",
+      color: "#777777"
+    }).setOrigin(0.5);
+
+    this.input.keyboard?.on("keydown-ONE", chooseStory);
+    this.input.keyboard?.on("keydown-NUMPAD_ONE", chooseStory);
+
+    this.input.keyboard?.on("keydown-TWO", chooseArena);
+    this.input.keyboard?.on("keydown-NUMPAD_TWO", chooseArena);
+
+    this.input.keyboard?.on("keydown-ENTER", chooseStory);
+    this.input.keyboard?.on("keydown-SPACE", chooseStory);
+
+    this.input.keyboard?.on("keydown-ESC", () => {
+      this.scene.start("Title");
+    });
+  }
+};
+
+/* Force title screen to go to ModeSelect instead of CharacterSelect */
+goFromTitle = function(scene){
+  startTitleMusic();
+  scene.scene.start("ModeSelect");
+};
   const config = {
   parent: "game",
   type: Phaser.AUTO,
