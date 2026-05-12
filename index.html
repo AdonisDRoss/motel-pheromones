@@ -285,7 +285,7 @@ function toggleTitleMusic(){
 
 function goFromTitle(scene){
   startTitleMusic();
-  scene.scene.start("CharacterSelect");
+  scene.scene.start("ModeSelect");
 }
 
   function startFightMusic(){
@@ -17119,11 +17119,13 @@ var ModeSelect = class ModeSelect extends Phaser.Scene {
   }
 };
 
-/* Force title screen to go to ModeSelect instead of CharacterSelect */
-goFromTitle = function(scene){
-  startTitleMusic();
+/* Force title screen to go to ModeSelect instead of CharacterSelect */function goFromTitle(scene){
+  if (typeof startTitleMusic === "function") {
+    startTitleMusic();
+  }
+
   scene.scene.start("ModeSelect");
-};
+}
   const config = {
   parent: "game",
   type: Phaser.AUTO,
