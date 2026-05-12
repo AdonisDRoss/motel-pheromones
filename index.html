@@ -16919,7 +16919,470 @@ if(typeof LevelSelect !== "undefined"){
     disableWebAudio: false
   }
 };
+/* =========================================================
+   PATCH: LOCKED CHARACTER CARD CAROUSEL
+   - Adds Amber, Johnny, Greg, Buddy Harley cards
+   - Donny is NOT added because Donny is already playable
+   - Locked cards cycle left/right
+   - Locked cards cannot be selected
+   ========================================================= */
 
+(() => {
+  "use strict";
+
+  const LOCKED_CARD_ROSTER = [
+    {
+      id: "amber",
+      name: "AMBER",
+      cardKey: "card_amber",
+      cardPath: "assets/cards/amber_card.png",
+      locked: true,
+      lockReason: "SPRITES NOT READY"
+    },
+    {
+      id: "johnny",
+      name: "JOHNNY",
+      cardKey: "card_johnny",
+      cardPath: "assets/cards/johnny_card.png",
+      locked: true,
+      lockReason: "SPRITES NOT READY"
+    },
+    {
+      id: "greg",
+      name: "GREG",
+      cardKey: "card_greg",
+      cardPath: "assets/cards/greg_card.png",
+      locked: true,
+      lockReason: "SPRITES NOT READY"
+    },
+    {
+      id: "buddy_harley",
+      name: "BUDDY HARLEY",
+      cardKey: "card_buddy_harley",
+      cardPath: "assets/cards/buddy_harley_card.png",
+      locked: true,
+      lockReason: "SPRITES NOT READY"
+    }
+  ];
+
+  window.LOCKED_CARD_ROSTER = LOCKED_CARD_ROSTER;
+
+  function normalizeId(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function isOldLockedDonnyCard(fighter) {
+    if (!fighter) return false;
+
+    const text = [
+      fighter.id,
+      fighter.name,
+      fighter.key,
+      fighter.cardKey,
+      fighter.cardPath,
+      fighter.portrait,
+      fighter.portraitKey
+    ].join(" ").toLowerCase();
+
+    const looksLikeDonny = text.includes("donny") || text.includes("donnie");
+    const looksLikeCardOnly =
+      fighter.locked ||
+      fighter.isLockedCard ||
+      fighter.isCardOnly ||
+      text.includes("donny_card") ||
+      text.includes("donnie_card");
+
+    return looksLikeDonny && looksLikeCardOnly;
+  }
+
+  function addLockedCardsToKnownRosters() {
+    const possibleRosters = [
+      window.CHARACTER_ROSTER,
+      window.CHARACTERS,
+      window.FIGHTERS,
+      window.ROSTER,
+      window.SELECTABLE_CHARACTERS,
+      window.characterRoster,
+      window.characters,
+      window.fighters,
+      window.roster
+    ];
+
+    possibleRosters.forEach((roster) => {
+      if (!Array.isArray(roster)) return;
+
+      for (let i = roster.length - 1; i >= 0; i--) {
+        if (isOldLockedDonnyCard(roster[i])) {
+          roster.splice(i, 1);
+        }
+      }
+
+      LOCKED_CARD_ROSTER.forEach((lockedFighter) => {
+        const alreadyExists = roster.some((existing) => {
+          const existingId = normalizeId(existing.id || existing.key || existing.name);
+          return existingId === lockedFighter.id;
+        });
+
+        if (!alreadyExists) {
+          roster.push({
+            ...lockedFighter,
+            isLockedCard: true,
+            isCardOnly: true,
+            selectable: false,
+            spriteReady: false,
+            portraitKey: lockedFighter.cardKey,
+            imageKey: lockedFighter.cardKey
+          });
+        }
+      });
+    });
+  }
+
+  function showLockedCardMessage(scene, fighter) {
+    if (!scene || !scene.add) return;
+
+    if (scene.lockedCardMessage) {
+      scene.lockedCardMessage.destroy();
+      scene.lockedCardMessage = null;
+    }
+
+    const width = scene.scale?.width || scene.game?.config?.width || 1280;
+    const height = scene.scale?.height || scene.game?.config?.height || 720;
+
+    scene.lockedCardMessage = scene.add.text(
+      width / 2,
+      height - 96,
+      `${fighter.name} LOCKED - ${fighter.lockReason || "SPRITES NOT READY"}`,
+      {
+        fontFamily: "monospace",
+        fontSize: "22px",
+        color: "#ff3bd5",
+        stroke: "#000000",
+        strokeThickness: 5,
+        align: "center"
+      }
+    )
+      .setOrigin(0.5)
+      .setDepth(99999);
+
+    scene.time.delayedCall(1400, () => {
+      if (scene.lockedCardMessage) {
+        scene.lockedCardMessage.destroy();
+        scene.lockedCardMessage = null;
+      }
+    });
+  }
+
+  window.showLockedCardMessage = showLockedCardMessage;
+
+  window.trySelectCarouselFighter = function trySelectCarouselFighter(scene, fighter) {
+    if (!fighter) return false;
+
+    if (fighter.locked || fighter.isLockedCard || fighter.isCardOnly || fighter.spriteReady === false) {
+      showLockedCardMessage(scene, fighter);
+      return false;
+    }
+
+    return true;
+  };
+
+  function preloadLockedCardImages(scene) {
+    if (!scene || !scene.load) return;
+
+    LOCKED_CARD_ROSTER.forEach((fighter) => {
+      if (!scene.textures.exists(fighter.cardKey)) {
+        scene.load.image(fighter.cardKey, fighter.cardPath);
+      }
+    });
+  }
+
+  function ensureLockedCardImagesLoaded(scene, callback) {
+    const missing = LOCKED_CARD_ROSTER.filter((fighter) => {
+      return !scene.textures.exists(fighter.cardKey);
+    });
+
+    if (missing.length === 0) {
+      callback();
+      return;
+    }
+
+    missing.forEach((fighter) => {
+      scene.load.image(fighter.cardKey, fighter.cardPath);
+    });
+
+    scene.load.once("complete", callback);
+    scene.load.start();
+  }
+
+  function getCurrentLockedFighter(scene) {
+    if (typeof scene.lockedCardIndex !== "number") {
+      scene.lockedCardIndex = 0;
+    }
+
+    return LOCKED_CARD_ROSTER[scene.lockedCardIndex];
+  }
+
+  function updateLockedCardDisplay(scene) {
+    const fighter = getCurrentLockedFighter(scene);
+    if (!fighter) return;
+
+    if (scene.lockedCardImage) {
+      scene.lockedCardImage.setTexture(fighter.cardKey);
+    }
+
+    if (scene.lockedCardNameText) {
+      scene.lockedCardNameText.setText(fighter.name);
+    }
+
+    if (scene.lockedCardLockText) {
+      scene.lockedCardLockText.setText("LOCKED - SPRITES NOT READY");
+    }
+  }
+
+  function nextLockedCard(scene) {
+    scene.lockedCardIndex = (scene.lockedCardIndex + 1) % LOCKED_CARD_ROSTER.length;
+    updateLockedCardDisplay(scene);
+  }
+
+  function prevLockedCard(scene) {
+    scene.lockedCardIndex =
+      (scene.lockedCardIndex - 1 + LOCKED_CARD_ROSTER.length) % LOCKED_CARD_ROSTER.length;
+    updateLockedCardDisplay(scene);
+  }
+
+  function layoutLockedCardCarousel(scene) {
+    if (!scene.lockedCardContainer) return;
+
+    const width = scene.scale?.width || scene.game?.config?.width || 1280;
+    const height = scene.scale?.height || scene.game?.config?.height || 720;
+
+    const cardHeight = Math.min(height * 0.58, 430);
+    const cardWidth = cardHeight * 0.66;
+
+    const centerX = width / 2;
+    const centerY = height * 0.49;
+
+    scene.lockedCardImage
+      .setPosition(centerX, centerY)
+      .setDisplaySize(cardWidth, cardHeight);
+
+    scene.lockedCardNameText.setPosition(centerX, centerY + cardHeight / 2 + 24);
+    scene.lockedCardLockText.setPosition(centerX, centerY + cardHeight / 2 + 52);
+
+    scene.lockedCardLeftArrow.setPosition(width * 0.08, height * 0.52);
+    scene.lockedCardRightArrow.setPosition(width * 0.92, height * 0.52);
+
+    scene.lockedCardSelectButton.setPosition(centerX, height - 54);
+  }
+
+  function installLockedCardCarousel(scene) {
+    if (!scene || !scene.add || scene.lockedCardPatchInstalled) return;
+
+    scene.lockedCardPatchInstalled = true;
+    scene.lockedCardIndex = 0;
+
+    ensureLockedCardImagesLoaded(scene, () => {
+      const width = scene.scale?.width || scene.game?.config?.width || 1280;
+      const height = scene.scale?.height || scene.game?.config?.height || 720;
+
+      scene.lockedCardContainer = scene.add.container(0, 0).setDepth(9000);
+
+      scene.lockedCardImage = scene.add.image(width / 2, height * 0.49, LOCKED_CARD_ROSTER[0].cardKey)
+        .setOrigin(0.5);
+
+      scene.lockedCardNameText = scene.add.text(width / 2, height - 130, "", {
+        fontFamily: "monospace",
+        fontSize: "24px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 5,
+        align: "center"
+      }).setOrigin(0.5);
+
+      scene.lockedCardLockText = scene.add.text(width / 2, height - 102, "", {
+        fontFamily: "monospace",
+        fontSize: "16px",
+        color: "#ff3bd5",
+        stroke: "#000000",
+        strokeThickness: 4,
+        align: "center"
+      }).setOrigin(0.5);
+
+      scene.lockedCardLeftArrow = scene.add.text(width * 0.08, height * 0.52, "‹", {
+        fontFamily: "monospace",
+        fontSize: "72px",
+        color: "#ff3bd5",
+        stroke: "#000000",
+        strokeThickness: 7
+      })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      scene.lockedCardRightArrow = scene.add.text(width * 0.92, height * 0.52, "›", {
+        fontFamily: "monospace",
+        fontSize: "72px",
+        color: "#ff3bd5",
+        stroke: "#000000",
+        strokeThickness: 7
+      })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      scene.lockedCardSelectButton = scene.add.text(width / 2, height - 54, "A  SELECT", {
+        fontFamily: "monospace",
+        fontSize: "22px",
+        color: "#ffffff",
+        backgroundColor: "rgba(0,0,0,0.55)",
+        padding: {
+          left: 22,
+          right: 22,
+          top: 10,
+          bottom: 10
+        },
+        stroke: "#ff3bd5",
+        strokeThickness: 3,
+        align: "center"
+      })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      scene.lockedCardContainer.add([
+        scene.lockedCardImage,
+        scene.lockedCardNameText,
+        scene.lockedCardLockText,
+        scene.lockedCardLeftArrow,
+        scene.lockedCardRightArrow,
+        scene.lockedCardSelectButton
+      ]);
+
+      scene.lockedCardLeftArrow.on("pointerdown", () => prevLockedCard(scene));
+      scene.lockedCardRightArrow.on("pointerdown", () => nextLockedCard(scene));
+
+      scene.lockedCardSelectButton.on("pointerdown", () => {
+        const fighter = getCurrentLockedFighter(scene);
+        window.trySelectCarouselFighter(scene, fighter);
+      });
+
+      if (scene.input?.keyboard) {
+        scene.input.keyboard.on("keydown-LEFT", () => prevLockedCard(scene));
+        scene.input.keyboard.on("keydown-RIGHT", () => nextLockedCard(scene));
+
+        scene.input.keyboard.on("keydown-A", () => {
+          const fighter = getCurrentLockedFighter(scene);
+          window.trySelectCarouselFighter(scene, fighter);
+        });
+
+        scene.input.keyboard.on("keydown-ENTER", () => {
+          const fighter = getCurrentLockedFighter(scene);
+          window.trySelectCarouselFighter(scene, fighter);
+        });
+
+        scene.input.keyboard.on("keydown-SPACE", () => {
+          const fighter = getCurrentLockedFighter(scene);
+          window.trySelectCarouselFighter(scene, fighter);
+        });
+      }
+
+      scene.showNextLockedCard = () => nextLockedCard(scene);
+      scene.showPrevLockedCard = () => prevLockedCard(scene);
+
+      updateLockedCardDisplay(scene);
+      layoutLockedCardCarousel(scene);
+
+      if (scene.scale?.on) {
+        scene.scale.on("resize", () => layoutLockedCardCarousel(scene));
+      }
+    });
+  }
+
+  function getSceneClassByName(name) {
+    try {
+      if (typeof window[name] !== "undefined") return window[name];
+      return eval(name);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function findCharacterSelectSceneClass() {
+    const commonNames = [
+      "CharacterSelectScene",
+      "CharacterSelect",
+      "CharacterSelectScreen",
+      "SelectScene"
+    ];
+
+    for (const name of commonNames) {
+      const SceneClass = getSceneClassByName(name);
+      if (SceneClass && SceneClass.prototype) {
+        return SceneClass;
+      }
+    }
+
+    try {
+      if (typeof config !== "undefined" && Array.isArray(config.scene)) {
+        for (const sceneEntry of config.scene) {
+          const SceneClass =
+            typeof sceneEntry === "function"
+              ? sceneEntry
+              : sceneEntry?.constructor;
+
+          const name = String(SceneClass?.name || sceneEntry?.key || "").toLowerCase();
+
+          if (name.includes("character") && name.includes("select")) {
+            return SceneClass;
+          }
+
+          if (name.includes("select") && !name.includes("level")) {
+            return SceneClass;
+          }
+        }
+      }
+    } catch (error) {
+      // Safe fallback.
+    }
+
+    return null;
+  }
+
+  function patchCharacterSelectScene() {
+    const SceneClass = findCharacterSelectSceneClass();
+
+    if (!SceneClass || !SceneClass.prototype) {
+      console.warn("Locked card patch: CharacterSelectScene was not found. Roster data was still patched.");
+      return;
+    }
+
+    if (SceneClass.prototype.lockedCardScenePatched) return;
+    SceneClass.prototype.lockedCardScenePatched = true;
+
+    const originalPreload = SceneClass.prototype.preload;
+    const originalCreate = SceneClass.prototype.create;
+
+    SceneClass.prototype.preload = function patchedCharacterSelectPreload(...args) {
+      if (typeof originalPreload === "function") {
+        originalPreload.apply(this, args);
+      }
+
+      preloadLockedCardImages(this);
+    };
+
+    SceneClass.prototype.create = function patchedCharacterSelectCreate(...args) {
+      if (typeof originalCreate === "function") {
+        originalCreate.apply(this, args);
+      }
+
+      installLockedCardCarousel(this);
+    };
+  }
+
+  addLockedCardsToKnownRosters();
+  patchCharacterSelectScene();
+
+})();
 new Phaser.Game(config);
   </script>
 </body>
