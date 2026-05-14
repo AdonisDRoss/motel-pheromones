@@ -21188,6 +21188,80 @@ const config = {
     });
   };
 })();
+  /* PATCH ADD-ON: Git assets/cards roster loader */
+(function(){
+  const CS = window.CharacterSelect;
+  if(!CS || !CS.prototype) return;
+
+  const CARD_CANDIDATES = [
+    ["amber", "AMBER", "LMNOP", "assets/cards/amber_card.png"],
+    ["johnny", "JOHNNY", "LMNOP", "assets/cards/johnny_card.png"],
+    ["greg", "GREG", "LMNOP", "assets/cards/greg_card.png"],
+    ["buddy", "BUDDY HARLEY", "LOCKED", "assets/cards/buddy_harley_card.png"],
+
+    ["bird", "BIRD", "JOINT PAIN", "assets/cards/bird_card.png"],
+    ["leanna", "LEANNA", "JOINT PAIN", "assets/cards/leanna_card.png"],
+    ["stan", "STAN", "LONE WOLF", "assets/cards/stan_card.png"],
+    ["phil", "PHIL", "LOCKED", "assets/cards/phil_card.png"],
+    ["jed", "JED", "LOCKED", "assets/cards/jed_card.png"],
+    ["sam", "SAM", "LOCKED", "assets/cards/sam_card.png"],
+    ["danny", "DANNY", "LOCKED", "assets/cards/danny_card.png"],
+    ["trent", "TRENT", "LOCKED", "assets/cards/trent_card.png"]
+  ];
+
+  CS.prototype.preload = function(){
+    const v = typeof VERSION !== "undefined" ? VERSION : Date.now();
+
+    this.load.on("loaderror", function(file){
+      console.warn("Optional card missing:", file.key, file.src);
+    });
+
+    this.load.image("character_select_bg", "assets/ui/character_select_bg.png?v=" + v);
+
+    this.load.image("char_card_donny", "assets/ui/cards/donny_card.png?v=" + v);
+    this.load.image("char_card_jt", "assets/ui/cards/jt_card.png?v=" + v);
+    this.load.image("char_card_hew", "assets/ui/cards/hew_card.png?v=" + v);
+    this.load.image("char_card_jackson", "assets/ui/cards/jackson_card.png?v=" + v);
+
+    CARD_CANDIDATES.forEach(function(c){
+      this.load.image(c[0] + "_card", c[3] + "?v=" + v);
+    }, this);
+  };
+
+  const oldCreate = CS.prototype.create;
+  CS.prototype.create = function(){
+    oldCreate.call(this);
+
+    const base = [
+      { id:"donny", displayName:"DONNY", faction:"MOTEL PHEROMONES", role:"FRONTMAN / HYPE LEADER", weapon:"ANASTASIA", cardKey:"char_card_donny", unlocked:true },
+      { id:"jt", displayName:"JT", faction:"MOTEL PHEROMONES", role:"RHYTHM CONTROLLER", weapon:"DRUMSTICKS", cardKey:"char_card_jt", unlocked:true },
+      { id:"hew", displayName:"HEW", faction:"MOTEL PHEROMONES", role:"TANK / CROWD CONTROL", weapon:"MEPHISTA BASS", cardKey:"char_card_hew", unlocked:true },
+      { id:"jackson", displayName:"JACKSON", faction:"ROCKER BOYS", role:"LEAD GUITAR", weapon:"GRETSCHEN GOLDIE", cardKey:"char_card_jackson", unlocked:true }
+    ];
+
+    CARD_CANDIDATES.forEach((c)=>{
+      const key = c[0] + "_card";
+      base.push({
+        id:c[0],
+        displayName:c[1],
+        faction:c[2],
+        role:"LOCKED",
+        weapon:"",
+        cardKey:this.textures.exists(key) ? key : null,
+        unlocked:false
+      });
+    });
+
+    this.fighters = base;
+
+    this.cardFrames.forEach(o=>o.destroy());
+    this.cardImages.forEach(o=>o.destroy());
+    this.nameTexts.forEach(o=>o.destroy());
+
+    this.buildCards();
+    this.updateSelection();
+  };
+})();
 
 new Phaser.Game(config);
   </script>
