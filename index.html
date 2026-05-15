@@ -4896,214 +4896,228 @@ placeMobileObject(obj, screenX, screenY){
 }
 
 makeMobileControls(){
-  const size = v => v * CONTROL_ZOOM;
-  const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
 
-  this.mobileUI = {};
-  this.mobileButtons = [];
+  const W=this.scale.width;
+  const H=this.scale.height;
 
-  // LEFT SIDE: true virtual thumb stick positioned on the circled spot.
-  // Base stays fixed; thumb knob follows the finger and snaps back on release.
-  const bx = 255;
-  const by = H - 158;
-  const baseR = size(50);
-  const knobR = size(22);
-  const touchR = size(86);
+  this.mobileUI={};
 
-  const stickTouch = this.add.circle(bx, by, touchR, 0xffffff, 0.001)
-    .setInteractive()
-    .setDepth(8999)
-    .setScrollFactor(0);
+  const depth=50000;
 
-  const stickBase = this.add.circle(bx, by, baseR, 0x000000, 0.34)
-    .setStrokeStyle(5, 0xffffff, 0.56)
-    .setDepth(9000)
-    .setScrollFactor(0);
+  const alphaBase=0.28;
+  const alphaStick=0.5;
 
-  const stickMid = this.add.circle(bx, by, size(31), 0xffffff, 0.10)
-    .setStrokeStyle(2, 0xffffff, 0.28)
-    .setDepth(9001)
-    .setScrollFactor(0);
+  /* =====================================================
+     JOYSTICK
+  ===================================================== */
 
-  const knob = this.add.circle(bx, by, knobR, 0xffffff, 0.46)
-    .setStrokeStyle(3, 0xffffff, 0.62)
-    .setDepth(9002)
-    .setScrollFactor(0);
+  const joyX=145;
+  const joyY=H-145;
 
-  this.mobileUI.stickTouch = stickTouch;
-  this.mobileUI.stickBase = stickBase;
-  this.mobileUI.stickMid = stickMid;
-  this.mobileUI.stickKnob = knob;
+  const base=this.add.circle(
+    joyX,
+    joyY,
+    74,
+    0xffffff,
+    alphaBase
+  )
+  .setStrokeStyle(4,0xffffff,0.35)
+  .setScrollFactor(0)
+  .setDepth(depth);
 
-  let dragging = false;
+  const stick=this.add.circle(
+    joyX,
+    joyY,
+    34,
+    0xffffff,
+    alphaStick
+  )
+  .setStrokeStyle(3,0xffffff,0.7)
+  .setScrollFactor(0)
+  .setDepth(depth+1);
 
-  const resetStick = () => {
-    dragging = false;
-    knob.x = stickBase.x;
-    knob.y = stickBase.y;
-    this.stickX = 0;
-    this.stickY = 0;
+  this.mobileUI.joyBase=base;
+  this.mobileUI.joyStick=stick;
+
+  this.stickPointer=null;
+  this.stickX=0;
+  this.stickY=0;
+
+  const maxRadius=52;
+
+  const resetStick=()=>{
+    stick.x=joyX;
+    stick.y=joyY;
+    this.stickX=0;
+    this.stickY=0;
+    this.stickPointer=null;
   };
 
-  const moveStick = p => {
-    let dx = p.x - stickBase.x;
-    let dy = p.y - stickBase.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
+  this.input.on("pointerdown",(p)=>{
 
-    if(d > baseR){
-      dx = (dx / d) * baseR;
-      dy = (dy / d) * baseR;
-    }
+    if(p.x<W*0.45){
 
-    knob.x = stickBase.x + dx;
-    knob.y = stickBase.y + dy;
+      this.stickPointer=p.id;
 
-    this.stickX = dx / baseR;
-    this.stickY = dy / baseR;
-  };
+      const dx=p.x-joyX;
+      const dy=p.y-joyY;
 
-  const startVirtualStick = p => {
-    if(p && p.event && p.event.preventDefault){
-      p.event.preventDefault();
-    }
-    dragging = true;
-    moveStick(p);
-  };
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
 
-  stickTouch.on("pointerdown", startVirtualStick);
+      const clamped=Math.min(dist,maxRadius);
 
-  this.input.on("pointerdown", p => {
-    if(Phaser.Math.Distance.Between(p.x, p.y, stickBase.x, stickBase.y) <= touchR){
-      startVirtualStick(p);
+      const nx=dx/dist;
+      const ny=dy/dist;
+
+      stick.x=joyX+(nx*clamped);
+      stick.y=joyY+(ny*clamped);
+
+      this.stickX=nx*(clamped/maxRadius);
+      this.stickY=ny*(clamped/maxRadius);
     }
   });
 
-  this.input.on("pointermove", p => {
-    if(dragging){
-      moveStick(p);
+  this.input.on("pointermove",(p)=>{
+
+    if(this.stickPointer!==p.id) return;
+
+    const dx=p.x-joyX;
+    const dy=p.y-joyY;
+
+    const dist=Math.sqrt(dx*dx+dy*dy)||1;
+
+    const clamped=Math.min(dist,maxRadius);
+
+    const nx=dx/dist;
+    const ny=dy/dist;
+
+    stick.x=joyX+(nx*clamped);
+    stick.y=joyY+(ny*clamped);
+
+    this.stickX=nx*(clamped/maxRadius);
+    this.stickY=ny*(clamped/maxRadius);
+  });
+
+  this.input.on("pointerup",(p)=>{
+    if(this.stickPointer===p.id){
+      resetStick();
     }
   });
 
-  this.input.on("pointerup", resetStick);
-  this.input.on("pointerupoutside", resetStick);
+  /* =====================================================
+     BUTTONS
+  ===================================================== */
 
-  // RIGHT SIDE: keep the spread-out photo-1 layout.
-  const diamondX = W - 310;
-  const diamondY = H - 158;
-  const gap = size(58);
+  const bx=W-150;
+  const by=H-145;
 
-  this.mobileButton(diamondX, diamondY - gap, "X", 0x4d7cff, () => this.startAttack("heavy"));
-  this.mobileButton(diamondX - gap, diamondY, "Y", 0x4fd35d, () => this.startAttack("light"));
-  this.mobileButton(diamondX + gap, diamondY, "A", 0xff5a5a, () => this.startContextKick());
-  this.mobileButton(diamondX, diamondY + gap, "B", 0xffd84d, () => this.startContextB());
+  const makeBtn=(x,y,label,color,callback)=>{
 
-  this.mobileButton(diamondX - gap, diamondY - gap, "SP", 0x8f72ff, () => this.playPlayerPose(this.getPlayerAnim("special"),750,this.getPlayerActionScale()));
-
-  this.mobileButton(W - 330, H - 138, "CR", 0x8a8a8a, () => {
-    this.recoverActionInput();
-    this.startCrouch(true);
-  });
-
-  const menuX = CX;
-  const menuY = H - 92;
-
-  const menuHit = this.add.rectangle(menuX, menuY, size(105), size(33), 0x000000, 0.30)
+    const btn=this.add.circle(
+      x,
+      y,
+      34,
+      color,
+      0.38
+    )
+    .setStrokeStyle(4,0xffffff,0.45)
     .setInteractive()
-    .setDepth(9500)
-    .setScrollFactor(0);
+    .setScrollFactor(0)
+    .setDepth(depth);
 
-  const menuFace = this.add.rectangle(menuX, menuY, size(105), size(33), 0xffffff, 0.10)
-    .setStrokeStyle(2, 0xffffff, 0.30)
-    .setDepth(9501)
-    .setScrollFactor(0);
-
-  const menuText = this.add.text(menuX, menuY, "MENU", {
-    font: font(13),
-    fill: "#fff"
-  }).setOrigin(0.5).setDepth(9502).setScrollFactor(0);
-
-  this.mobileUI.menuHit = menuHit;
-  this.mobileUI.menuFace = menuFace;
-  this.mobileUI.menuText = menuText;
-
-  menuHit.on("pointerdown", () => this.togglePauseMenu());
-}
-
-mobileButton(x, y, label, color, down, up = null){
-  const size = v => v * CONTROL_ZOOM;
-  const font = v => Math.round(v * CONTROL_ZOOM) + "px monospace";
-
-  const hitR = size(28);
-  const faceR = size(22);
-
-  const hit = this.add.circle(x, y, hitR, 0xffffff, 0.01)
-    .setInteractive()
-    .setDepth(9500)
-    .setScrollFactor(0);
-
-  const shadow = this.add.circle(x + 2, y + 3, faceR, 0x000000, 0.18)
-    .setDepth(9500)
-    .setScrollFactor(0);
-
-  const face = this.add.circle(x, y, faceR, color, 0.78)
-    .setStrokeStyle(2, 0xffffff, 0.42)
-    .setDepth(9501)
-    .setScrollFactor(0);
-
-  const shine = this.add.circle(x - 5, y - 5, size(8), 0xffffff, 0.14)
-    .setDepth(9502)
-    .setScrollFactor(0);
-
-  const text = this.add.text(x, y, label, {
-    font: font(label.length > 1 ? 12 : 15),
-    fill: "#ffffff",
-    stroke: "#000000",
-    strokeThickness: 3
-  })
+    const txt=this.add.text(
+      x,
+      y,
+      label,
+      {
+        font:"22px Arial",
+        color:"#ffffff",
+        stroke:"#000000",
+        strokeThickness:5
+      }
+    )
     .setOrigin(0.5)
-    .setDepth(9503)
-    .setScrollFactor(0);
+    .setScrollFactor(0)
+    .setDepth(depth+1);
 
-  hit.on("pointerdown", p => {
-    if(p && p.event && p.event.preventDefault){
-      p.event.preventDefault();
-    }
+    btn.on("pointerdown",callback);
 
-    this.ensureRoundActive();
-    this.readInput();
-    this.recoverActionInput();
-    vibrate(VIBE.button);
-
-    if(down){
-      down();
-    }
-  });
-
-  hit.on("pointerup", p => {
-    if(p && p.event && p.event.preventDefault){
-      p.event.preventDefault();
-    }
-
-    if(up){
-      up();
-    }
-  });
-
-  hit.on("pointerout", () => {
-    if(up){
-      up();
-    }
-  });
-
-  return {
-    hit,
-    shadow,
-    face,
-    shine,
-    text
+    return {btn,txt};
   };
-}
-} // THIS CLOSES class Game
+
+  /* Y */
+  makeBtn(
+    bx,
+    by-64,
+    "Y",
+    0x6f42ff,
+    ()=>this.startContextY()
+  );
+
+  /* A */
+  makeBtn(
+    bx,
+    by+64,
+    "A",
+    0x32d74b,
+    ()=>this.startJump(true)
+  );
+
+  /* X */
+  makeBtn(
+    bx-64,
+    by,
+    "X",
+    0x3ba7ff,
+    ()=>this.startAttack("light")
+  );
+
+  /* B */
+  makeBtn(
+    bx+64,
+    by,
+    "B",
+    0xff4d5a,
+    ()=>this.startContextB()
+  );
+
+  /* =====================================================
+     MENU BUTTON
+  ===================================================== */
+
+  const menu=this.add.rectangle(
+    W*0.5,
+    H-62,
+    120,
+    42,
+    0x000000,
+    0.42
+  )
+  .setStrokeStyle(3,0xffffff,0.4)
+  .setInteractive()
+  .setScrollFactor(0)
+  .setDepth(depth);
+
+  const menuText=this.add.text(
+    W*0.5,
+    H-62,
+    "MENU",
+    {
+      font:"18px Arial",
+      color:"#ffffff",
+      stroke:"#000000",
+      strokeThickness:4
+    }
+  )
+  .setOrigin(0.5)
+  .setScrollFactor(0)
+  .setDepth(depth+1);
+
+  menu.on("pointerdown",()=>{
+    this.togglePauseMenu();
+  });
+
+}// THIS CLOSES class Game
 /* =========================================================
    FAST BUTTON ANIMATION FIX PATCH
    Paste this after:
