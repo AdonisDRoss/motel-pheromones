@@ -1,0 +1,155 @@
+{
+  "version": 795,
+  "cardBasePath": "assets/cards/",
+  "movementBasePath": "assets/sprites/player/",
+  "carouselOrder": [
+    "donny",
+    "jt",
+    "hew",
+    "jackson",
+    "amber",
+    "johnny",
+    "greg",
+    "buddy_harley",
+    "rey",
+    "leanna",
+    "bird",
+    "sam",
+    "trent",
+    "jed",
+    "phil",
+    "danny",
+    "stan",
+    "putzie"
+  ],
+  "characters": [
+    {
+      "id": "donny",
+      "displayName": "DONNY",
+      "card": "assets/cards/donny_card.png",
+      "fallbackCard": "assets/ui/cards/donny_card.png",
+      "movement": "assets/sprites/player/donny/cutouts/donny_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "jt",
+      "displayName": "JT",
+      "card": "assets/cards/jt_card.png",
+      "fallbackCard": "assets/ui/cards/jt_card.png",
+      "movement": "assets/sprites/player/jt/cutouts/jt_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "hew",
+      "displayName": "HEW",
+      "card": "assets/cards/hew_card.png",
+      "fallbackCard": "assets/ui/cards/hew_card.png",
+      "movement": "assets/sprites/player/hew/cutouts/hew_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "jackson",
+      "displayName": "JACKSON",
+      "card": "assets/cards/jackson_card.png",
+      "fallbackCard": "assets/ui/cards/jackson_card.png",
+      "movement": "assets/sprites/player/jackson/cutouts/jackson_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "amber",
+      "displayName": "AMBER",
+      "card": "assets/cards/amber_card.png",
+      "movement": "assets/sprites/player/amber/cutouts/amber_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "johnny",
+      "displayName": "JOHNNY",
+      "card": "assets/cards/johnny_card.png",
+      "movement": "assets/sprites/player/johnny/cutouts/johnny_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "greg",
+      "displayName": "GREG",
+      "card": "assets/cards/greg_card.png",
+      "movement": "assets/sprites/player/greg/cutouts/greg_movement_clean_retry.png",
+      "unlocked": true
+    },
+    {
+      "id": "buddy_harley",
+      "displayName": "BUDDY HARLEY",
+      "card": "assets/cards/buddy_harley_card.png",
+      "movement": "assets/sprites/player/buddy_harley/cutouts/buddy_harley_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "rey",
+      "displayName": "REY",
+      "card": "assets/cards/rey_card.png",
+      "movement": "assets/sprites/player/rey/cutouts/rey_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "leanna",
+      "displayName": "LEANNA",
+      "card": "assets/cards/leanna_card.png",
+      "movement": "assets/sprites/player/leanna/cutouts/leanna_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "bird",
+      "displayName": "BIRD",
+      "card": "assets/cards/bird_card.png",
+      "movement": "assets/sprites/player/bird/cutouts/bird_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "sam",
+      "displayName": "SAM",
+      "card": "assets/cards/sam_card.png",
+      "movement": "assets/sprites/player/sam/cutouts/sam_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "trent",
+      "displayName": "TRENT",
+      "card": "assets/cards/trent_card.png",
+      "movement": "assets/sprites/player/trent/cutouts/trent_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "jed",
+      "displayName": "JED",
+      "card": "assets/cards/jed_card.png",
+      "movement": "assets/sprites/player/jed/cutouts/jed_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "phil",
+      "displayName": "PHIL",
+      "card": "assets/cards/phil_card.png",
+      "movement": "assets/sprites/player/phil/cutouts/phil_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "danny",
+      "displayName": "DANNY",
+      "card": "assets/cards/danny_card.png",
+      "movement": "assets/sprites/player/danny/cutouts/danny_movement_clean.png",
+      "unlocked": true
+    },
+    {
+      "id": "stan",
+      "displayName": "STAN",
+      "card": "assets/cards/stan_card.png",
+      "unlocked": false
+    },
+    {
+      "id": "putzie",
+      "displayName": "PUTZIE",
+      "card": "assets/cards/putzie_card.png",
+      "unlocked": false
+    }
+  ]
+}
