@@ -1,0 +1,390 @@
+{
+  "name": "hew_frame_events",
+  "version": 827,
+  "character": "Hew",
+  "notes": [
+    "Frame numbers are local to each 6-frame row.",
+    "FX events are placeholders; Hew FX will be built separately.",
+    "Projectile, amp, and cab assets should spawn as separate sprites."
+  ],
+  "events": {
+    "hew_jab": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_light"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_jab"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_low_punch": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_light"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_low_punch"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_bass_uppercut": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "bass_swing"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_bass_uppercut"
+      },
+      {
+        "frame": 3,
+        "type": "launch_flag",
+        "value": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_bass_note_projectile": [
+      {
+        "frame": 2,
+        "type": "spawn_projectile",
+        "key": "hew_bass_note_projectile",
+        "placeholder": true
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "hew_bass_note_projectile_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 3,
+        "type": "sfx",
+        "key": "bass_note"
+      }
+    ],
+    "hew_bass_sound": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_bass_sound"
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "hew_bass_soundwave_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_heavy_bass_hit": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_heavy"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_heavy_bass_hit"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_heavy_bass_swing": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "bass_swing_heavy"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_heavy_bass_swing"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_heavy_kick": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "kick"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_heavy_kick"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_jump_kick": [
+      {
+        "frame": 0,
+        "type": "movement",
+        "x": 16,
+        "y": -22
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_jump_kick"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      },
+      {
+        "frame": 5,
+        "type": "land"
+      }
+    ],
+    "hew_sweep": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_sweep"
+      },
+      {
+        "frame": 3,
+        "type": "status_on_hit",
+        "status": "knockdown"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_hook_punch": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_hook_punch"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_heavy_bass_slam": [
+      {
+        "frame": 2,
+        "type": "sfx",
+        "key": "bass_slam_charge"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "hew_heavy_bass_slam"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "hew_heavy_hit_spark_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_grab_start": [
+      {
+        "frame": 2,
+        "type": "grabbox_on",
+        "attack": "hew_grab_start"
+      },
+      {
+        "frame": 4,
+        "type": "grabbox_off"
+      }
+    ],
+    "hew_throw_item": [
+      {
+        "frame": 3,
+        "type": "release_item"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "hew_throw_item"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_extra_cab_attack": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "cab_call"
+      },
+      {
+        "frame": 2,
+        "type": "spawn_object",
+        "key": "hew_extra_cab_object",
+        "placeholder": true
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "hew_extra_cab_attack"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "hew_extra_cab_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_amp_slam": [
+      {
+        "frame": 2,
+        "type": "sfx",
+        "key": "amp_slam"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "hew_amp_slam"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "hew_amp_pulse_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_bass_quake": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_bass_quake"
+      },
+      {
+        "frame": 2,
+        "type": "screen_shake",
+        "durationMs": 160,
+        "intensity": 0.004
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "hew_bass_quake_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_crowd_control_bass_roar": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "bass_roar_charge"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "hew_crowd_control_bass_roar"
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "hew_bass_soundwave_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "hew_tank_guard_power_charge": [
+      {
+        "frame": 1,
+        "type": "armor_on",
+        "damageReduction": 0.35
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "hew_tank_guard_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "armor_off"
+      }
+    ],
+    "hew_ultimate_wall_of_sound": [
+      {
+        "frame": 1,
+        "type": "cinematic_lock",
+        "durationMs": 500
+      },
+      {
+        "frame": 2,
+        "type": "sfx",
+        "key": "wall_of_sound"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "hew_ultimate_wall_of_sound"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "hew_wall_of_sound_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 4,
+        "type": "screen_shake",
+        "durationMs": 260,
+        "intensity": 0.008
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ]
+  }
+}
