@@ -1,0 +1,345 @@
+{
+  "name": "jackson_frame_events",
+  "version": 815,
+  "character": "JACKSON",
+  "notes": [
+    "Frame numbers are local to each 6-frame row.",
+    "FX events are placeholders only; FX sheets will be created last.",
+    "Use event.frame to trigger hitboxes, movement, sound, and meter gain."
+  ],
+  "events": {
+    "jackson_jab": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_light"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_jab"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_low_punch": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_light"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_low_punch"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_bass_uppercut": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_medium"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_bass_uppercut"
+      },
+      {
+        "frame": 3,
+        "type": "launch_flag",
+        "value": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_bass_note_projectile": [
+      {
+        "frame": 2,
+        "type": "spawn_projectile",
+        "key": "jackson_note_projectile",
+        "placeholder": true
+      },
+      {
+        "frame": 3,
+        "type": "sfx",
+        "key": "note_throw"
+      }
+    ],
+    "jackson_bass_sound": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_bass_sound"
+      },
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "jackson_bass_sound_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_heavy_guitar_swing": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "swing_heavy"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_heavy_guitar_swing"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_spin_kick": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "spin"
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_spin_kick"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_jumping_kick": [
+      {
+        "frame": 0,
+        "type": "movement",
+        "x": 18,
+        "y": -24
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_jumping_kick"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      },
+      {
+        "frame": 5,
+        "type": "land"
+      }
+    ],
+    "jackson_sweep": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_sweep"
+      },
+      {
+        "frame": 3,
+        "type": "status_on_hit",
+        "status": "knockdown"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_phase_dash": [
+      {
+        "frame": 1,
+        "type": "movement",
+        "x": 60,
+        "y": 0
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_phase_dash"
+      },
+      {
+        "frame": 3,
+        "type": "movement",
+        "x": 70,
+        "y": 0
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_hook_punch": [
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_hook_punch"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_grab_start": [
+      {
+        "frame": 2,
+        "type": "grabbox_on",
+        "attack": "jackson_grab_start"
+      },
+      {
+        "frame": 4,
+        "type": "grabbox_off"
+      }
+    ],
+    "jackson_throw_item": [
+      {
+        "frame": 3,
+        "type": "release_item"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "jackson_throw_item"
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_all_shook_up": [
+      {
+        "frame": 1,
+        "type": "sfx",
+        "key": "riff_charge"
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "jackson_all_shook_up"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "jackson_all_shook_up_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_step_away": [
+      {
+        "frame": 1,
+        "type": "invulnerable_on"
+      },
+      {
+        "frame": 2,
+        "type": "movement",
+        "x": -48,
+        "y": 0
+      },
+      {
+        "frame": 4,
+        "type": "movement",
+        "x": -48,
+        "y": 0
+      },
+      {
+        "frame": 5,
+        "type": "invulnerable_off"
+      }
+    ],
+    "jackson_lone_wolf_dash": [
+      {
+        "frame": 1,
+        "type": "movement",
+        "x": 72,
+        "y": 0
+      },
+      {
+        "frame": 2,
+        "type": "hitbox_on",
+        "attack": "jackson_lone_wolf_dash"
+      },
+      {
+        "frame": 3,
+        "type": "movement",
+        "x": 98,
+        "y": 0
+      },
+      {
+        "frame": 4,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_guitar_riff_blast": [
+      {
+        "frame": 2,
+        "type": "spawn_fx",
+        "key": "jackson_riff_blast_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "jackson_guitar_riff_blast"
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ],
+    "jackson_counter_pose": [
+      {
+        "frame": 1,
+        "type": "counter_on"
+      },
+      {
+        "frame": 4,
+        "type": "counter_strike",
+        "attack": "jackson_counter_pose"
+      },
+      {
+        "frame": 5,
+        "type": "counter_off"
+      }
+    ],
+    "jackson_ultimate_encore": [
+      {
+        "frame": 1,
+        "type": "cinematic_lock",
+        "durationMs": 420
+      },
+      {
+        "frame": 3,
+        "type": "hitbox_on",
+        "attack": "jackson_ultimate_encore"
+      },
+      {
+        "frame": 3,
+        "type": "spawn_fx",
+        "key": "jackson_ultimate_encore_fx",
+        "placeholder": true
+      },
+      {
+        "frame": 5,
+        "type": "hitbox_off"
+      }
+    ]
+  }
+}

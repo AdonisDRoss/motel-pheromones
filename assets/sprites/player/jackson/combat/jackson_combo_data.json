@@ -1,0 +1,216 @@
+{
+  "name": "jackson_combo_data",
+  "version": 815,
+  "character": "JACKSON",
+  "comboResetMs": 900,
+  "inputBufferMs": 180,
+  "rules": {
+    "lightChain": {
+      "sequence": [
+        "jackson_jab",
+        "jackson_low_punch",
+        "jackson_bass_uppercut"
+      ],
+      "windowMs": 420,
+      "finisher": "jackson_bass_uppercut"
+    },
+    "heavyChain": {
+      "sequence": [
+        "jackson_heavy_guitar_swing",
+        "jackson_spin_kick",
+        "jackson_hook_punch"
+      ],
+      "windowMs": 470
+    },
+    "airChain": {
+      "sequence": [
+        "jackson_bass_uppercut",
+        "jackson_jumping_kick"
+      ],
+      "windowMs": 500,
+      "requiresLauncher": true
+    }
+  },
+  "chains": {
+    "jackson_jab": [
+      "jackson_low_punch",
+      "jackson_spin_kick",
+      "jackson_phase_dash"
+    ],
+    "jackson_low_punch": [
+      "jackson_bass_uppercut",
+      "jackson_sweep",
+      "jackson_heavy_guitar_swing"
+    ],
+    "jackson_bass_uppercut": [
+      "jackson_jumping_kick",
+      "jackson_lone_wolf_dash",
+      "jackson_guitar_riff_blast"
+    ],
+    "jackson_bass_note_projectile": [
+      "jackson_phase_dash",
+      "jackson_all_shook_up"
+    ],
+    "jackson_bass_sound": [
+      "jackson_lone_wolf_dash",
+      "jackson_ultimate_encore"
+    ],
+    "jackson_heavy_guitar_swing": [
+      "jackson_spin_kick",
+      "jackson_hook_punch"
+    ],
+    "jackson_spin_kick": [
+      "jackson_sweep",
+      "jackson_phase_dash"
+    ],
+    "jackson_jumping_kick": [
+      "jackson_guitar_riff_blast"
+    ],
+    "jackson_sweep": [
+      "jackson_phase_dash",
+      "jackson_grab_start"
+    ],
+    "jackson_phase_dash": [
+      "jackson_hook_punch",
+      "jackson_counter_pose"
+    ],
+    "jackson_hook_punch": [
+      "jackson_all_shook_up"
+    ],
+    "jackson_grab_start": [
+      "jackson_throw_item",
+      "jackson_sweep"
+    ],
+    "jackson_all_shook_up": [
+      "jackson_guitar_riff_blast",
+      "jackson_ultimate_encore"
+    ],
+    "jackson_step_away": [
+      "jackson_phase_dash",
+      "jackson_counter_pose"
+    ],
+    "jackson_lone_wolf_dash": [
+      "jackson_hook_punch",
+      "jackson_guitar_riff_blast"
+    ],
+    "jackson_guitar_riff_blast": [
+      "jackson_ultimate_encore"
+    ],
+    "jackson_counter_pose": [
+      "jackson_hook_punch",
+      "jackson_lone_wolf_dash"
+    ]
+  },
+  "cancelRules": {
+    "lightToHeavy": {
+      "allowed": true,
+      "windowMs": 300
+    },
+    "lightToSpecial": {
+      "allowed": true,
+      "windowMs": 260,
+      "cost": "special_1"
+    },
+    "heavyToSpecial": {
+      "allowed": true,
+      "windowMs": 220,
+      "cost": "special_1"
+    },
+    "specialToUltimate": {
+      "allowed": true,
+      "windowMs": 360,
+      "cost": "ultimate"
+    },
+    "sweepToGrab": {
+      "allowed": true,
+      "windowMs": 280
+    },
+    "stepAwayCancel": {
+      "allowed": true,
+      "from": [
+        "jackson_step_away"
+      ],
+      "to": [
+        "jackson_phase_dash",
+        "jackson_counter_pose"
+      ]
+    }
+  },
+  "meterGain": {
+    "onLightHit": 4,
+    "onHeavyHit": 7,
+    "onSpecialHit": 10,
+    "onGrab": 6,
+    "onCounter": 12,
+    "onUltimateHit": 0
+  },
+  "recommendedCombos": [
+    {
+      "name": "Basic light launcher",
+      "inputs": [
+        "Y",
+        "Y",
+        "Y"
+      ],
+      "moves": [
+        "jackson_jab",
+        "jackson_low_punch",
+        "jackson_bass_uppercut"
+      ]
+    },
+    {
+      "name": "Spin control",
+      "inputs": [
+        "X",
+        "A",
+        "Down+X"
+      ],
+      "moves": [
+        "jackson_heavy_guitar_swing",
+        "jackson_spin_kick",
+        "jackson_sweep"
+      ]
+    },
+    {
+      "name": "Lone Wolf pressure",
+      "inputs": [
+        "Y",
+        "Y",
+        "SP"
+      ],
+      "moves": [
+        "jackson_jab",
+        "jackson_low_punch",
+        "jackson_lone_wolf_dash"
+      ]
+    },
+    {
+      "name": "Dash punish",
+      "inputs": [
+        "SP",
+        "X"
+      ],
+      "moves": [
+        "jackson_phase_dash",
+        "jackson_hook_punch"
+      ]
+    },
+    {
+      "name": "Encore finisher",
+      "inputs": [
+        "Y",
+        "Y",
+        "Y",
+        "SP",
+        "ULT"
+      ],
+      "moves": [
+        "jackson_jab",
+        "jackson_low_punch",
+        "jackson_bass_uppercut",
+        "jackson_guitar_riff_blast",
+        "jackson_ultimate_encore"
+      ]
+    }
+  ]
+}
