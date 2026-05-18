@@ -1,0 +1,460 @@
+{
+  "meta": {
+    "character": "donny",
+    "version": 1,
+    "localFrameIndexes": true,
+    "notes": [
+      "frame is the local frame number inside the animation row: 0-5.",
+      "Use global sheet frame values from the animation JSON only for slicing."
+    ]
+  },
+  "events": {
+    "donny_jab": [
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_jab"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_low_punch": [
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_low_punch"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_uppercut": [
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_uppercut"
+      },
+      {
+        "frame": 3,
+        "type": "applyLaunch",
+        "x": 90,
+        "y": -220
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_hat_throw": [
+      {
+        "frame": 1,
+        "type": "detachHatVisual"
+      },
+      {
+        "frame": 3,
+        "type": "spawnProjectile",
+        "projectile": "donny_hat_projectile",
+        "x": 46,
+        "y": -104,
+        "vx": 420,
+        "vy": -15,
+        "damage": 8
+      },
+      {
+        "frame": 5,
+        "type": "restoreHatVisual"
+      }
+    ],
+    "donny_guitar_sound": [
+      {
+        "frame": 3,
+        "type": "spawnFx",
+        "fx": "donny_sound_break_fx",
+        "x": 24,
+        "y": -106
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_guitar_sound"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_heavy_guitar_hit": [
+      {
+        "frame": 2,
+        "type": "screenShake",
+        "amount": 2,
+        "durationMs": 80
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_heavy_guitar_hit"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_heavy_guitar_swing": [
+      {
+        "frame": 2,
+        "type": "screenShake",
+        "amount": 2,
+        "durationMs": 90
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_heavy_guitar_swing"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_kick": [
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_kick"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_jumping_kick": [
+      {
+        "frame": 0,
+        "type": "setAirborne",
+        "value": true
+      },
+      {
+        "frame": 1,
+        "type": "applyMovement",
+        "x": 75,
+        "y": -35
+      },
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_jumping_kick"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      },
+      {
+        "frame": 5,
+        "type": "setAirborne",
+        "value": false
+      }
+    ],
+    "donny_sweep": [
+      {
+        "frame": 2,
+        "type": "setLowProfile",
+        "value": true
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_sweep"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      },
+      {
+        "frame": 5,
+        "type": "setLowProfile",
+        "value": false
+      }
+    ],
+    "donny_flying_knee": [
+      {
+        "frame": 1,
+        "type": "spawnFx",
+        "fx": "donny_flying_knee_fire_fx",
+        "x": 28,
+        "y": -88
+      },
+      {
+        "frame": 1,
+        "type": "startDash",
+        "x": 270,
+        "durationMs": 260
+      },
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_flying_knee"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      },
+      {
+        "frame": 5,
+        "type": "stopDash"
+      }
+    ],
+    "donny_hook_punch": [
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_hook_punch"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_slide": [
+      {
+        "frame": 1,
+        "type": "startSlide",
+        "x": 180,
+        "durationMs": 300
+      },
+      {
+        "frame": 2,
+        "type": "setInvulnerable",
+        "value": true
+      },
+      {
+        "frame": 4,
+        "type": "setInvulnerable",
+        "value": false
+      },
+      {
+        "frame": 5,
+        "type": "stopSlide"
+      }
+    ],
+    "donny_grab_start": [
+      {
+        "frame": 2,
+        "type": "enableGrabBox",
+        "x": 30,
+        "y": -104,
+        "w": 58,
+        "h": 86
+      },
+      {
+        "frame": 4,
+        "type": "confirmGrabOrRecover"
+      },
+      {
+        "frame": 5,
+        "type": "disableGrabBox"
+      }
+    ],
+    "donny_stage_toss": [
+      {
+        "frame": 0,
+        "type": "lockCarriedEnemyToPlayer",
+        "x": 44,
+        "y": -74
+      },
+      {
+        "frame": 2,
+        "type": "prepareThrow"
+      },
+      {
+        "frame": 3,
+        "type": "releaseEnemy",
+        "vx": 420,
+        "vy": -80,
+        "damage": 16,
+        "canHitOtherEnemies": true
+      },
+      {
+        "frame": 3,
+        "type": "addGroove",
+        "amount": 12
+      },
+      {
+        "frame": 4,
+        "type": "clearGrabState"
+      }
+    ],
+    "donny_sound_break": [
+      {
+        "frame": 2,
+        "type": "spawnFx",
+        "fx": "donny_sound_break_fx",
+        "x": 0,
+        "y": -96
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_sound_break"
+      },
+      {
+        "frame": 3,
+        "type": "screenShake",
+        "amount": 3,
+        "durationMs": 160
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_silence_field": [
+      {
+        "frame": 3,
+        "type": "spawnFx",
+        "fx": "donny_silence_field_fx",
+        "x": 0,
+        "y": -86
+      },
+      {
+        "frame": 3,
+        "type": "applyAreaDebuff",
+        "debuff": "silenced",
+        "radius": 145,
+        "durationMs": 4200
+      }
+    ],
+    "donny_stage_dive": [
+      {
+        "frame": 1,
+        "type": "startDash",
+        "x": 280,
+        "y": -70,
+        "durationMs": 300
+      },
+      {
+        "frame": 2,
+        "type": "enableHitbox",
+        "hitboxId": "donny_stage_dive"
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      },
+      {
+        "frame": 5,
+        "type": "stopDash"
+      }
+    ],
+    "donny_feedback_scream": [
+      {
+        "frame": 2,
+        "type": "spawnFx",
+        "fx": "donny_feedback_scream_fx",
+        "x": 34,
+        "y": -104
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_feedback_scream"
+      },
+      {
+        "frame": 3,
+        "type": "applyStatus",
+        "status": "stunned",
+        "durationMs": 450
+      },
+      {
+        "frame": 4,
+        "type": "disableHitbox"
+      }
+    ],
+    "donny_ghost_mode_activate": [
+      {
+        "frame": 3,
+        "type": "spawnFx",
+        "fx": "donny_ghost_mode_fx",
+        "x": 0,
+        "y": -96
+      },
+      {
+        "frame": 3,
+        "type": "activateBuff",
+        "buff": "ghost_mode",
+        "durationMs": 9000
+      },
+      {
+        "frame": 3,
+        "type": "screenShake",
+        "amount": 3,
+        "durationMs": 180
+      }
+    ],
+    "donny_ghost_mode_finale": [
+      {
+        "frame": 2,
+        "type": "spawnFx",
+        "fx": "donny_ghost_mode_finale_fx",
+        "x": 0,
+        "y": -108
+      },
+      {
+        "frame": 3,
+        "type": "enableHitbox",
+        "hitboxId": "donny_ghost_mode_finale"
+      },
+      {
+        "frame": 3,
+        "type": "screenShake",
+        "amount": 5,
+        "durationMs": 280
+      },
+      {
+        "frame": 4,
+        "type": "enableHitbox",
+        "hitboxId": "donny_ghost_mode_finale"
+      },
+      {
+        "frame": 5,
+        "type": "disableHitbox"
+      },
+      {
+        "frame": 5,
+        "type": "drainGroove",
+        "mode": "remaining"
+      }
+    ],
+    "donny_ko": [
+      {
+        "frame": 5,
+        "type": "holdFrame"
+      },
+      {
+        "frame": 5,
+        "type": "setState",
+        "state": "downed"
+      }
+    ],
+    "donny_getup": [
+      {
+        "frame": 0,
+        "type": "setInvulnerable",
+        "value": true
+      },
+      {
+        "frame": 4,
+        "type": "setInvulnerable",
+        "value": false
+      },
+      {
+        "frame": 5,
+        "type": "setState",
+        "state": "ready"
+      }
+    ]
+  }
+}

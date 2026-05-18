@@ -1,0 +1,246 @@
+{
+  "meta": {
+    "character": "donny",
+    "version": 1,
+    "inputWindowMs": 520,
+    "bufferMs": 140,
+    "notes": [
+      "Y = light, X = heavy, A = kick, B = grab/jump depending current mapping; SP = special.",
+      "Routes are suggested game logic. You can tune damage/hitstun later."
+    ]
+  },
+  "inputs": {
+    "light": "Y",
+    "heavy": "X",
+    "kick": "A",
+    "grab": "B",
+    "special": "SP",
+    "jump": "B",
+    "down": "DOWN",
+    "up": "UP"
+  },
+  "basicChains": [
+    {
+      "id": "donny_light_1_2_3",
+      "name": "Frontman Three Count",
+      "sequence": [
+        "light",
+        "light",
+        "light"
+      ],
+      "moves": [
+        "donny_jab",
+        "donny_low_punch",
+        "donny_uppercut"
+      ],
+      "rules": {
+        "mustHitOrBlock": true,
+        "maxGapMs": 520
+      },
+      "reward": {
+        "grooveGainOnComplete": 6
+      }
+    },
+    {
+      "id": "donny_light_hat_route",
+      "name": "Hat Check Route",
+      "sequence": [
+        "light",
+        "light",
+        "special"
+      ],
+      "moves": [
+        "donny_jab",
+        "donny_low_punch",
+        "donny_hat_throw"
+      ],
+      "rules": {
+        "mustHitOrBlock": true,
+        "maxGapMs": 560
+      },
+      "reward": {
+        "grooveGainOnComplete": 7
+      }
+    },
+    {
+      "id": "donny_heavy_route",
+      "name": "Backline Breaker",
+      "sequence": [
+        "heavy",
+        "heavy"
+      ],
+      "moves": [
+        "donny_heavy_guitar_swing",
+        "donny_hook_punch"
+      ],
+      "rules": {
+        "mustHitOrBlock": true,
+        "maxGapMs": 620
+      },
+      "reward": {
+        "grooveGainOnComplete": 8
+      }
+    },
+    {
+      "id": "donny_kick_route",
+      "name": "Bootleg Follow-Up",
+      "sequence": [
+        "kick",
+        "kick"
+      ],
+      "moves": [
+        "donny_kick",
+        "donny_jumping_kick"
+      ],
+      "rules": {
+        "mustHit": true,
+        "maxGapMs": 520
+      },
+      "reward": {
+        "grooveGainOnComplete": 6
+      }
+    },
+    {
+      "id": "donny_sweep_route",
+      "name": "Low Noise Trip",
+      "sequence": [
+        "down+kick"
+      ],
+      "moves": [
+        "donny_sweep"
+      ],
+      "rules": {
+        "targetMustBeGrounded": true
+      },
+      "reward": {
+        "knockdown": true,
+        "grooveGainOnComplete": 4
+      }
+    }
+  ],
+  "comboExtenders": [
+    {
+      "id": "donny_pop_launcher",
+      "name": "Low Pop Launcher",
+      "starter": "donny_low_punch",
+      "extender": "donny_uppercut",
+      "followups": [
+        "donny_jumping_kick",
+        "donny_stage_dive",
+        "donny_flying_knee"
+      ],
+      "rules": {
+        "targetState": "standing_or_staggered",
+        "maxGapMs": 480
+      }
+    },
+    {
+      "id": "donny_guitar_body_check_route",
+      "name": "Guitar Body Check",
+      "starter": "donny_heavy_guitar_swing",
+      "extender": "donny_heavy_guitar_strike",
+      "followups": [
+        "donny_hook_punch",
+        "donny_stage_toss"
+      ],
+      "rules": {
+        "mustHit": true,
+        "maxGapMs": 560
+      }
+    },
+    {
+      "id": "donny_flying_knee_route",
+      "name": "Flaming Knee Setup",
+      "starter": "donny_uppercut",
+      "extender": "donny_flying_knee",
+      "followups": [
+        "donny_stage_dive",
+        "donny_sound_break"
+      ],
+      "rules": {
+        "targetState": "launched_or_staggered",
+        "maxGapMs": 600
+      }
+    },
+    {
+      "id": "donny_sound_break_route",
+      "name": "Sound Break Chase",
+      "starter": "donny_sound_break",
+      "followups": [
+        "donny_stage_dive",
+        "donny_hat_throw"
+      ],
+      "rules": {
+        "targetState": "stunned_or_knocked_back",
+        "maxGapMs": 680
+      }
+    }
+  ],
+  "grabRoutes": [
+    {
+      "id": "donny_stage_toss_route",
+      "name": "Stage Toss",
+      "starter": "donny_grab_start",
+      "throw": "donny_stage_toss",
+      "sequence": [
+        "grab",
+        "grab"
+      ],
+      "rules": {
+        "range": 58,
+        "targetCanBeGrabbed": true
+      },
+      "effects": {
+        "damage": 16,
+        "knockbackX": 420,
+        "knockbackY": -80,
+        "grooveGain": 12,
+        "canHitOtherEnemies": true
+      }
+    }
+  ],
+  "specialRoutes": [
+    {
+      "id": "donny_silence_to_finale",
+      "name": "Quiet Before the Scream",
+      "sequence": [
+        "SP2",
+        "SP+heavy"
+      ],
+      "moves": [
+        "donny_silence_field",
+        "donny_ghost_mode_finale"
+      ],
+      "rules": {
+        "requiresFullGrooveForFinale": true,
+        "maxGapMs": 5000
+      }
+    },
+    {
+      "id": "donny_feedback_push",
+      "name": "Feedback Push",
+      "sequence": [
+        "SP",
+        "heavy"
+      ],
+      "moves": [
+        "donny_feedback_scream",
+        "donny_heavy_guitar_swing"
+      ],
+      "rules": {
+        "mustHitOrBlock": true,
+        "maxGapMs": 720
+      }
+    }
+  ],
+  "cancelRules": {
+    "lightIntoLight": true,
+    "lightIntoHeavy": true,
+    "heavyIntoLight": false,
+    "heavyIntoSpecial": true,
+    "specialIntoUltimate": true,
+    "onWhiffCancel": false,
+    "onBlockCancel": true,
+    "onHitCancel": true
+  }
+}
