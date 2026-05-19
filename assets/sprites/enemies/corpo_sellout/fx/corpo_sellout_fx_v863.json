@@ -1,0 +1,106 @@
+{
+  "name": "corpo_sellout_fx",
+  "version": 863,
+  "enemy": "Corpo Sellout",
+  "enemyType": "grunt",
+  "textureKey": "corpo_sellout_fx",
+  "image": "corpo_sellout_fx_v863_transparent_phaser_ready.png",
+  "path": "assets/sprites/enemies/corpo_sellout/fx/corpo_sellout_fx_v863_transparent_phaser_ready.png",
+  "frameWidth": 282,
+  "frameHeight": 256,
+  "columns": 5,
+  "rows": 3,
+  "frameCount": 15,
+  "margin": 0,
+  "spacing": 0,
+  "transparentBackground": true,
+  "animations": {
+    "corpo_sellout_spark_small": {
+      "row": 0,
+      "frames": [
+        0,
+        1,
+        2
+      ],
+      "frameRate": 14,
+      "repeat": 0
+    },
+    "corpo_sellout_particle_burst_small": {
+      "row": 0,
+      "frames": [
+        2,
+        3,
+        4
+      ],
+      "frameRate": 12,
+      "repeat": 0
+    },
+    "corpo_sellout_slash_fx": {
+      "row": 1,
+      "frames": [
+        5,
+        6,
+        7
+      ],
+      "frameRate": 14,
+      "repeat": 0
+    },
+    "corpo_sellout_particle_burst_medium": {
+      "row": 1,
+      "frames": [
+        7,
+        8,
+        9
+      ],
+      "frameRate": 12,
+      "repeat": 0
+    },
+    "corpo_sellout_hit_burst": {
+      "row": 2,
+      "frames": [
+        10,
+        11,
+        12
+      ],
+      "frameRate": 14,
+      "repeat": 0
+    },
+    "corpo_sellout_explosion_burst": {
+      "row": 2,
+      "frames": [
+        11,
+        12,
+        13
+      ],
+      "frameRate": 12,
+      "repeat": 0
+    },
+    "corpo_sellout_sparks_fade": {
+      "row": 2,
+      "frames": [
+        13,
+        14
+      ],
+      "frameRate": 10,
+      "repeat": 0
+    }
+  },
+  "aliases": {
+    "spark_small": "corpo_sellout_spark_small",
+    "slash_fx": "corpo_sellout_slash_fx",
+    "hit_burst": "corpo_sellout_hit_burst",
+    "explosion_burst": "corpo_sellout_explosion_burst",
+    "sparks_fade": "corpo_sellout_sparks_fade"
+  },
+  "notes": "Uploaded image is an FX-only sheet with 5 columns x 3 rows, not the 6x6 character specials sheet. Packaged as a transparent FX sheet.",
+  "phaserLoad": {
+    "key": "corpo_sellout_fx",
+    "url": "assets/sprites/enemies/corpo_sellout/fx/corpo_sellout_fx_v863_transparent_phaser_ready.png",
+    "frameConfig": {
+      "frameWidth": 282,
+      "frameHeight": 256,
+      "margin": 0,
+      "spacing": 0
+    }
+  }
+}
