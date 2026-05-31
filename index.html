@@ -524,9 +524,9 @@ preload(){
   this.load.spritesheet("blacklight_runner_idle", NPC_ASSETS.blacklight_runner.idle, {frameWidth:128,frameHeight:128});
   this.load.spritesheet("kira_volt_idle", NPC_ASSETS.kira_volt.idle, {frameWidth:128,frameHeight:128});
   this.load.spritesheet("vendor_stall", PROPS.vendorStall, {frameWidth:256,frameHeight:256});
-  this.load.audio("blacklight_theme", AUDIO.blacklightTheme + "?v=59");
-  this.load.audio("blacklight_alt", AUDIO.blacklightAlt + "?v=59");
-  this.load.audio("club_interior_theme", AUDIO.clubInterior + "?v=59");
+  this.load.audio("blacklight_theme", AUDIO.blacklightTheme + "?v=61");
+  this.load.audio("blacklight_alt", AUDIO.blacklightAlt + "?v=61");
+  this.load.audio("club_interior_theme", AUDIO.clubInterior + "?v=61");
  }
  create(){
   window.__cfScene=this;
@@ -571,6 +571,35 @@ preload(){
     showToast("ANIM SAFE MODE\nPlayer still loaded");
   }
   this.safePlay(this.player,"donny_idle_down");
+  this.npcs=[];
+  if(AREA==="a1") {
+    // v20: place reusable Neon Vendor Stall prop beside the vendor.
+    this.vendorStall=this.add.sprite(this.mapW*.635,this.mapH*.405,"vendor_stall",0).setDepth(DEPTH.CHARACTER_BASE + this.mapH*.405 + 58).setScale(0.62);
+    this.vendorStall.depthBaseOffset = 42;
+    this.safePlay(this.vendorStall,"vendor_stall_idle");
+
+    this.addNpc("KIRA VOLT", .735,.410, "The club hears everything.", "Find the hidden signal relay.", "talk", "kira_volt");
+    this.addNpc("NEON VENDOR", .595,.445, "Water, batteries, noodles, glow junk. Buying or selling?", "Buy or sell supplies.", "vendor", "neon_vendor");
+    this.addNpc("BLACKLIGHT RUNNER", .84,.56, "Concord patrol rolled through an hour ago.", "Get the passphrase from the runner.", "talk", "blacklight_runner");
+    this.addNpc("CLUB BOUNCER", .745,.445, "Passphrase first. Door second.", "Bring the passphrase to the club door.", "talk", "blacklight_bouncer");
+    this.exitZone=new Phaser.Geom.Rectangle(this.mapW*.03,this.mapH*.65,this.mapW*.16,this.mapH*.25);
+    this.clubDoorZone=new Phaser.Geom.Rectangle(this.mapW*.795,this.mapH*.245,this.mapW*.095,this.mapH*.15);
+    this.clubDoorMarker=this.add.image(this.mapW*.835,this.mapH*.315,"door_marker").setDepth(DEPTH.CHARACTER_BASE + 80).setScale(.42);
+    this.clubDoorMarker.setVisible(hasFlag("club_access") || hasFlag("talked_bouncer"));
+  } else if(AREA==="club") {
+    this.addNpc("KIRA VOLT", .18,.28, "Signal board is live. The club is hiding more than music.", "Recover the Signal Relay Fragment.", "talk", "kira_volt");
+    this.addNpc("BLACKLIGHT DJ", .19,.35, "Keep the beat low. Concord scanners hate bass drift.", "Talk to Kira at the booth.", "talk", "blacklight_kid");
+    this.addNpc("CLUB RUNNER", .64,.23, "Back room terminal is still warm.", "Check the signal room.", "talk", "blacklight_runner");
+    this.exitZone=new Phaser.Geom.Rectangle(this.mapW*.41,this.mapH*.82,this.mapW*.20,this.mapH*.16);
+  } else {
+    this.addNpc('KADE "STATIC"', .40,.34, "You looking for the club?", "Blacklight opens for signal.", "talk", "blacklight_kid");
+    this.exitZone=new Phaser.Geom.Rectangle(this.mapW*.55,this.mapH*.30,this.mapW*.18,this.mapH*.18);
+  }
+  this.lockCameraToPlayer();
+  this.cameras.main.centerOn(this.player.x,this.player.y);
+  this.time.delayedCall(50, ()=>{ this.lockCameraToPlayer(); this.cameras.main.centerOn(this.player.x,this.player.y); });
+  this.time.delayedCall(250, ()=>{ this.lockCameraToPlayer(); this.cameras.main.centerOn(this.player.x,this.player.y); });
+  this.time.delayedCall(700, ()=>{ this.lockCameraToPlayer(); this.cameras.main.centerOn(this.player.x,this.player.y); });
   this.keys=this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,E,X,SPACE,ESC,P,M,C");
   this.input.keyboard.on("keydown-E",()=>this.handleUse()); this.input.keyboard.on("keydown-X",()=>this.handleUse());
   showToast(AREA==="a1" ? "BLACKLIGHT DISTRICT A1\nCamera locked to Donny" : (AREA==="club" ? "BLACKLIGHT CLUB" : "WESTGATE CONNECTOR"));
@@ -639,13 +668,13 @@ preload(){
     for(const n of this.npcs){
       const nx=n.x, ny=n.y+18;
       const dx=Math.abs(px-nx), dy=Math.abs(py-ny);
-      if(dx<12 && dy<14) return true;
+      if(dx<10 && dy<12) return true;
     }
   }
 
   if(this.vendorStall){
     const sx=this.vendorStall.x, sy=this.vendorStall.y+34;
-    if(Math.abs(px-sx)<38 && Math.abs(py-sy)<18) return true;
+    if(Math.abs(px-sx)<34 && Math.abs(py-sy)<16) return true;
   }
 
   return false;
@@ -698,17 +727,17 @@ tryMove(dx,dy){
   else hideHint();
   if(input.usePressed){input.usePressed=false;this.handleUse();}
   this.lockCameraToPlayer();
-  // v48: grounded foot-depth sorting. Uses sprite feet, not body center,
-  // so Donny does not appear to float over walls/furniture as often.
-  // v61: Donny locked in front of street NPCs/props.
-  // This is intentional for this playable test so NPCs/vendor do not float above him.
+  // v61: lock Donny above street NPCs and props for this working build.
   this.npcs.forEach(n=>n.setDepth(DEPTH.CHARACTER_BASE + 100));
   if(this.vendorStall) this.vendorStall.setDepth(DEPTH.CHARACTER_BASE + 90);
   if(this.clubDoorMarker) this.clubDoorMarker.setDepth(DEPTH.CHARACTER_BASE + 80);
-  if(this.donnyDebugDot){ this.donnyDebugDot.setPosition(this.player.x,this.player.y+32); this.donnyDebugDot.setDepth(DEPTH.CHARACTER_BASE + 1999); this.donnyDebugDot.setAlpha(0); }
   this.player.setDepth(DEPTH.CHARACTER_BASE + 2000);
+  if(this.donnyDebugDot){
+    this.donnyDebugDot.setPosition(this.player.x,this.player.y+32);
+    this.donnyDebugDot.setDepth(DEPTH.CHARACTER_BASE+1999);
+    this.donnyDebugDot.setAlpha(0);
+  }
   this.children.bringToTop(this.player);
-  if(this.donnyDebugDot) this.children.bringToTop(this.donnyDebugDot);
   coordLine.innerHTML=`<span class="tag">XY:</span> ${Math.round(this.player.x)}, ${Math.round(this.player.y)} <span class="tag">JOY:</span> ${input.x.toFixed(1)},${input.y.toFixed(1)} <span class="tag">USE:</span> ${input.usePressed?1:0} <span class="tag">DYN:</span> ${this.dynamicBlocked(this.player.x,this.player.y)?1:0} <span class="tag">CAM:</span> ${Math.round(this.cameras.main.scrollX)},${Math.round(this.cameras.main.scrollY)} <span class="tag">COL:</span> ${COLLISION_MODE} ${this.maskReady?"READY":"NO MASK"}`;
  }
  handleUse(){
@@ -856,9 +885,10 @@ function setupControls(){
         const dir=Math.abs(vx)>Math.abs(vy)?(vx>0?"right":"left"):(vy>0?"down":"up");
         lastDir=dir;
         sc.player.dir=dir;
-        sc.player.setFlipX(false);
-        const key=`donny_${input.r?"run":"walk"}_${dir}`;
+        const animDir = dir==="right" ? "left" : dir;
+        const key=`donny_${input.r?"run":"walk"}_${animDir}`;
         if(sc.anims && sc.anims.exists(key)) sc.player.play(key,true);
+        sc.player.setFlipX(dir==="right");
       }
     }
     requestAnimationFrame(directMoveTick);
